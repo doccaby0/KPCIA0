@@ -3,7 +3,7 @@ import { UserProfile, LectureRequest, EducationalProgram, InstructorTier } from 
 import { Calendar, Clock, MapPin, Award, CheckCircle2, AlertCircle, PlusCircle, Users, Check, Banknote, Sparkles, X } from 'lucide-react';
 
 interface LectureBoardProps {
-  currentUser: UserProfile;
+  currentUser: UserProfile | null;
   lectures: LectureRequest[];
   programs: EducationalProgram[];
   onApplyLecture: (lectureId: string) => void;
@@ -97,7 +97,7 @@ export default function LectureBoard({
         </div>
 
         {/* Admin Post Button */}
-        {currentUser.isAdmin && (
+        {currentUser?.isAdmin && (
           <button
             onClick={() => setShowAddForm(!showAddForm)}
             className="px-4 py-2 bg-kpcia-gold hover:bg-kpcia-gold-hover text-kpcia-dark text-xs font-bold rounded-lg transition-all flex items-center gap-2 shadow-lg shadow-kpcia-gold/15"
@@ -296,9 +296,9 @@ export default function LectureBoard({
       {/* Lectures Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6" id="lectures-grid">
         {lectures.map((lecture) => {
-          const isQualified = checkQualification(currentUser.tier, lecture.targetTier);
-          const hasApplied = lecture.applicants.includes(currentUser.uid);
-          const isAssignedToMe = lecture.assignedTo === currentUser.uid;
+          const isQualified = currentUser ? checkQualification(currentUser.tier, lecture.targetTier) : false;
+          const hasApplied = currentUser ? lecture.applicants.includes(currentUser.uid) : false;
+          const isAssignedToMe = currentUser ? lecture.assignedTo === currentUser.uid : false;
 
           // Badges rendering or labels
           const tierColors = {
@@ -417,7 +417,7 @@ export default function LectureBoard({
               <div className="mt-5 pt-3.5 border-t border-neutral-800/80 flex items-center justify-between">
                 <div>
                   <div className="text-[10px] text-neutral-500 uppercase font-mono">출강 강사료</div>
-                  {isQualified || currentUser.isAdmin ? (
+                  {isQualified || currentUser?.isAdmin ? (
                     <div className="text-sm font-bold text-neutral-200 flex items-center gap-1 font-mono">
                       <Banknote className="w-4 h-4 text-neutral-400" />
                       {lecture.budget.toLocaleString()} KRW
@@ -432,7 +432,7 @@ export default function LectureBoard({
                 {/* Apply Actions */}
                 <div id={`apply-actions-${lecture.id}`}>
                   {lecture.status === 'open' ? (
-                    currentUser.isAdmin ? (
+                    currentUser?.isAdmin ? (
                       <div className="text-xs text-neutral-500 font-mono flex items-center gap-1">
                         <Users className="w-3.5 h-3.5" />
                         <span>신청 강사 {lecture.applicants.length}명 대기중</span>

@@ -47,6 +47,10 @@ export default function App() {
   const [loginPassword, setLoginPassword] = useState<string>('');
   const [loginError, setLoginError] = useState<string>('');
 
+  // Auth Modal States
+  const [showAuthModal, setShowAuthModal] = useState<boolean>(false);
+  const [authModalTab, setAuthModalTab] = useState<'login' | 'register'>('login');
+
   // Notification Toast alert
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'info' } | null>(null);
 
@@ -631,7 +635,62 @@ export default function App() {
   // 11. Logout current user
   const handleLogout = () => {
     setCurrentUser(null);
+    setActiveTab('home');
+    localStorage.removeItem('kpcia_logged_in_uid');
     triggerToast('성공적으로 로그아웃되었습니다. 다른 강사 계정으로 로그인하거나 신규 가입을 진행해 주세요.', 'info');
+  };
+
+  // 12. Main website login submit handler
+  const handleLoginSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoginError('');
+
+    const trimmedId = loginId.trim();
+    const trimmedPw = loginPassword.trim();
+
+    if (!trimmedId || !trimmedPw) {
+      setLoginError('아이디와 비밀번호를 모두 입력해 주세요.');
+      return;
+    }
+
+    // 1. Check main operator / office admin credentials
+    if (trimmedId === 'insight9lab' && trimmedPw === '400828') {
+      const adminUser = users.find(u => u.isAdmin);
+      if (adminUser) {
+        setCurrentUser(adminUser);
+        localStorage.setItem('kpcia_logged_in_uid', adminUser.uid);
+        triggerToast('KPCIA 운영사무국 메인 관리자 계정으로 로그인되었습니다.', 'success');
+        setLoginId('');
+        setLoginPassword('');
+        setShowAuthModal(false);
+        return;
+      }
+    }
+
+    // 2. Check general instructor login (by custom loginId, or fallback to email / name for demo accounts)
+    const matchedUser = users.find(u => 
+      (u.loginId && u.loginId.toLowerCase() === trimmedId.toLowerCase()) ||
+      (!u.loginId && (u.email.toLowerCase() === trimmedId.toLowerCase() || u.name === trimmedId || u.uid === trimmedId))
+    );
+
+    if (matchedUser) {
+      // If the user has a registered password, check it
+      if (matchedUser.password && matchedUser.password !== trimmedPw) {
+        setLoginError('비밀번호가 일치하지 않습니다.');
+        return;
+      }
+
+      // Log in the matched instructor
+      setCurrentUser(matchedUser);
+      localStorage.setItem('kpcia_logged_in_uid', matchedUser.uid);
+      triggerToast(`${matchedUser.name} 강사님 계정으로 로그인되었습니다.`, 'success');
+      setLoginId('');
+      setLoginPassword('');
+      setShowAuthModal(false);
+      return;
+    }
+
+    setLoginError('아이디 또는 비밀번호가 일치하지 않습니다.');
   };
 
   // Global Register Modal Renderer with Interactive Email Verification Wizard
@@ -963,180 +1022,7 @@ export default function App() {
     );
   }
 
-  if (!currentUser && !isMobileSimulated) {
-    const handleLoginSubmit = (e: React.FormEvent) => {
-      e.preventDefault();
-      setLoginError('');
-
-      const trimmedId = loginId.trim();
-      const trimmedPw = loginPassword.trim();
-
-      if (!trimmedId || !trimmedPw) {
-        setLoginError('아이디와 비밀번호를 모두 입력해 주세요.');
-        return;
-      }
-
-      // 1. Check main operator / office admin credentials
-      if (trimmedId === 'insight9lab' && trimmedPw === '400828') {
-        const adminUser = users.find(u => u.isAdmin);
-        if (adminUser) {
-          setCurrentUser(adminUser);
-          localStorage.setItem('kpcia_logged_in_uid', adminUser.uid);
-          triggerToast('KPCIA 운영사무국 메인 관리자 계정으로 로그인되었습니다.', 'success');
-          setLoginId('');
-          setLoginPassword('');
-          return;
-        }
-      }
-
-      // 2. Check general instructor login (by custom loginId, or fallback to email / name for demo accounts)
-      const matchedUser = users.find(u => 
-        (u.loginId && u.loginId.toLowerCase() === trimmedId.toLowerCase()) ||
-        (!u.loginId && (u.email.toLowerCase() === trimmedId.toLowerCase() || u.name === trimmedId || u.uid === trimmedId))
-      );
-
-      if (matchedUser) {
-        // If the user has a registered password, check it
-        if (matchedUser.password && matchedUser.password !== trimmedPw) {
-          setLoginError('비밀번호가 일치하지 않습니다.');
-          return;
-        }
-
-        // Log in the matched instructor
-        setCurrentUser(matchedUser);
-        localStorage.setItem('kpcia_logged_in_uid', matchedUser.uid);
-        triggerToast(`${matchedUser.name} 강사님 계정으로 로그인되었습니다.`, 'success');
-        setLoginId('');
-        setLoginPassword('');
-        return;
-      }
-
-      setLoginError('아이디 또는 비밀번호가 일치하지 않습니다.');
-    };
-
-    return (
-      <div className="min-h-screen bg-neutral-950 flex flex-col items-center justify-start md:justify-center p-4 py-8 sm:py-12 text-neutral-100 relative overflow-y-auto font-sans selection:bg-kpcia-gold selection:text-kpcia-dark" id="gateway-root">
-        {/* Decorative gold spotlight effect */}
-        <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[600px] h-[300px] bg-gradient-to-b from-kpcia-gold/15 to-transparent blur-3xl pointer-events-none" />
-        
-        {/* Toast Notification */}
-        {toast && (
-          <div className="fixed bottom-6 right-6 z-50 px-5 py-4 rounded-xl border border-kpcia-gold/40 bg-neutral-900 shadow-2xl flex items-center space-x-3 max-w-md animate-in slide-in-from-bottom-5 duration-300" id="gateway-toast">
-            <div className="w-6 h-6 rounded-full bg-kpcia-gold/15 flex items-center justify-center text-kpcia-gold shrink-0">★</div>
-            <p className="text-xs font-semibold leading-relaxed">{toast.message}</p>
-          </div>
-        )}
-
-        {/* Portal Card */}
-        <div className="w-full max-w-lg bg-neutral-900/80 border border-neutral-800 rounded-2xl p-6 sm:p-8 backdrop-blur-xl shadow-2xl space-y-6 relative z-10 my-auto animate-in fade-in duration-300" id="gateway-card">
-          
-          {/* Header info */}
-          <div className="text-center space-y-3">
-            <div className="flex justify-center">
-              <div className="p-3 bg-neutral-950 border-2 border-kpcia-gold/50 rounded-2xl shadow-xl shadow-kpcia-gold/10">
-                <span className="font-display font-black text-2xl text-kpcia-gold tracking-widest">KPCIA</span>
-              </div>
-            </div>
-            <div className="space-y-1">
-              <span className="text-[9px] font-mono tracking-widest font-extrabold text-kpcia-gold uppercase bg-kpcia-gold/15 border border-kpcia-gold/30 px-2 py-0.5 rounded inline-block">
-                강사용 프레스티지 포털
-              </span>
-              <h1 className="text-xl sm:text-2xl font-black tracking-tight text-neutral-100 font-display">
-                프레스티지 강사 전용 시스템 v1
-              </h1>
-            </div>
-          </div>
-
-          {/* ================= LOGIN FORM ================= */}
-          <div className="space-y-6 animate-in fade-in duration-200">
-            <form onSubmit={handleLoginSubmit} className="space-y-4">
-              {loginError && (
-                <div className="p-3 bg-red-950/50 border border-red-800/60 rounded-xl text-red-200 text-xs font-sans leading-relaxed text-left" id="login-error-box">
-                  ⚠ {loginError}
-                </div>
-              )}
-
-              <div className="space-y-3">
-                <div>
-                  <label className="block text-[10px] font-bold text-neutral-400 uppercase tracking-widest mb-1 text-left">
-                    아이디 또는 이메일
-                  </label>
-                  <input
-                    type="text"
-                    value={loginId}
-                    onChange={(e) => setLoginId(e.target.value)}
-                    placeholder="ID (예: kindom) 또는 이메일 주소"
-                    className="w-full px-4 py-2.5 bg-neutral-950 border border-neutral-800 hover:border-kpcia-gold/40 focus:border-kpcia-gold focus:ring-1 focus:ring-kpcia-gold text-neutral-100 rounded-xl text-xs font-sans outline-none transition-all placeholder:text-neutral-600 font-medium animate-in fade-in"
-                    id="login-id-input"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-[10px] font-bold text-neutral-400 uppercase tracking-widest mb-1 text-left">
-                    비밀번호 (PASSWORD)
-                  </label>
-                  <input
-                    type="password"
-                    value={loginPassword}
-                    onChange={(e) => setLoginPassword(e.target.value)}
-                    placeholder="비밀번호를 입력하세요"
-                    className="w-full px-4 py-2.5 bg-neutral-950 border border-neutral-800 hover:border-kpcia-gold/40 focus:border-kpcia-gold focus:ring-1 focus:ring-kpcia-gold text-neutral-100 rounded-xl text-xs font-sans outline-none transition-all placeholder:text-neutral-600 font-medium animate-in fade-in"
-                    id="login-pw-input"
-                  />
-                </div>
-              </div>
-
-              <button
-                type="submit"
-                className="w-full py-3 bg-kpcia-gold hover:bg-kpcia-gold-hover text-kpcia-dark hover:scale-[1.015] active:scale-[0.99] font-black text-xs rounded-xl transition-all duration-300 shadow-xl shadow-kpcia-gold/15 flex items-center justify-center gap-1.5 cursor-pointer mt-5 uppercase"
-                id="login-submit-btn"
-              >
-                <LogIn className="w-4 h-4 text-kpcia-dark" />
-                <span>KPCIA 전용 포털 안전 로그인</span>
-              </button>
-            </form>
-          </div>
-
-          {/* Guest CTA (Visible at bottom for both) */}
-          <div className="border-t border-neutral-800/80 pt-4 flex justify-center text-xs">
-            <button
-              type="button"
-              onClick={() => {
-                const guestUser: UserProfile = {
-                  uid: 'guest',
-                  email: 'guest@kpcia.org',
-                  name: '비회원 게스트',
-                  tier: 'Prestige Member',
-                  mileage: 0,
-                  profileCard: {
-                    title: '비회원 게스트',
-                    bio: '비회원 상태로 제휴 제안 및 협회 소개를 확인하는 중입니다.',
-                    specialties: [],
-                    career: [],
-                    education: [],
-                    contactEmail: 'guest@kpcia.org',
-                    contactPhone: '',
-                    cardTheme: 'classic'
-                  },
-                  badges: [],
-                  createdAt: new Date().toISOString(),
-                  updatedAt: new Date().toISOString(),
-                  isAdmin: false
-                };
-                setCurrentUser(guestUser);
-                setActiveTab('proposal');
-                triggerToast('비회원 게스트 상태로 접속했습니다. 제휴 제안이 가능합니다.', 'info');
-              }}
-              className="w-full px-4 py-2 bg-neutral-900 border border-neutral-800 hover:border-kpcia-gold/40 hover:text-kpcia-gold text-[10px] font-extrabold rounded-lg transition-all duration-300 hover:scale-[1.01] cursor-pointer"
-              id="gateway-guest-btn"
-            >
-              ★ 비회원 게스트 제휴 제안 바로가기
-            </button>
-          </div>
-        </div>
-      </div>
-    );
-  }
+  // Login wall removed - users can now view the home corporate website first and login/signup via popup modal as requested.
 
   return (
     <div className="min-h-screen flex flex-col bg-neutral-950 text-neutral-100 selection:bg-kpcia-gold selection:text-kpcia-dark" id="app-root">
@@ -1158,6 +1044,358 @@ export default function App() {
         </div>
       )}
 
+      {/* 🔐 Unified Authentication Modal (Popup) */}
+      {showAuthModal && (
+        <div className="fixed inset-0 z-[1000] bg-black/80 backdrop-blur-md flex items-center justify-center p-4 overflow-y-auto font-sans animate-in fade-in duration-200" id="auth-modal-overlay">
+          <div className="bg-neutral-900 border-2 border-kpcia-gold/30 rounded-2xl w-full max-w-md overflow-hidden shadow-2xl relative my-auto" id="auth-modal-card">
+            
+            {/* Modal Header */}
+            <div className="p-4 border-b border-neutral-800 bg-neutral-950/50 flex justify-between items-center" id="auth-modal-header">
+              <div className="flex items-center gap-2">
+                <span className="font-display font-black text-sm text-kpcia-gold tracking-widest bg-kpcia-gold/10 px-2.5 py-1 rounded-lg border border-kpcia-gold/20">KPCIA</span>
+                <span className="text-xs font-semibold text-neutral-300">인증 허브</span>
+              </div>
+              <button 
+                onClick={() => {
+                  setShowAuthModal(false);
+                  setLoginError('');
+                  setVerificationError('');
+                }}
+                className="text-neutral-400 hover:text-neutral-200 transition-colors cursor-pointer"
+                id="close-auth-modal"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            {/* Modal Tabs */}
+            <div className="grid grid-cols-2 border-b border-neutral-800 bg-neutral-950/20" id="auth-modal-tabs">
+              <button
+                onClick={() => setAuthModalTab('login')}
+                className={`py-3 text-xs font-bold transition-all text-center border-b-2 cursor-pointer ${
+                  authModalTab === 'login'
+                    ? 'text-kpcia-gold border-kpcia-gold bg-kpcia-gold/5'
+                    : 'text-neutral-500 border-transparent hover:text-neutral-300'
+                }`}
+                id="auth-tab-login"
+              >
+                로그인 (Login)
+              </button>
+              <button
+                onClick={() => setAuthModalTab('register')}
+                className={`py-3 text-xs font-bold transition-all text-center border-b-2 cursor-pointer ${
+                  authModalTab === 'register'
+                    ? 'text-kpcia-gold border-kpcia-gold bg-kpcia-gold/5'
+                    : 'text-neutral-500 border-transparent hover:text-neutral-300'
+                }`}
+                id="auth-tab-register"
+              >
+                신규 강사 가입 (Sign Up)
+              </button>
+            </div>
+
+            {/* Modal Content */}
+            <div className="p-5 overflow-y-auto max-h-[80vh]" id="auth-modal-content">
+              {authModalTab === 'login' ? (
+                /* ================= LOGIN FORM ================= */
+                <form onSubmit={handleLoginSubmit} className="space-y-4">
+                  <div className="space-y-1">
+                    <span className="text-[9px] font-mono tracking-widest font-extrabold text-kpcia-gold uppercase bg-kpcia-gold/15 border border-kpcia-gold/30 px-2 py-0.5 rounded inline-block">
+                      강사용 프레스티지 포털
+                    </span>
+                    <h3 className="text-sm font-bold text-neutral-100 font-display text-left">
+                      한국 프레스티지기업강사협회
+                    </h3>
+                  </div>
+
+                  {loginError && (
+                    <div className="p-2.5 bg-red-950/50 border border-red-800/60 rounded-xl text-red-200 text-xs font-sans leading-relaxed text-left" id="modal-login-error">
+                      ⚠ {loginError}
+                    </div>
+                  )}
+
+                  <div className="space-y-3">
+                    <div>
+                      <label className="block text-[10px] font-bold text-neutral-400 uppercase tracking-widest mb-1 text-left">
+                        아이디 또는 이메일
+                      </label>
+                      <input
+                        type="text"
+                        value={loginId}
+                        onChange={(e) => setLoginId(e.target.value)}
+                        placeholder="ID (예: kindom) 또는 이메일 주소"
+                        className="w-full px-4 py-2 bg-neutral-950 border border-neutral-800 hover:border-kpcia-gold/40 focus:border-kpcia-gold focus:ring-1 focus:ring-kpcia-gold text-neutral-100 rounded-xl text-xs font-sans outline-none transition-all placeholder:text-neutral-600 font-medium"
+                        id="modal-login-id"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-[10px] font-bold text-neutral-400 uppercase tracking-widest mb-1 text-left">
+                        비밀번호 (PASSWORD)
+                      </label>
+                      <input
+                        type="password"
+                        value={loginPassword}
+                        onChange={(e) => setLoginPassword(e.target.value)}
+                        placeholder="비밀번호를 입력하세요"
+                        className="w-full px-4 py-2 bg-neutral-950 border border-neutral-800 hover:border-kpcia-gold/40 focus:border-kpcia-gold focus:ring-1 focus:ring-kpcia-gold text-neutral-100 rounded-xl text-xs font-sans outline-none transition-all placeholder:text-neutral-600 font-medium"
+                        id="modal-login-pw"
+                      />
+                    </div>
+                  </div>
+
+                  <button
+                    type="submit"
+                    className="w-full py-2.5 bg-kpcia-gold hover:bg-kpcia-gold-hover text-kpcia-dark hover:scale-[1.01] active:scale-[0.99] font-black text-xs rounded-xl transition-all duration-300 shadow-xl shadow-kpcia-gold/15 flex items-center justify-center gap-1.5 cursor-pointer mt-5 uppercase"
+                    id="modal-login-btn"
+                  >
+                    <LogIn className="w-3.5 h-3.5 text-kpcia-dark" />
+                    <span>KPCIA 전용 포털 안전 로그인</span>
+                  </button>
+
+                  <div className="border-t border-neutral-800/80 pt-4 flex flex-col gap-2">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const guestUser: UserProfile = {
+                          uid: 'guest',
+                          email: 'guest@kpcia.org',
+                          name: '비회원 게스트',
+                          tier: 'Prestige Member',
+                          mileage: 0,
+                          profileCard: {
+                            title: '비회원 게스트',
+                            bio: '비회원 상태로 제휴 제안 및 협회 소개를 확인하는 중입니다.',
+                            specialties: [],
+                            career: [],
+                            education: [],
+                            contactEmail: 'guest@kpcia.org',
+                            contactPhone: '',
+                            cardTheme: 'classic'
+                          },
+                          badges: [],
+                          createdAt: new Date().toISOString(),
+                          updatedAt: new Date().toISOString(),
+                          isAdmin: false
+                        };
+                        setCurrentUser(guestUser);
+                        setActiveTab('proposal');
+                        setShowAuthModal(false);
+                        triggerToast('비회원 게스트 상태로 접속했습니다. 제휴 제안이 가능합니다.', 'info');
+                      }}
+                      className="w-full px-4 py-2 bg-neutral-950 hover:bg-neutral-900 border border-neutral-800 hover:border-kpcia-gold/40 hover:text-kpcia-gold text-[10px] font-extrabold rounded-lg transition-all duration-300 cursor-pointer text-center"
+                      id="modal-guest-btn"
+                    >
+                      ★ 비회원 게스트 제휴 제안 바로가기
+                    </button>
+                  </div>
+                </form>
+              ) : (
+                /* ================= REGISTER FORM (WIZARD) ================= */
+                verificationStep === 'input' ? (
+                  <form 
+                    onSubmit={(e) => {
+                      e.preventDefault();
+                      if (!gwName.trim() || !gwEmail.trim()) return;
+
+                      const trimmedId = gwLoginId.trim();
+                      const trimmedPw = gwPassword.trim();
+
+                      if (!trimmedId || !trimmedPw) {
+                        setVerificationError('로그인용 아이디와 비밀번호를 모두 입력해 주세요.');
+                        return;
+                      }
+
+                      if (trimmedId.length < 3) {
+                        setVerificationError('아이디는 최소 3글자 이상이어야 합니다.');
+                        return;
+                      }
+                      
+                      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+                      if (!emailRegex.test(gwEmail.trim())) {
+                        setVerificationError('유효한 이메일 형식이 아닙니다.');
+                        return;
+                      }
+
+                      const code = Math.floor(100000 + Math.random() * 900000).toString();
+                      setGeneratedCode(code);
+                      setVerificationStep('verify');
+                      setVerificationCode('');
+                      setVerificationError('');
+                      triggerToast('이메일 주소로 인증코드가 발송되었습니다. (하단 시뮬레이션 창을 확인하세요!)', 'info');
+                    }} 
+                    className="space-y-4 text-left"
+                  >
+                    {verificationError && (
+                      <div className="p-2.5 rounded-lg bg-red-950/50 border border-red-900/50 text-[11px] text-red-400 font-medium">
+                        {verificationError}
+                      </div>
+                    )}
+
+                    <div className="space-y-1.5">
+                      <label className="block text-[10px] font-bold text-neutral-400 uppercase tracking-wide">성명 <span className="text-kpcia-gold">*</span></label>
+                      <input
+                        type="text"
+                        required
+                        value={gwName}
+                        onChange={(e) => setGwName(e.target.value)}
+                        placeholder="예: 김성우 강사"
+                        className="w-full px-3 py-1.5 bg-neutral-950 border border-neutral-800 rounded-lg text-xs text-neutral-100 focus:border-kpcia-gold/50 outline-none"
+                      />
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-3">
+                      <div className="space-y-1.5">
+                        <label className="block text-[10px] font-bold text-neutral-400 uppercase tracking-wide">로그인용 아이디 <span className="text-kpcia-gold">*</span></label>
+                        <input
+                          type="text"
+                          required
+                          value={gwLoginId}
+                          onChange={(e) => setGwLoginId(e.target.value.replace(/[^a-zA-Z0-9]/g, ''))}
+                          placeholder="아이디 (영문/숫자)"
+                          className="w-full px-3 py-1.5 bg-neutral-950 border border-neutral-800 rounded-lg text-xs text-neutral-100 focus:border-kpcia-gold/50 outline-none"
+                        />
+                      </div>
+
+                      <div className="space-y-1.5">
+                        <label className="block text-[10px] font-bold text-neutral-400 uppercase tracking-wide">비밀번호 <span className="text-kpcia-gold">*</span></label>
+                        <input
+                          type="password"
+                          required
+                          value={gwPassword}
+                          onChange={(e) => setGwPassword(e.target.value)}
+                          placeholder="비밀번호"
+                          className="w-full px-3 py-1.5 bg-neutral-950 border border-neutral-800 rounded-lg text-xs text-neutral-100 focus:border-kpcia-gold/50 outline-none"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="space-y-1.5">
+                      <label className="block text-[10px] font-bold text-neutral-400 uppercase tracking-wide">이메일 주소 <span className="text-kpcia-gold">*</span></label>
+                      <input
+                        type="email"
+                        required
+                        value={gwEmail}
+                        onChange={(e) => setGwEmail(e.target.value)}
+                        placeholder="sungwoo@kpcia.or.kr"
+                        className="w-full px-3 py-1.5 bg-neutral-950 border border-neutral-800 rounded-lg text-xs text-neutral-100 focus:border-kpcia-gold/50 outline-none"
+                      />
+                    </div>
+
+                    <div className="space-y-1.5">
+                      <label className="block text-[10px] font-bold text-neutral-400 uppercase tracking-wide">연락처 (휴대폰)</label>
+                      <input
+                        type="tel"
+                        value={gwPhone}
+                        onChange={(e) => setGwPhone(e.target.value)}
+                        placeholder="010-9999-8888"
+                        className="w-full px-3 py-1.5 bg-neutral-950 border border-neutral-800 rounded-lg text-xs text-neutral-100 focus:border-kpcia-gold/50 outline-none"
+                      />
+                    </div>
+
+                    <div className="space-y-1.5">
+                      <label className="block text-[10px] font-bold text-neutral-400 uppercase tracking-wide">핵심 강의 전문 분야</label>
+                      <input
+                        type="text"
+                        value={gwTitle}
+                        onChange={(e) => setGwTitle(e.target.value)}
+                        placeholder="예: HRD 조직문화 및 리더십 혁신"
+                        className="w-full px-3 py-1.5 bg-neutral-950 border border-neutral-800 rounded-lg text-xs text-neutral-100 focus:border-kpcia-gold/50 outline-none"
+                      />
+                    </div>
+
+                    <div className="pt-3 border-t border-neutral-800/60 flex space-x-2">
+                      <button
+                        type="submit"
+                        className="w-full py-2 bg-kpcia-gold hover:bg-kpcia-gold-hover text-kpcia-dark text-xs font-extrabold rounded-lg transition-all shadow-md shadow-kpcia-gold/10"
+                      >
+                        이메일 인증 요청
+                      </button>
+                    </div>
+                  </form>
+                ) : (
+                  <div className="space-y-4 text-left">
+                    <div className="space-y-1">
+                      <span className="text-[10px] font-bold text-kpcia-gold uppercase tracking-wider block">STEP 2: 이메일 검증 진행 중</span>
+                      <p className="text-xs text-neutral-300 leading-relaxed">
+                        이메일 <strong className="text-neutral-100">{gwEmail}</strong>의 실제 소유주 확인을 위해 모의 전송된 6자리 코드를 아래에 기입해 주세요.
+                      </p>
+                    </div>
+
+                    <div className="space-y-1.5">
+                      <label className="block text-[10px] font-bold text-neutral-400 uppercase tracking-wide">6자리 인증코드 입력</label>
+                      <input
+                        type="text"
+                        maxLength={6}
+                        value={verificationCode}
+                        onChange={(e) => setVerificationCode(e.target.value.replace(/[^0-9]/g, ''))}
+                        placeholder="XXXXXX"
+                        className="w-full px-4 py-2.5 bg-neutral-950 border border-neutral-800 rounded-lg text-lg text-center tracking-widest font-mono text-kpcia-gold focus:border-kpcia-gold outline-none"
+                      />
+                      {verificationError && (
+                        <p className="text-[10px] text-red-400 font-medium mt-1">⚠ {verificationError}</p>
+                      )}
+                    </div>
+
+                    <div className="bg-neutral-950/80 border border-neutral-800 p-3 rounded-xl space-y-2">
+                      <div className="flex items-center justify-between text-[9px] font-mono text-neutral-500">
+                        <span className="text-kpcia-gold font-bold">✉ KPCIA 모의 이메일 수신함</span>
+                        <span className="bg-kpcia-gold/10 text-kpcia-gold px-1.5 rounded">SIMULATOR ACTIVE</span>
+                      </div>
+                      <div className="text-[11px] font-mono space-y-1 text-neutral-300 border-t border-neutral-900 pt-1.5">
+                        <div><strong>수신:</strong> {gwEmail}</div>
+                        <div><strong>제목:</strong> KPCIA 강사 인증 코드</div>
+                        <div className="mt-2 text-center p-1.5 bg-neutral-900 border border-neutral-800 text-sm font-bold tracking-widest text-kpcia-gold select-all">
+                          {generatedCode}
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="pt-3 border-t border-neutral-800/60 flex space-x-2">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setVerificationStep('input');
+                          setVerificationError('');
+                        }}
+                        className="flex-1 py-2 bg-neutral-950 hover:bg-neutral-900 border border-neutral-800 text-neutral-300 text-xs font-bold rounded-lg transition-all"
+                      >
+                        이전 단계로
+                      </button>
+                      <button
+                        onClick={() => {
+                          if (verificationCode === generatedCode) {
+                            handleRegisterUser(gwName.trim(), gwEmail.trim(), gwTier, gwTitle.trim(), gwPhone.trim(), gwLoginId.trim(), gwPassword.trim());
+                            setShowAuthModal(false);
+                            
+                            // Reset state
+                            setGwName('');
+                            setGwEmail('');
+                            setGwTitle('');
+                            setGwPhone('');
+                            setGwLoginId('');
+                            setGwPassword('');
+                            setVerificationStep('input');
+                            setVerificationCode('');
+                            setGeneratedCode('');
+                            setVerificationError('');
+                          } else {
+                            setVerificationError('인증코드가 일치하지 않습니다.');
+                          }
+                        }}
+                        className="flex-1 py-2 bg-kpcia-gold hover:bg-kpcia-gold-hover text-kpcia-dark text-xs font-extrabold rounded-lg transition-all shadow-md shadow-kpcia-gold/10"
+                      >
+                        인증 완료 및 가입
+                      </button>
+                    </div>
+                  </div>
+                )
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Header component with User switcher - hidden in mobile simulated mode */}
       {!isMobileSimulated && (
         <Header
@@ -1171,7 +1409,14 @@ export default function App() {
           }}
           isMobileSimulated={isMobileSimulated}
           onToggleSimulator={() => setIsMobileSimulated(!isMobileSimulated)}
-          onOpenRegister={() => setShowGatewayRegister(true)}
+          onOpenRegister={() => {
+            setAuthModalTab('register');
+            setShowAuthModal(true);
+          }}
+          onOpenAuthModal={(tab) => {
+            setAuthModalTab(tab);
+            setShowAuthModal(true);
+          }}
           onLogout={handleLogout}
         />
       )}
@@ -1369,7 +1614,7 @@ export default function App() {
             )}
 
             {/* Tab 5: Admin Panel Control Room */}
-            {activeTab === 'admin' && currentUser.isAdmin && (
+            {activeTab === 'admin' && currentUser?.isAdmin && (
               <AdminPanel
                 users={users}
                 lectures={lectures}
@@ -1409,7 +1654,7 @@ export default function App() {
           <div className="flex flex-wrap items-center justify-center gap-4 text-[10px] font-mono text-neutral-400" id="footer-specs">
             <span>© 2026 KPCIA. All Rights Reserved.</span>
             <span className="w-1.5 h-1.5 rounded-full bg-kpcia-gold" />
-            <span>프레스티지 강사 전용 시스템 v2.4</span>
+            <span>v1.0</span>
           </div>
         </div>
       </footer>

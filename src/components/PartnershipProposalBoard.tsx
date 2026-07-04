@@ -3,7 +3,7 @@ import { UserProfile, PartnershipProposal } from '../types';
 import { Handshake, Send, CheckCircle, Clock, AlertCircle, FileText, Sparkles, Building, Phone, Mail, User } from 'lucide-react';
 
 interface PartnershipProposalBoardProps {
-  currentUser: UserProfile;
+  currentUser: UserProfile | null;
   proposals: PartnershipProposal[];
   onSubmitProposal: (proposalData: any) => void;
 }
@@ -15,9 +15,11 @@ export default function PartnershipProposalBoard({
 }: PartnershipProposalBoardProps) {
   const [showForm, setShowForm] = useState(false);
   const [companyName, setCompanyName] = useState('');
-  const [proposerName, setProposerName] = useState(currentUser.uid === 'guest' ? '' : (currentUser.name || ''));
-  const [email, setEmail] = useState(currentUser.uid === 'guest' ? '' : (currentUser.email || ''));
-  const [phone, setPhone] = useState(currentUser.uid === 'guest' ? '' : (currentUser.profileCard?.contactPhone || ''));
+  
+  const isGuest = !currentUser || currentUser.uid === 'guest';
+  const [proposerName, setProposerName] = useState(isGuest ? '' : (currentUser?.name || ''));
+  const [email, setEmail] = useState(isGuest ? '' : (currentUser?.email || ''));
+  const [phone, setPhone] = useState(isGuest ? '' : (currentUser?.profileCard?.contactPhone || ''));
   const [title, setTitle] = useState('');
   const [content, setContent] = useState('');
   const [isSubmittedSuccessfully, setIsSubmittedSuccessfully] = useState(false);
@@ -47,7 +49,7 @@ export default function PartnershipProposalBoard({
   };
 
   // Filter proposals submitted by the current user or show relevant ones
-  const userProposals = proposals.filter(p => p.email === currentUser.email);
+  const userProposals = proposals.filter(p => currentUser && p.email === currentUser.email);
 
   return (
     <div className="space-y-8" id="partnership-proposal-section">
@@ -76,7 +78,7 @@ export default function PartnershipProposalBoard({
 
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-8" id="proposal-layout">
         {/* Left: Form or Guideline */}
-        <div className={`${currentUser.isAdmin ? 'lg:col-span-7' : 'lg:col-span-12 max-w-4xl mx-auto w-full'} space-y-6`}>
+        <div className={`${currentUser?.isAdmin ? 'lg:col-span-7' : 'lg:col-span-12 max-w-4xl mx-auto w-full'} space-y-6`}>
           {showForm ? (
             <div className="bg-neutral-900 border border-kpcia-gold/30 rounded-2xl p-6 relative overflow-hidden" id="proposal-form-container">
               {isSubmittedSuccessfully ? (
@@ -262,7 +264,7 @@ export default function PartnershipProposalBoard({
         </div>
 
         {/* Right: User's submitted proposals list - Only viewable by Administration (운영사무국/Admin) */}
-        {currentUser.isAdmin && (
+        {currentUser?.isAdmin && (
           <div className="lg:col-span-5 space-y-6 text-left">
             <div className="bg-neutral-900/50 border border-neutral-800 rounded-xl p-5" id="my-proposals-history">
               <h3 className="text-xs font-bold font-display uppercase tracking-wider text-kpcia-gold flex items-center gap-1.5 mb-4 border-b border-neutral-800/80 pb-2">

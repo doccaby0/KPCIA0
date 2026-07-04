@@ -3,7 +3,7 @@ import { UserProfile, EducationalProgram } from '../types';
 import { BookOpen, Sparkles, PlusCircle, Bookmark, Award, HelpCircle, GraduationCap, CheckCircle } from 'lucide-react';
 
 interface ProgramBoardProps {
-  currentUser: UserProfile;
+  currentUser: UserProfile | null;
   programs: EducationalProgram[];
   onRegisterProgram: (program: any) => void;
 }
@@ -186,7 +186,7 @@ export default function ProgramBoard({ currentUser, programs, onRegisterProgram 
                     <Bookmark className="w-4 h-4 text-kpcia-gold" />
                     <span className="text-[10px] font-mono text-neutral-500 font-bold">PROG ID: {program.id.toUpperCase()}</span>
                   </div>
-                  {program.authorId === currentUser.uid ? (
+                  {currentUser && program.authorId === currentUser.uid ? (
                     <span className="text-[9px] px-2 py-0.5 rounded bg-kpcia-gold/15 text-kpcia-gold font-bold border border-kpcia-gold/20">
                       내가 기획한 프로그램
                     </span>
@@ -250,7 +250,7 @@ export default function ProgramBoard({ currentUser, programs, onRegisterProgram 
       </div>
 
       {/* User's Pending Programs */}
-      {programs.filter(p => p.isApproved === false && p.authorId === currentUser.uid).length > 0 && (
+      {currentUser && programs.filter(p => p.isApproved === false && p.authorId === currentUser.uid).length > 0 && (
         <div className="pt-6 border-t border-neutral-800 space-y-4" id="pending-my-programs">
           <h3 className="text-xs font-bold font-display uppercase tracking-wider text-amber-500 flex items-center gap-1.5">
             <span className="w-2 h-2 rounded-full bg-amber-500 animate-pulse" /> 저작권 등록 심사 대기 중인 내 프로그램
