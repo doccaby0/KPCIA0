@@ -34,6 +34,7 @@ export default function Header({
   };
 
   return (
+    <>
     <header className="sticky top-0 z-50 border-b border-neutral-800 bg-kpcia-dark/95 backdrop-blur-md" id="header">
       {/* Association Top Bar */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-20 flex items-center justify-between" id="header-container">
@@ -160,5 +161,37 @@ export default function Header({
         </div>
       </div>
     </header>
+    
+    {/* Mobile Navigation (Bottom Nav) for actual mobile screens */}
+    <nav className="md:hidden fixed bottom-0 left-0 right-0 z-50 bg-neutral-950/90 backdrop-blur-md border-t border-neutral-850 px-2 py-1.5 flex justify-around items-center" id="mobile-bottom-nav">
+      {[
+        { id: 'home', label: '협회소개', icon: <Home className="w-4 h-4" /> },
+        { id: 'lectures', label: '출강공고', icon: <Briefcase className="w-4 h-4" />, instructorOnly: true },
+        { id: 'programs', label: '교육기획', icon: <BookOpen className="w-4 h-4" />, instructorOnly: true },
+        { id: 'profile', label: '강사카드', icon: <Award className="w-4 h-4" />, instructorOnly: true },
+        { id: 'proposal', label: '제휴제안', icon: <Handshake className="w-4 h-4" /> },
+        { id: 'admin', label: '관리자', icon: <Shield className="w-4 h-4" />, adminOnly: true }
+      ].map((tab) => {
+        if (tab.adminOnly && !currentUser.isAdmin) return null;
+        if (tab.instructorOnly && currentUser.uid === 'guest') return null;
+        const isActive = activeTab === tab.id;
+        return (
+          <button
+            key={tab.id}
+            onClick={() => onTabChange(tab.id)}
+            className={`flex flex-col items-center justify-center py-1 px-2 rounded-lg transition-all cursor-pointer ${
+              isActive
+                ? 'text-kpcia-gold scale-105'
+                : 'text-neutral-400 hover:text-neutral-200'
+            }`}
+            id={`mobile-tab-${tab.id}`}
+          >
+            {tab.icon}
+            <span className="text-[8px] mt-1 font-semibold tracking-tight">{tab.label}</span>
+          </button>
+        );
+      })}
+    </nav>
+  </>
   );
 }

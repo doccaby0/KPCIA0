@@ -1177,7 +1177,7 @@ export default function App() {
       )}
 
       {/* Main Content Area */}
-      <main className="flex-1 max-w-7xl mx-auto w-full px-4 sm:px-6 lg:px-8 py-8 no-print" id="main-content">
+      <main className="flex-1 max-w-7xl mx-auto w-full px-4 sm:px-6 lg:px-8 pt-6 pb-24 md:pb-8 no-print" id="main-content">
         {isMobileSimulated ? (
           /* Centered mobile phone simulator with all instructional text removed */
           <div className="flex flex-col items-center justify-center min-h-[740px] py-4" id="simulator-view">
