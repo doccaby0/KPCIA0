@@ -1168,13 +1168,6 @@ export default function App() {
                       <span>출강 매칭 공고 보기</span>
                       <ArrowRight className="w-4 h-4" />
                     </button>
-                    <button
-                      onClick={() => setIsMobileSimulated(true)}
-                      className="px-6 py-2.5 bg-neutral-900 border border-neutral-800 hover:border-kpcia-gold/40 text-neutral-300 font-bold text-xs rounded-xl transition-all"
-                      id="hero-go-mobile"
-                    >
-                      강사용 모바일 앱 체험
-                    </button>
                   </div>
                 </div>
 

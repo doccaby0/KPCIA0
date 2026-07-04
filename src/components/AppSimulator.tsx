@@ -13,7 +13,8 @@ import {
   ChevronDown, 
   AlertCircle, 
   Check, 
-  Globe 
+  Globe,
+  Users 
 } from 'lucide-react';
 
 interface AppSimulatorProps {
@@ -203,11 +204,24 @@ export default function AppSimulator({
                                 </span>
                               </div>
 
-                              <div className="space-y-1">
+                              <div className="space-y-1.5">
                                 <h4 className="text-xs font-bold text-neutral-200 line-clamp-1">{l.title}</h4>
-                                <div className="flex items-center space-x-2 text-[9px] text-neutral-400 font-sans">
-                                  <MapPin className="w-2.5 h-2.5 text-neutral-500" />
-                                  <span className="truncate">{l.location}</span>
+                                {l.description && (
+                                  <p className="text-[9px] text-neutral-400 line-clamp-2 leading-relaxed font-sans">
+                                    {l.description}
+                                  </p>
+                                )}
+                                <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-[9px] text-neutral-400 font-sans pt-0.5">
+                                  <div className="flex items-center space-x-1">
+                                    <MapPin className="w-2.5 h-2.5 text-neutral-500 shrink-0" />
+                                    <span className="truncate max-w-[120px]">{l.location}</span>
+                                  </div>
+                                  {l.attendees !== undefined && (
+                                    <div className="flex items-center space-x-1 border-l border-neutral-800 pl-2">
+                                      <Users className="w-2.5 h-2.5 text-neutral-500 shrink-0" />
+                                      <span>{l.attendees}명</span>
+                                    </div>
+                                  )}
                                 </div>
                               </div>
 
