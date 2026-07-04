@@ -21,7 +21,8 @@ import {
   Coins, 
   FileText, 
   ChevronRight, 
-  Activity 
+  Activity,
+  Trash2
 } from 'lucide-react';
 
 export function getLectureMilestoneBadge(lectureCount?: number) {
@@ -109,6 +110,7 @@ interface AdminPanelProps {
   onApproveProgram?: (programId: string, updatedProgram: EducationalProgram) => void;
   onUpdateUserPerformance?: (userId: string, lectureCount: number, ratings: number[]) => void;
   onDeleteUser?: (userId: string) => void;
+  onDeleteProgram?: (programId: string) => void;
 }
 
 export default function AdminPanel({
@@ -127,7 +129,8 @@ export default function AdminPanel({
   onRejectUser,
   onApproveProgram,
   onUpdateUserPerformance,
-  onDeleteUser
+  onDeleteUser,
+  onDeleteProgram
 }: AdminPanelProps) {
   // Navigation State
   const [activeTab, setActiveTab] = useState<'dashboard' | 'approvals' | 'lectures' | 'members' | 'proposals'>('dashboard');
@@ -136,6 +139,7 @@ export default function AdminPanel({
   const [memberSearch, setMemberSearch] = useState('');
   const [txSearch, setTxSearch] = useState('');
   const [deletingUserId, setDeletingUserId] = useState<string | null>(null);
+  const [deletingProgramId, setDeletingProgramId] = useState<string | null>(null);
   
   // Handlers state
   const [selectedUser, setSelectedUser] = useState<string>('');
@@ -1481,6 +1485,38 @@ export default function AdminPanel({
                         </div>
 
                         <div className="flex items-center space-x-1.5 shrink-0">
+                          {deletingProgramId === program.id ? (
+                            <div className="flex items-center space-x-1 bg-red-950/20 px-1.5 py-0.5 rounded border border-red-900/30" id={`deleting-program-confirm-${program.id}`}>
+                              <span className="text-[8px] text-red-400 font-bold">정말 삭제?</span>
+                              <button
+                                onClick={() => {
+                                  if (onDeleteProgram) onDeleteProgram(program.id);
+                                  setDeletingProgramId(null);
+                                }}
+                                className="px-1.5 py-0.5 bg-red-600 hover:bg-red-500 text-white text-[8px] font-extrabold rounded cursor-pointer"
+                                id={`btn-confirm-delete-prog-${program.id}`}
+                              >
+                                예
+                              </button>
+                              <button
+                                onClick={() => setDeletingProgramId(null)}
+                                className="px-1.5 py-0.5 bg-neutral-900 hover:bg-neutral-800 text-neutral-400 text-[8px] font-bold rounded cursor-pointer"
+                                id={`btn-cancel-delete-prog-${program.id}`}
+                              >
+                                아니오
+                              </button>
+                            </div>
+                          ) : (
+                            <button
+                              onClick={() => setDeletingProgramId(program.id)}
+                              className="p-1 rounded text-red-400 hover:bg-red-950/20 transition-all cursor-pointer"
+                              title="교육 콘텐츠 삭제"
+                              id={`btn-trigger-delete-prog-${program.id}`}
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                          )}
+
                           <input
                             type="number"
                             title="콘텐츠 마일리지 조정"

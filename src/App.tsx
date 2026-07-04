@@ -462,6 +462,15 @@ export default function App() {
     triggerToast(`'${targetUser.name}' 강사님이 협회 회원에서 영구 탈퇴 처리되었습니다.`, 'info');
   };
 
+  // 8.5.2. Delete Educational Program (Admin Only)
+  const handleDeleteProgram = async (programId: string) => {
+    const targetProg = programs.find(p => p.id === programId);
+    if (!targetProg) return;
+    setPrograms(prev => prev.filter(p => p.id !== programId));
+    await StorageService.deleteProgram(programId);
+    triggerToast(`'${targetProg.title}' 교육 콘텐츠가 영구 삭제 처리되었습니다.`, 'info');
+  };
+
   // 8.6. Approve and finalize Educational Program Copyright (Admin Only)
   const handleApproveProgram = async (programId: string, updatedProgram: EducationalProgram) => {
     // Save program to state & storage
@@ -1387,6 +1396,7 @@ export default function App() {
                 onApproveProgram={handleApproveProgram}
                 onUpdateUserPerformance={handleUpdateUserPerformance}
                 onDeleteUser={handleDeleteUser}
+                onDeleteProgram={handleDeleteProgram}
               />
             )}
           </div>
