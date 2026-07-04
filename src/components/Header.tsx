@@ -52,9 +52,8 @@ export default function Header({
         <nav className="hidden md:flex space-x-2" id="desktop-nav">
           {[
             { id: 'home', label: '협회 소개', icon: <Home className="w-4 h-4" /> },
-            { id: 'lectures', label: '출강 공고 매칭', icon: <Briefcase className="w-4 h-4" />, instructorOnly: true },
+            { id: 'lectures', label: '출강 공고 매칭', icon: <Briefcase className="w-4 h-4" /> },
             { id: 'programs', label: '교육 프로그램 기획', icon: <BookOpen className="w-4 h-4" />, instructorOnly: true },
-            { id: 'profile', label: '강사 정보 카드', icon: <Award className="w-4 h-4" />, instructorOnly: true },
             { id: 'proposal', label: '제휴 및 협력 제안', icon: <Handshake className="w-4 h-4" /> },
             { id: 'admin', label: '협회 관리자실', icon: <Shield className="w-4 h-4" />, adminOnly: true }
           ].map((tab) => {
@@ -128,6 +127,28 @@ export default function Header({
               {dropdownOpen && (
                 <div className="absolute right-0 top-full pt-1.5 w-72 z-50 animate-in fade-in slide-in-from-top-3 duration-200" id="user-dropdown-menu-wrapper">
                   <div className="rounded-xl border border-neutral-800 bg-neutral-950/95 backdrop-blur-lg shadow-2xl p-2.5 space-y-1.5" id="user-dropdown-menu">
+                    
+                    {/* Instructor Card Link (로그아웃 위에) */}
+                    {currentUser && currentUser.uid !== 'guest' && (
+                      <div className="pb-1 border-b border-neutral-900">
+                        <button
+                          onClick={() => {
+                            onTabChange('profile');
+                            setDropdownOpen(false);
+                          }}
+                          className={`w-full py-2 px-3 rounded-lg text-xs font-bold transition-all flex items-center gap-2 cursor-pointer ${
+                            activeTab === 'profile'
+                              ? 'bg-kpcia-gold/15 text-kpcia-gold border border-kpcia-gold/25 shadow-lg shadow-kpcia-gold/5'
+                              : 'text-neutral-300 hover:text-neutral-100 hover:bg-neutral-900 border border-transparent'
+                          }`}
+                          id="dropdown-profile-btn"
+                        >
+                          <Award className="w-3.5 h-3.5 text-kpcia-gold" />
+                          <span>강사 정보 카드 (My Profile)</span>
+                        </button>
+                      </div>
+                    )}
+
                     {/* Logout Action */}
                     <div className="pt-1">
                       <button
@@ -163,9 +184,8 @@ export default function Header({
     <nav className="md:hidden fixed bottom-0 left-0 right-0 z-50 bg-neutral-950/90 backdrop-blur-md border-t border-neutral-850 px-2 py-1.5 flex justify-around items-center" id="mobile-bottom-nav">
       {[
         { id: 'home', label: '협회소개', icon: <Home className="w-4 h-4" /> },
-        { id: 'lectures', label: '출강공고', icon: <Briefcase className="w-4 h-4" />, instructorOnly: true },
+        { id: 'lectures', label: '출강공고', icon: <Briefcase className="w-4 h-4" /> },
         { id: 'programs', label: '교육기획', icon: <BookOpen className="w-4 h-4" />, instructorOnly: true },
-        { id: 'profile', label: '강사카드', icon: <Award className="w-4 h-4" />, instructorOnly: true },
         { id: 'proposal', label: '제휴제안', icon: <Handshake className="w-4 h-4" /> },
         { id: 'admin', label: '관리자', icon: <Shield className="w-4 h-4" />, adminOnly: true }
       ].map((tab) => {

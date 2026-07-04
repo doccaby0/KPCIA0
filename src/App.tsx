@@ -1152,43 +1152,6 @@ export default function App() {
                     <LogIn className="w-3.5 h-3.5 text-kpcia-dark" />
                     <span>KPCIA 전용 포털 안전 로그인</span>
                   </button>
-
-                  <div className="border-t border-neutral-800/80 pt-4 flex flex-col gap-2">
-                    <button
-                      type="button"
-                      onClick={() => {
-                        const guestUser: UserProfile = {
-                          uid: 'guest',
-                          email: 'guest@kpcia.org',
-                          name: '비회원 게스트',
-                          tier: 'Prestige Member',
-                          mileage: 0,
-                          profileCard: {
-                            title: '비회원 게스트',
-                            bio: '비회원 상태로 제휴 제안 및 협회 소개를 확인하는 중입니다.',
-                            specialties: [],
-                            career: [],
-                            education: [],
-                            contactEmail: 'guest@kpcia.org',
-                            contactPhone: '',
-                            cardTheme: 'classic'
-                          },
-                          badges: [],
-                          createdAt: new Date().toISOString(),
-                          updatedAt: new Date().toISOString(),
-                          isAdmin: false
-                        };
-                        setCurrentUser(guestUser);
-                        setActiveTab('proposal');
-                        setShowAuthModal(false);
-                        triggerToast('비회원 게스트 상태로 접속했습니다. 제휴 제안이 가능합니다.', 'info');
-                      }}
-                      className="w-full px-4 py-2 bg-neutral-950 hover:bg-neutral-900 border border-neutral-800 hover:border-kpcia-gold/40 hover:text-kpcia-gold text-[10px] font-extrabold rounded-lg transition-all duration-300 cursor-pointer text-center"
-                      id="modal-guest-btn"
-                    >
-                      ★ 비회원 게스트 제휴 제안 바로가기
-                    </button>
-                  </div>
                 </form>
               ) : (
                 /* ================= REGISTER FORM (WIZARD) ================= */
@@ -1464,8 +1427,11 @@ export default function App() {
                   </div>
                   <h2 className="text-3xl sm:text-4xl font-extrabold tracking-tight text-neutral-100 font-display">
                     대한민국 최고의 기업 교육 명가 <br />
-                    <span className="text-gradient bg-gradient-to-r from-kpcia-gold via-amber-200 to-kpcia-gold bg-clip-text text-transparent">한국 프레스티지 기업 강사 협회</span>
+                    <span className="text-gradient bg-gradient-to-r from-kpcia-gold via-amber-200 to-kpcia-gold bg-clip-text text-transparent">한국프레스티지기업강사협회</span>
                   </h2>
+                  <p className="text-[10px] sm:text-xs font-mono font-bold uppercase tracking-widest text-neutral-400">
+                    KOREA PRESTIGE CORPORATE INSTRUCTOR ASSOCIATION
+                  </p>
                   <p className="text-sm sm:text-base text-neutral-400 font-sans max-w-2xl mx-auto leading-relaxed">
                     KPCIA는 검증된 교육 설계 역량과 독창적 마일리지 저작권 공유 모델을 결합하여, 최고 권위의 기업 출강을 리드하는 기업 파견 전문 강사 공식 인증 협회입니다.
                   </p>
@@ -1571,9 +1537,11 @@ export default function App() {
                 <LectureBoard
                   currentUser={currentUser}
                   lectures={lectures}
-                  programs={programs}
                   onApplyLecture={handleApplyLecture}
-                  onAddLecture={handleAddLecture}
+                  onOpenAuthModal={(tab) => {
+                    setAuthModalTab(tab);
+                    setShowAuthModal(true);
+                  }}
                 />
               )
             )}
@@ -1630,6 +1598,7 @@ export default function App() {
                 onApproveUser={handleApproveUser}
                 onRejectUser={handleRejectUser}
                 onApproveProgram={handleApproveProgram}
+                onAddLecture={handleAddLecture}
                 onUpdateUserPerformance={handleUpdateUserPerformance}
                 onDeleteUser={handleDeleteUser}
                 onDeleteProgram={handleDeleteProgram}
@@ -1646,6 +1615,9 @@ export default function App() {
           <div className="space-y-1.5 text-center md:text-left" id="footer-branding">
             <p className="font-display font-bold text-neutral-400">
               KPCIA 한국프레스티지기업강사협회 (비영리 협회)
+            </p>
+            <p className="text-[9px] font-mono tracking-wider text-neutral-500 font-bold uppercase leading-none">
+              KOREA PRESTIGE CORPORATE INSTRUCTOR ASSOCIATION
             </p>
             <p className="text-[10px] font-sans">
               충청북도 충주시 성남동 365번지 | 연락처: 010-6400-0924

@@ -198,7 +198,11 @@ export default function AppSimulator({
                                   {l.targetTier}
                                 </span>
                                 <span className="text-[8px] font-mono text-kpcia-gold">
-                                  {currentUser.isAdmin || isQualified 
+                                  {currentUser.uid === 'guest' ? (
+                                    <span className="blur-[3px] select-none opacity-50">
+                                      {l.budget.toLocaleString()}원
+                                    </span>
+                                  ) : currentUser.isAdmin || isQualified 
                                     ? `${l.budget.toLocaleString()}원` 
                                     : '🔒 등급 상향 시 공개'}
                                 </span>

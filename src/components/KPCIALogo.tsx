@@ -34,7 +34,7 @@ export default function KPCIALogo({ variant = 'hero', theme = 'dark' }: KPCIALog
             한국프레스티지기업강사협회
           </span>
           <span className="text-[7.5px] text-neutral-350 font-mono tracking-wider mt-0.5 font-bold uppercase transition-all duration-300 group-hover:text-neutral-200">
-            PRESTIGE CORPORATE INSTRUCTOR ASSOCIATION
+            KOREA PRESTIGE CORPORATE INSTRUCTOR ASSOCIATION
           </span>
         </div>
       </div>

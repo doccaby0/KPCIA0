@@ -108,6 +108,7 @@ interface AdminPanelProps {
   onApproveUser?: (userId: string) => void;
   onRejectUser?: (userId: string) => void;
   onApproveProgram?: (programId: string, updatedProgram: EducationalProgram) => void;
+  onAddLecture?: (lecture: any) => void;
   onUpdateUserPerformance?: (userId: string, lectureCount: number, ratings: number[]) => void;
   onDeleteUser?: (userId: string) => void;
   onDeleteProgram?: (programId: string) => void;
@@ -129,6 +130,7 @@ export default function AdminPanel({
   onApproveUser,
   onRejectUser,
   onApproveProgram,
+  onAddLecture,
   onUpdateUserPerformance,
   onDeleteUser,
   onDeleteProgram,
@@ -136,6 +138,20 @@ export default function AdminPanel({
 }: AdminPanelProps) {
   // Navigation State
   const [activeTab, setActiveTab] = useState<'dashboard' | 'approvals' | 'lectures' | 'members' | 'proposals'>('dashboard');
+  
+  // Lecture Posting States
+  const [showAddForm, setShowAddForm] = useState(false);
+  const [lectTitle, setLectTitle] = useState('');
+  const [lectDescription, setLectDescription] = useState('');
+  const [lectTargetTier, setLectTargetTier] = useState<InstructorTier>('Prestige Associate');
+  const [lectBudget, setLectBudget] = useState<number>(1000000);
+  const [lectMileageRoyalty, setLectMileageRoyalty] = useState<number>(5000);
+  const [lectProgramId, setLectProgramId] = useState('');
+  const [lectDate, setLectDate] = useState('2026-07-20');
+  const [lectTime, setLectTime] = useState('14:00 - 16:00');
+  const [lectDuration, setLectDuration] = useState('2 hours');
+  const [lectLocation, setLectLocation] = useState('');
+  const [lectAttendees, setLectAttendees] = useState<string>('30');
   
   // Search States
   const [memberSearch, setMemberSearch] = useState('');
@@ -198,6 +214,41 @@ export default function AdminPanel({
     if (!isNaN(currentCount) && currentCount > 0) {
       setPerfLectureCount((currentCount - 1).toString());
     }
+  };
+
+  const handleCreateLecture = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!lectTitle || !lectLocation || !onAddLecture) return;
+
+    const selectedProg = programs.find(p => p.id === lectProgramId);
+
+    const newLect = {
+      title: lectTitle,
+      description: lectDescription,
+      targetTier: lectTargetTier,
+      budget: Number(lectBudget),
+      mileageRoyalty: selectedProg ? selectedProg.royaltyRate : Number(lectMileageRoyalty),
+      programId: lectProgramId || undefined,
+      programTitle: selectedProg ? selectedProg.title : undefined,
+      date: lectDate,
+      time: lectTime,
+      duration: lectDuration,
+      location: lectLocation,
+      attendees: lectAttendees ? Number(lectAttendees) : undefined,
+    };
+
+    onAddLecture(newLect);
+    setShowAddForm(false);
+    
+    // Reset Form
+    setLectTitle('');
+    setLectDescription('');
+    setLectTargetTier('Prestige Associate');
+    setLectBudget(1000000);
+    setLectMileageRoyalty(5000);
+    setLectProgramId('');
+    setLectLocation('');
+    setLectAttendees('30');
   };
 
   // Editing and approval states for Educational Programs
@@ -1036,12 +1087,208 @@ export default function AdminPanel({
         {/* ==================== TAB 3: LECTURE MATCHING & SETTLEMENTS ==================== */}
         {activeTab === 'lectures' && (
           <div className="bg-neutral-900/50 border border-neutral-800 rounded-xl p-5 text-left animate-in fade-in duration-200" id="matching-panel">
-            <h3 className="text-xs font-bold font-display uppercase tracking-wider text-neutral-300 flex items-center gap-1.5 mb-2 border-b border-neutral-800/80 pb-2">
-              <CheckSquare className="w-4 h-4 text-kpcia-gold" /> 출강 신청 강사 심사 & 강의 최종 정산 관리국
-            </h3>
-            <p className="text-[11px] text-neutral-400 mb-5 leading-relaxed">
-              신청을 접수한 강사들의 등급 및 적합성을 평가하여 최종 배정하고, 강사의 출강이 성공적으로 끝났을 시 출강료와 프로그램 저작 마일리지를 자동 안전 분할 정산 지급합니다.
-            </p>
+            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 border-b border-neutral-800/80 pb-4 mb-5">
+              <div>
+                <h3 className="text-xs font-bold font-display uppercase tracking-wider text-neutral-300 flex items-center gap-1.5 mb-1">
+                  <CheckSquare className="w-4 h-4 text-kpcia-gold" /> 출강 신청 강사 심사 & 강의 최종 정산 관리국
+                </h3>
+                <p className="text-[11px] text-neutral-400 leading-relaxed">
+                  신청을 접수한 강사들의 등급 및 적합성을 평가하여 최종 배정하고, 강사의 출강이 성공적으로 끝났을 시 출강료와 프로그램 저작 마일리지를 자동 안전 분할 정산 지급합니다.
+                </p>
+              </div>
+              <button
+                onClick={() => setShowAddForm(!showAddForm)}
+                className="px-4 py-2 bg-kpcia-gold hover:bg-kpcia-gold-hover text-kpcia-dark text-xs font-bold rounded-lg transition-all flex items-center gap-2 shadow-lg shadow-kpcia-gold/15 cursor-pointer shrink-0"
+                id="admin-add-lecture-btn"
+              >
+                <Plus className="w-4 h-4" />
+                <span>강의 요청서 공고하기</span>
+              </button>
+            </div>
+
+            {/* Lecture Post Form inside Admin Panel */}
+            {showAddForm && (
+              <form onSubmit={handleCreateLecture} className="bg-neutral-950 border border-kpcia-gold/30 rounded-xl p-6 space-y-4 mb-6 animate-in fade-in slide-in-from-top-4 duration-300" id="lecture-add-form">
+                <div className="flex items-center justify-between border-b border-neutral-800 pb-3 mb-4">
+                  <h4 className="font-display font-bold text-sm text-kpcia-gold flex items-center gap-2">
+                    <CheckSquare className="w-4 h-4 text-kpcia-gold" /> 신규 출강 강의 요청 공고 등록 (사무국 전용)
+                  </h4>
+                  <span className="text-[10px] text-neutral-400 font-mono">KPCIA ADMIN ONLY</span>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="text-[10px] font-mono text-neutral-400 block mb-1">강의 명칭 / 주제</label>
+                    <input
+                      type="text"
+                      placeholder="예: 현대자동차 차세대 신사업본부 리더십 포럼"
+                      value={lectTitle}
+                      onChange={(e) => setLectTitle(e.target.value)}
+                      required
+                      className="w-full px-3.5 py-2 rounded-lg bg-neutral-900 border border-neutral-800 text-xs font-medium text-neutral-100 focus:border-kpcia-gold focus:outline-none"
+                      id="admin-lect-title"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-[10px] font-mono text-neutral-400 block mb-1">강의 진행 장소 / 기업 정보</label>
+                    <input
+                      type="text"
+                      placeholder="예: 경기도 용인시 삼성인력개발원"
+                      value={lectLocation}
+                      onChange={(e) => setLectLocation(e.target.value)}
+                      required
+                      className="w-full px-3.5 py-2 rounded-lg bg-neutral-900 border border-neutral-800 text-xs font-medium text-neutral-100 focus:border-kpcia-gold focus:outline-none"
+                      id="admin-lect-location"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="text-[10px] font-mono text-neutral-400 block mb-1">강의 설명 및 세부 요구사항</label>
+                  <textarea
+                    rows={3}
+                    placeholder="대기업 파견 강사로서 담당할 세부 커리큘럼 및 기대사항을 자세히 적어주세요."
+                    value={lectDescription}
+                    onChange={(e) => setLectDescription(e.target.value)}
+                    className="w-full px-3.5 py-2 rounded-lg bg-neutral-900 border border-neutral-800 text-xs font-medium text-neutral-100 focus:border-kpcia-gold focus:outline-none resize-none"
+                    id="admin-lect-desc"
+                  />
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                  {/* Required Tier */}
+                  <div>
+                    <label className="text-[10px] font-mono text-neutral-400 block mb-1">지원 가능한 최소 강사 등급</label>
+                    <select
+                      value={lectTargetTier}
+                      onChange={(e) => setLectTargetTier(e.target.value as any)}
+                      className="w-full px-3.5 py-2 rounded-lg bg-neutral-900 border border-neutral-800 text-xs font-medium text-neutral-100 focus:border-kpcia-gold focus:outline-none"
+                      id="admin-lect-tier"
+                    >
+                      <option value="Prestige Member">Prestige Member (일반)</option>
+                      <option value="Prestige Associate">Prestige Associate (어소시에이트)</option>
+                      <option value="Prestige Professional">Prestige Professional (프로페셔널)</option>
+                      <option value="Prestige Master">Prestige Master (마스터)</option>
+                      <option value="Prestige Elite">Prestige Elite (엘리트)</option>
+                    </select>
+                  </div>
+
+                  {/* Associate Educational Program */}
+                  <div>
+                    <label className="text-[10px] font-mono text-neutral-400 block mb-1">지정 교육 프로그램 연계</label>
+                    <select
+                      value={lectProgramId}
+                      onChange={(e) => {
+                        setLectProgramId(e.target.value);
+                        const selected = programs.find(p => p.id === e.target.value);
+                        if (selected) {
+                          setLectMileageRoyalty(selected.royaltyRate);
+                        }
+                      }}
+                      className="w-full px-3.5 py-2 rounded-lg bg-neutral-900 border border-neutral-800 text-xs font-medium text-neutral-100 focus:border-kpcia-gold focus:outline-none"
+                      id="admin-lect-program"
+                    >
+                      <option value="">연계 프로그램 없음 (자유교안)</option>
+                      {programs.map(p => (
+                        <option key={p.id} value={p.id}>{p.title} (저작자: {p.authorName})</option>
+                      ))}
+                    </select>
+                  </div>
+
+                  {/* Budget / Price */}
+                  <div>
+                    <label className="text-[10px] font-mono text-neutral-400 block mb-1">출강 강사료 (KRW 원화)</label>
+                    <input
+                      type="number"
+                      value={lectBudget}
+                      onChange={(e) => setLectBudget(Number(e.target.value))}
+                      className="w-full px-3.5 py-2 rounded-lg bg-neutral-900 border border-neutral-800 text-xs font-medium text-neutral-100 focus:border-kpcia-gold focus:outline-none"
+                      id="admin-lect-budget"
+                    />
+                  </div>
+
+                  {/* Attendees Count */}
+                  <div>
+                    <label className="text-[10px] font-mono text-neutral-400 block mb-1">수강 대상 인원 (명)</label>
+                    <input
+                      type="number"
+                      min={1}
+                      placeholder="예: 30"
+                      value={lectAttendees}
+                      onChange={(e) => setLectAttendees(e.target.value)}
+                      required
+                      className="w-full px-3.5 py-2 rounded-lg bg-neutral-900 border border-neutral-800 text-xs font-medium text-neutral-100 focus:border-kpcia-gold focus:outline-none"
+                      id="admin-lect-attendees"
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                  <div>
+                    <label className="text-[10px] font-mono text-neutral-400 block mb-1">출강 일정</label>
+                    <input
+                      type="date"
+                      value={lectDate}
+                      onChange={(e) => setLectDate(e.target.value)}
+                      className="w-full px-3.5 py-2 rounded-lg bg-neutral-900 border border-neutral-800 text-xs font-medium text-neutral-100 focus:border-kpcia-gold"
+                      id="admin-lect-date"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-[10px] font-mono text-neutral-400 block mb-1">강의 진행 시간</label>
+                    <input
+                      type="text"
+                      value={lectTime}
+                      onChange={(e) => setLectTime(e.target.value)}
+                      className="w-full px-3.5 py-2 rounded-lg bg-neutral-900 border border-neutral-800 text-xs font-medium text-neutral-100 focus:border-kpcia-gold"
+                      id="admin-lect-time"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-[10px] font-mono text-neutral-400 block mb-1">총 소요 시간</label>
+                    <input
+                      type="text"
+                      value={lectDuration}
+                      onChange={(e) => setLectDuration(e.target.value)}
+                      className="w-full px-3.5 py-2 rounded-lg bg-neutral-900 border border-neutral-800 text-xs font-medium text-neutral-100 focus:border-kpcia-gold"
+                      id="admin-lect-duration"
+                    />
+                  </div>
+                  {/* Royalty Amount Manual Input if no program */}
+                  <div>
+                    <label className="text-[10px] font-mono text-neutral-400 block mb-1">
+                      원작 저작자 지급 마일리지 누적 (M)
+                    </label>
+                    <input
+                      type="number"
+                      value={lectMileageRoyalty}
+                      onChange={(e) => setLectMileageRoyalty(Number(e.target.value))}
+                      disabled={!!lectProgramId}
+                      className="w-full px-3.5 py-2 rounded-lg bg-neutral-900 border border-neutral-800 text-xs font-medium text-neutral-100 focus:border-kpcia-gold disabled:opacity-50"
+                      id="admin-lect-royalty"
+                    />
+                  </div>
+                </div>
+
+                <div className="flex justify-end space-x-2 pt-2 border-t border-neutral-800">
+                  <button
+                    type="button"
+                    onClick={() => setShowAddForm(false)}
+                    className="px-4 py-2 border border-neutral-800 bg-neutral-950 text-neutral-400 text-xs font-bold rounded-lg hover:bg-neutral-900 transition-all cursor-pointer"
+                    id="admin-form-lect-cancel"
+                  >
+                    취소
+                  </button>
+                  <button
+                    type="submit"
+                    className="px-5 py-2 bg-kpcia-gold text-kpcia-dark text-xs font-bold rounded-lg hover:bg-kpcia-gold-hover transition-all cursor-pointer"
+                    id="admin-form-lect-submit"
+                  >
+                    공고 게시 완료
+                  </button>
+                </div>
+              </form>
+            )}
 
             <div className="space-y-4" id="matching-list">
               {pendingLectures.length === 0 ? (

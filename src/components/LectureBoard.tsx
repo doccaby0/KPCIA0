@@ -1,35 +1,20 @@
 import React, { useState } from 'react';
-import { UserProfile, LectureRequest, EducationalProgram, InstructorTier } from '../types';
-import { Calendar, Clock, MapPin, Award, CheckCircle2, AlertCircle, PlusCircle, Users, Check, Banknote, Sparkles, X } from 'lucide-react';
+import { UserProfile, LectureRequest, InstructorTier } from '../types';
+import { Calendar, Clock, MapPin, Award, CheckCircle2, AlertCircle, Users, Check, Banknote, Sparkles, X } from 'lucide-react';
 
 interface LectureBoardProps {
   currentUser: UserProfile | null;
   lectures: LectureRequest[];
-  programs: EducationalProgram[];
   onApplyLecture: (lectureId: string) => void;
-  onAddLecture: (lecture: any) => void;
+  onOpenAuthModal?: (tab: 'login' | 'register') => void;
 }
 
 export default function LectureBoard({
   currentUser,
   lectures,
-  programs,
   onApplyLecture,
-  onAddLecture
+  onOpenAuthModal
 }: LectureBoardProps) {
-  const [showAddForm, setShowAddForm] = useState(false);
-  const [title, setTitle] = useState('');
-  const [description, setDescription] = useState('');
-  const [targetTier, setTargetTier] = useState<InstructorTier>('Prestige Associate');
-  const [budget, setBudget] = useState<number>(1000000);
-  const [mileageRoyalty, setMileageRoyalty] = useState<number>(5000);
-  const [programId, setProgramId] = useState('');
-  const [date, setDate] = useState('2026-07-20');
-  const [time, setTime] = useState('14:00 - 16:00');
-  const [duration, setDuration] = useState('2 hours');
-  const [location, setLocation] = useState('');
-  const [attendees, setAttendees] = useState<string>('30');
-
   // Map popup states
   const [selectedMapLocation, setSelectedMapLocation] = useState<string | null>(null);
   const [selectedMapTitle, setSelectedMapTitle] = useState<string>('');
@@ -49,40 +34,6 @@ export default function LectureBoard({
     return userIndex >= requiredIndex;
   };
 
-  const handleCreateLecture = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!title || !location) return;
-
-    const selectedProg = programs.find(p => p.id === programId);
-
-    const newLect = {
-      title,
-      description,
-      targetTier,
-      budget: Number(budget),
-      mileageRoyalty: selectedProg ? selectedProg.royaltyRate : Number(mileageRoyalty),
-      programId: programId || undefined,
-      programTitle: selectedProg ? selectedProg.title : undefined,
-      date,
-      time,
-      duration,
-      location,
-      attendees: attendees ? Number(attendees) : undefined,
-    };
-
-    onAddLecture(newLect);
-    setShowAddForm(false);
-    // Reset Form
-    setTitle('');
-    setDescription('');
-    setTargetTier('Prestige Associate');
-    setBudget(1000000);
-    setMileageRoyalty(5000);
-    setProgramId('');
-    setLocation('');
-    setAttendees('30');
-  };
-
   return (
     <div className="space-y-6" id="lecture-board-section">
       {/* Header and Controls */}
@@ -95,203 +46,9 @@ export default function LectureBoard({
             운영사무국에서 접수한 강의 요청 목록입니다. 강사 등급에 따라서 출강을 신청할 수 있습니다.
           </p>
         </div>
-
-        {/* Admin Post Button */}
-        {currentUser?.isAdmin && (
-          <button
-            onClick={() => setShowAddForm(!showAddForm)}
-            className="px-4 py-2 bg-kpcia-gold hover:bg-kpcia-gold-hover text-kpcia-dark text-xs font-bold rounded-lg transition-all flex items-center gap-2 shadow-lg shadow-kpcia-gold/15"
-            id="add-lecture-btn"
-          >
-            <PlusCircle className="w-4 h-4" />
-            <span>강의 요청서 공고하기</span>
-          </button>
-        )}
       </div>
 
-      {/* Admin Post Form */}
-      {showAddForm && (
-        <form onSubmit={handleCreateLecture} className="bg-neutral-900 border border-kpcia-gold/30 rounded-xl p-6 space-y-4 animate-in fade-in slide-in-from-top-4 duration-300" id="lecture-add-form">
-          <div className="flex items-center justify-between border-b border-neutral-800 pb-3 mb-4">
-            <h3 className="font-display font-bold text-sm text-kpcia-gold flex items-center gap-2">
-              <Sparkles className="w-4 h-4" /> 신규 출강 강의 요청 공고 등록
-            </h3>
-            <span className="text-[10px] text-neutral-400">운영사무국 권한</span>
-          </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div>
-              <label className="text-[10px] font-mono text-neutral-400 block mb-1">강의 명칭 / 주제</label>
-              <input
-                type="text"
-                placeholder="예: 현대자동차 차세대 신사업본부 리더십 포럼"
-                value={title}
-                onChange={(e) => setTitle(e.target.value)}
-                required
-                className="w-full px-3.5 py-2 rounded-lg bg-neutral-950 border border-neutral-800 text-xs font-medium text-neutral-100 focus:border-kpcia-gold focus:outline-none"
-                id="input-lect-title"
-              />
-            </div>
-            <div>
-              <label className="text-[10px] font-mono text-neutral-400 block mb-1">강의 진행 장소 / 기업 정보</label>
-              <input
-                type="text"
-                placeholder="예: 경기도 용인시 삼성인력개발원"
-                value={location}
-                onChange={(e) => setLocation(e.target.value)}
-                required
-                className="w-full px-3.5 py-2 rounded-lg bg-neutral-950 border border-neutral-800 text-xs font-medium text-neutral-100 focus:border-kpcia-gold focus:outline-none"
-                id="input-lect-location"
-              />
-            </div>
-          </div>
-
-          <div>
-            <label className="text-[10px] font-mono text-neutral-400 block mb-1">강의 설명 및 세부 요구사항</label>
-            <textarea
-              rows={3}
-              placeholder="대기업 파견 강사로서 담당할 세부 커리큘럼 및 기대사항을 자세히 적어주세요."
-              value={description}
-              onChange={(e) => setDescription(e.target.value)}
-              className="w-full px-3.5 py-2 rounded-lg bg-neutral-950 border border-neutral-800 text-xs font-medium text-neutral-100 focus:border-kpcia-gold focus:outline-none resize-none"
-              id="input-lect-desc"
-            />
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-            {/* Required Tier */}
-            <div>
-              <label className="text-[10px] font-mono text-neutral-400 block mb-1">지원 가능한 최소 강사 등급</label>
-              <select
-                value={targetTier}
-                onChange={(e) => setTargetTier(e.target.value as any)}
-                className="w-full px-3.5 py-2 rounded-lg bg-neutral-950 border border-neutral-800 text-xs font-medium text-neutral-100 focus:border-kpcia-gold focus:outline-none"
-                id="input-lect-tier"
-              >
-                <option value="Prestige Member">Prestige Member (일반)</option>
-                <option value="Prestige Associate">Prestige Associate (어소시에이트)</option>
-                <option value="Prestige Professional">Prestige Professional (프로페셔널)</option>
-                <option value="Prestige Master">Prestige Master (마스터)</option>
-                <option value="Prestige Elite">Prestige Elite (엘리트)</option>
-              </select>
-            </div>
-
-            {/* Associate Educational Program */}
-            <div>
-              <label className="text-[10px] font-mono text-neutral-400 block mb-1">지정 교육 프로그램 연계</label>
-              <select
-                value={programId}
-                onChange={(e) => {
-                  setProgramId(e.target.value);
-                  const selected = programs.find(p => p.id === e.target.value);
-                  if (selected) {
-                    setMileageRoyalty(selected.royaltyRate);
-                  }
-                }}
-                className="w-full px-3.5 py-2 rounded-lg bg-neutral-950 border border-neutral-800 text-xs font-medium text-neutral-100 focus:border-kpcia-gold focus:outline-none"
-                id="input-lect-program"
-              >
-                <option value="">연계 프로그램 없음 (자유교안)</option>
-                {programs.map(p => (
-                  <option key={p.id} value={p.id}>{p.title} (저작자: {p.authorName})</option>
-                ))}
-              </select>
-            </div>
-
-            {/* Budget / Price */}
-            <div>
-              <label className="text-[10px] font-mono text-neutral-400 block mb-1">출강 강사료 (KRW 원화)</label>
-              <input
-                type="number"
-                value={budget}
-                onChange={(e) => setBudget(Number(e.target.value))}
-                className="w-full px-3.5 py-2 rounded-lg bg-neutral-950 border border-neutral-800 text-xs font-medium text-neutral-100 focus:border-kpcia-gold focus:outline-none"
-                id="input-lect-budget"
-              />
-            </div>
-
-            {/* Attendees Count */}
-            <div>
-              <label className="text-[10px] font-mono text-neutral-400 block mb-1">수강 대상 인원 (명)</label>
-              <input
-                type="number"
-                min={1}
-                placeholder="예: 30"
-                value={attendees}
-                onChange={(e) => setAttendees(e.target.value)}
-                required
-                className="w-full px-3.5 py-2 rounded-lg bg-neutral-950 border border-neutral-800 text-xs font-medium text-neutral-100 focus:border-kpcia-gold focus:outline-none"
-                id="input-lect-attendees"
-              />
-            </div>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-            <div>
-              <label className="text-[10px] font-mono text-neutral-400 block mb-1">출강 일정</label>
-              <input
-                type="date"
-                value={date}
-                onChange={(e) => setDate(e.target.value)}
-                className="w-full px-3.5 py-2 rounded-lg bg-neutral-950 border border-neutral-800 text-xs font-medium text-neutral-100 focus:border-kpcia-gold"
-                id="input-lect-date"
-              />
-            </div>
-            <div>
-              <label className="text-[10px] font-mono text-neutral-400 block mb-1">강의 진행 시간</label>
-              <input
-                type="text"
-                value={time}
-                onChange={(e) => setTime(e.target.value)}
-                className="w-full px-3.5 py-2 rounded-lg bg-neutral-950 border border-neutral-800 text-xs font-medium text-neutral-100 focus:border-kpcia-gold"
-                id="input-lect-time"
-              />
-            </div>
-            <div>
-              <label className="text-[10px] font-mono text-neutral-400 block mb-1">총 소요 시간</label>
-              <input
-                type="text"
-                value={duration}
-                onChange={(e) => setDuration(e.target.value)}
-                className="w-full px-3.5 py-2 rounded-lg bg-neutral-950 border border-neutral-800 text-xs font-medium text-neutral-100 focus:border-kpcia-gold"
-                id="input-lect-duration"
-              />
-            </div>
-            {/* Royalty Amount Manual Input if no program */}
-            <div>
-              <label className="text-[10px] font-mono text-neutral-400 block mb-1">
-                원작 저작자 지급 마일리지 누적 (M)
-              </label>
-              <input
-                type="number"
-                value={mileageRoyalty}
-                onChange={(e) => setMileageRoyalty(Number(e.target.value))}
-                disabled={!!programId}
-                className="w-full px-3.5 py-2 rounded-lg bg-neutral-950 border border-neutral-800 text-xs font-medium text-neutral-100 focus:border-kpcia-gold disabled:opacity-50"
-                id="input-lect-royalty"
-              />
-            </div>
-          </div>
-
-          <div className="flex justify-end space-x-2 pt-2 border-t border-neutral-800">
-            <button
-              type="button"
-              onClick={() => setShowAddForm(false)}
-              className="px-4 py-2 border border-neutral-800 bg-neutral-950 text-neutral-400 text-xs font-bold rounded-lg hover:bg-neutral-900 transition-all"
-              id="form-lect-cancel"
-            >
-              취소
-            </button>
-            <button
-              type="submit"
-              className="px-5 py-2 bg-kpcia-gold text-kpcia-dark text-xs font-bold rounded-lg hover:bg-kpcia-gold-hover transition-all"
-              id="form-lect-submit"
-            >
-              공고 게시 완료
-            </button>
-          </div>
-        </form>
-      )}
 
       {/* Lectures Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6" id="lectures-grid">
@@ -417,7 +174,19 @@ export default function LectureBoard({
               <div className="mt-5 pt-3.5 border-t border-neutral-800/80 flex items-center justify-between">
                 <div>
                   <div className="text-[10px] text-neutral-500 uppercase font-mono">출강 강사료</div>
-                  {isQualified || currentUser?.isAdmin ? (
+                  {!currentUser || currentUser.uid === 'guest' ? (
+                    <div className="relative group/price mt-1" title="로그인 후 확인 가능합니다.">
+                      <div className="text-sm font-bold text-neutral-450/40 flex items-center gap-1 font-mono select-none pointer-events-none filter blur-[4.5px]">
+                        <Banknote className="w-4 h-4 text-neutral-600 shrink-0" />
+                        {lecture.budget.toLocaleString()} KRW
+                      </div>
+                      <div className="absolute inset-y-0 left-0 flex items-center">
+                        <span className="text-[9px] text-kpcia-gold/90 font-bold bg-kpcia-gold/10 border border-kpcia-gold/25 px-1.5 py-0.5 rounded shadow-sm">
+                          🔒 로그인 후 공개
+                        </span>
+                      </div>
+                    </div>
+                  ) : isQualified || currentUser?.isAdmin ? (
                     <div className="text-sm font-bold text-neutral-200 flex items-center gap-1 font-mono">
                       <Banknote className="w-4 h-4 text-neutral-400" />
                       {lecture.budget.toLocaleString()} KRW
@@ -432,7 +201,15 @@ export default function LectureBoard({
                 {/* Apply Actions */}
                 <div id={`apply-actions-${lecture.id}`}>
                   {lecture.status === 'open' ? (
-                    currentUser?.isAdmin ? (
+                    !currentUser || currentUser.uid === 'guest' ? (
+                      <button
+                        onClick={() => onOpenAuthModal && onOpenAuthModal('login')}
+                        className="px-4 py-2 bg-kpcia-gold hover:bg-kpcia-gold-hover text-kpcia-dark text-xs font-bold rounded-lg transition-all shadow-md hover:shadow-kpcia-gold/10 cursor-pointer"
+                        id={`login-to-apply-${lecture.id}`}
+                      >
+                        로그인 후 신청
+                      </button>
+                    ) : currentUser?.isAdmin ? (
                       <div className="text-xs text-neutral-500 font-mono flex items-center gap-1">
                         <Users className="w-3.5 h-3.5" />
                         <span>신청 강사 {lecture.applicants.length}명 대기중</span>
