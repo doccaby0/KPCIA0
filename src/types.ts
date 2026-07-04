@@ -25,6 +25,7 @@ export interface InstructorCardInfo {
   imageUrl?: string;
   pdfUrl?: string;
   cardTheme: 'classic' | 'gold_luxury' | 'midnight_sapphire' | 'elite_emerald';
+  bankAccount?: string;
 }
 
 export interface UserProfile {

@@ -559,6 +559,7 @@ export default function App() {
       contactPhone: sanitizePhone(cardInfo.contactPhone),
       imageUrl: cardInfo.imageUrl ? sanitizeString(cardInfo.imageUrl) : undefined,
       pdfUrl: cardInfo.pdfUrl ? sanitizeString(cardInfo.pdfUrl) : undefined,
+      bankAccount: cardInfo.bankAccount ? sanitizeString(cardInfo.bankAccount) : undefined,
       specialties: Array.isArray(cardInfo.specialties) 
         ? cardInfo.specialties.map((s: string) => sanitizeString(s)) 
         : [],
@@ -1150,7 +1151,7 @@ export default function App() {
                     id="modal-login-btn"
                   >
                     <LogIn className="w-3.5 h-3.5 text-kpcia-dark" />
-                    <span>KPCIA 전용 포털 안전 로그인</span>
+                    <span>KPCIA 로그인</span>
                   </button>
                 </form>
               ) : (

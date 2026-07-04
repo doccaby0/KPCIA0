@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { UserProfile, LectureRequest, InstructorTier } from '../types';
-import { Calendar, Clock, MapPin, Award, CheckCircle2, AlertCircle, Users, Check, Banknote, Sparkles, X } from 'lucide-react';
+import { Calendar, Clock, MapPin, Award, CheckCircle2, AlertCircle, Users, Check, Banknote, Sparkles, X, FileDown } from 'lucide-react';
 
 interface LectureBoardProps {
   currentUser: UserProfile | null;
@@ -32,6 +32,46 @@ export default function LectureBoard({
     const userIndex = tiersOrder.indexOf(userTier);
     const requiredIndex = tiersOrder.indexOf(requiredTier);
     return userIndex >= requiredIndex;
+  };
+
+  const downloadLectureAsTxt = (lecture: LectureRequest) => {
+    const isPriceVisible = !currentUser || currentUser.uid === 'guest' 
+      ? false 
+      : currentUser.isAdmin || checkQualification(currentUser.tier, lecture.targetTier);
+
+    const textContent = `==================================================
+KPCIA 한국프레스티지강사협회 - 출강 공고 상세 정보
+==================================================
+
+■ 공고 제목       : ${lecture.title}
+■ 최저 지원 등급 : ${lecture.targetTier} 이상
+■ 출강 일자       : ${lecture.date}
+■ 출강 시간       : ${lecture.time} (${lecture.duration})
+■ 수강 대상       : ${lecture.attendees ? `${lecture.attendees}명` : '상세 정보 참조'}
+■ 출강 장소       : ${lecture.location}
+■ 출강 강사료     : ${isPriceVisible ? `${lecture.budget.toLocaleString()} KRW` : '[로그인 및 자격 획득 후 공개]'}
+■ 마일리지 로열티 : ${lecture.mileageRoyalty.toLocaleString()} M
+■ 연계 교육 프로그램 : ${lecture.programTitle || '없음'}
+■ 공고 상태       : ${lecture.status === 'open' ? '모집중 (지원 가능)' : lecture.status === 'assigned' ? '배정 완료' : '종료'}
+
+--------------------------------------------------
+[ 상세 강의 설명 ]
+--------------------------------------------------
+${lecture.description}
+
+==================================================
+본 공고는 KPCIA 회원 및 검증된 소속 강사를 위한 공식 출강 정보입니다.
+출강 및 제휴 문의: KPCIA 한국프레스티지강사협회 (dh_kim@kpcia.or.kr)
+출력 일시: ${new Date().toLocaleString('ko-KR')}
+==================================================`;
+
+    const element = document.createElement("a");
+    const file = new Blob([textContent], { type: 'text/plain;charset=utf-8' });
+    element.href = URL.createObjectURL(file);
+    element.download = `KPCIA_출강공고_${lecture.title.replace(/[\s/\\:*?"<>|]/g, '_')}.txt`;
+    document.body.appendChild(element);
+    element.click();
+    document.body.removeChild(element);
   };
 
   return (
@@ -102,9 +142,20 @@ export default function LectureBoard({
                   </div>
 
                   {/* Required Tier Qualification */}
-                  <span className={`text-[9px] px-2.5 py-0.5 rounded-full font-mono font-bold border ${tierColors[lecture.targetTier]}`}>
-                    {lecture.targetTier} ↑ 지원 가능
-                  </span>
+                  <div className="flex items-center space-x-2">
+                    <button
+                      onClick={() => downloadLectureAsTxt(lecture)}
+                      className="px-2 py-1 bg-neutral-950 hover:bg-neutral-800 border border-neutral-850 hover:border-kpcia-gold/30 text-[10px] text-neutral-400 hover:text-kpcia-gold rounded font-medium flex items-center gap-1 transition-all cursor-pointer"
+                      title="강의 내용을 메모장(TXT) 파일로 다운로드합니다."
+                      id={`download-txt-${lecture.id}`}
+                    >
+                      <FileDown className="w-3 h-3 text-neutral-500 group-hover:text-kpcia-gold" />
+                      <span>메모장 출력</span>
+                    </button>
+                    <span className={`text-[9px] px-2.5 py-0.5 rounded-full font-mono font-bold border ${tierColors[lecture.targetTier]}`}>
+                      {lecture.targetTier} ↑ 지원 가능
+                    </span>
+                  </div>
                 </div>
 
                 {/* Title */}
@@ -182,14 +233,14 @@ export default function LectureBoard({
                       </div>
                       <div className="absolute inset-y-0 left-0 flex items-center">
                         <span className="text-[9px] text-kpcia-gold/90 font-bold bg-kpcia-gold/10 border border-kpcia-gold/25 px-1.5 py-0.5 rounded shadow-sm">
-                          🔒 로그인 후 공개
+                          등급 달성시 공개
                         </span>
                       </div>
                     </div>
                   ) : isQualified || currentUser?.isAdmin ? (
                     <div className="text-sm font-bold text-neutral-200 flex items-center gap-1 font-mono">
-                      <Banknote className="w-4 h-4 text-neutral-400" />
-                      {lecture.budget.toLocaleString()} KRW
+                       <Banknote className="w-4 h-4 text-neutral-400" />
+                       {lecture.budget.toLocaleString()} KRW
                     </div>
                   ) : (
                     <div className="text-xs font-semibold text-neutral-500 flex items-center gap-1 mt-1 font-sans" title="귀하의 등급이 자격 요건에 달하지 않아 강사료가 비공개 처리되었습니다.">
@@ -207,7 +258,7 @@ export default function LectureBoard({
                         className="px-4 py-2 bg-kpcia-gold hover:bg-kpcia-gold-hover text-kpcia-dark text-xs font-bold rounded-lg transition-all shadow-md hover:shadow-kpcia-gold/10 cursor-pointer"
                         id={`login-to-apply-${lecture.id}`}
                       >
-                        로그인 후 신청
+                        등급 달성시 신청
                       </button>
                     ) : currentUser?.isAdmin ? (
                       <div className="text-xs text-neutral-500 font-mono flex items-center gap-1">

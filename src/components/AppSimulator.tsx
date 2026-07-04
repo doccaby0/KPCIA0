@@ -14,7 +14,8 @@ import {
   AlertCircle, 
   Check, 
   Globe,
-  Users 
+  Users,
+  FileDown
 } from 'lucide-react';
 
 interface AppSimulatorProps {
@@ -57,6 +58,46 @@ export default function AppSimulator({
   const checkIsQualified = (userTier: string, requiredTier: string) => {
     const order = ['Prestige Member', 'Prestige Associate', 'Prestige Professional', 'Prestige Master', 'Prestige Elite'];
     return order.indexOf(userTier) >= order.indexOf(requiredTier);
+  };
+
+  const downloadLectureAsTxt = (lecture: LectureRequest) => {
+    const isPriceVisible = !currentUser || currentUser.uid === 'guest' 
+      ? false 
+      : currentUser.isAdmin || checkIsQualified(currentUser.tier, lecture.targetTier);
+
+    const textContent = `==================================================
+KPCIA 한국프레스티지강사협회 - 출강 공고 상세 정보 (모바일)
+==================================================
+
+■ 공고 제목       : ${lecture.title}
+■ 최저 지원 등급 : ${lecture.targetTier} 이상
+■ 출강 일자       : ${lecture.date}
+■ 출강 시간       : ${lecture.time} (${lecture.duration})
+■ 수강 대상       : ${lecture.attendees ? `${lecture.attendees}명` : '상세 정보 참조'}
+■ 출강 장소       : ${lecture.location}
+■ 출강 강사료     : ${isPriceVisible ? `${lecture.budget.toLocaleString()} KRW` : '[로그인 및 자격 획득 후 공개]'}
+■ 마일리지 로열티 : ${lecture.mileageRoyalty.toLocaleString()} M
+■ 연계 교육 프로그램 : ${lecture.programTitle || '없음'}
+■ 공고 상태       : ${lecture.status === 'open' ? '모집중 (지원 가능)' : lecture.status === 'assigned' ? '배정 완료' : '종료'}
+
+--------------------------------------------------
+[ 상세 강의 설명 ]
+--------------------------------------------------
+${lecture.description}
+
+==================================================
+본 공고는 KPCIA 회원 및 검증된 소속 강사를 위한 공식 출강 정보입니다.
+출강 및 제휴 문의: KPCIA 한국프레스티지강사협회 (dh_kim@kpcia.or.kr)
+출력 일시: ${new Date().toLocaleString('ko-KR')}
+==================================================`;
+
+    const element = document.createElement("a");
+    const file = new Blob([textContent], { type: 'text/plain;charset=utf-8' });
+    element.href = URL.createObjectURL(file);
+    element.download = `KPCIA_출강공고_${lecture.title.replace(/[\s/\\:*?"<>|]/g, '_')}.txt`;
+    document.body.appendChild(element);
+    element.click();
+    document.body.removeChild(element);
   };
 
   const handleMobileLoginSubmit = async (e: React.FormEvent) => {
@@ -230,7 +271,17 @@ export default function AppSimulator({
                               </div>
 
                               <div className="flex items-center justify-between pt-2 border-t border-neutral-900/50">
-                                <span className="text-[8px] text-neutral-500 font-mono">{l.date} 출강</span>
+                                <div className="flex items-center space-x-1.5">
+                                  <span className="text-[8px] text-neutral-500 font-mono">{l.date} 출강</span>
+                                  <button
+                                    onClick={() => downloadLectureAsTxt(l)}
+                                    className="p-1 hover:bg-neutral-800 rounded text-neutral-400 hover:text-kpcia-gold transition-colors cursor-pointer"
+                                    title="메모장(TXT) 다운로드"
+                                    id={`mobile-txt-down-${l.id}`}
+                                  >
+                                    <FileDown className="w-3.5 h-3.5" />
+                                  </button>
+                                </div>
                                 {l.status === 'open' ? (
                                   isQualified ? (
                                     hasApplied ? (

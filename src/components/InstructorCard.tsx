@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { UserProfile, InstructorCardInfo } from '../types';
-import { Mail, Phone, MapPin, Award, Download, Save, RefreshCw, Plus, Trash2, Printer, X, User, FileUp, FileText, CheckCircle2, AlertCircle, Sparkles, Building, Loader2 } from 'lucide-react';
+import { Mail, Phone, MapPin, Award, Download, Save, RefreshCw, Plus, Trash2, Printer, X, User, FileUp, FileText, CheckCircle2, AlertCircle, Sparkles, Building, Loader2, CreditCard } from 'lucide-react';
 
 export function getLectureMilestoneBadge(lectureCount?: number) {
   if (lectureCount === undefined || lectureCount < 10) return null;
@@ -47,6 +47,7 @@ export default function InstructorCard({ currentUser, onSaveProfileCard, onGoHom
 
   const [contactEmail, setContactEmail] = useState(currentUser.profileCard?.contactEmail || currentUser.email);
   const [contactPhone, setContactPhone] = useState(currentUser.profileCard?.contactPhone || '');
+  const [bankAccount, setBankAccount] = useState(currentUser.profileCard?.bankAccount || '');
   const [cardTheme, setCardTheme] = useState<'classic' | 'gold_luxury' | 'midnight_sapphire' | 'elite_emerald'>(
     currentUser.profileCard?.cardTheme || 'classic'
   );
@@ -71,6 +72,7 @@ export default function InstructorCard({ currentUser, onSaveProfileCard, onGoHom
     setEducation(currentUser.profileCard?.education || []);
     setContactEmail(currentUser.profileCard?.contactEmail || currentUser.email);
     setContactPhone(currentUser.profileCard?.contactPhone || '');
+    setBankAccount(currentUser.profileCard?.bankAccount || '');
     setCardTheme(currentUser.profileCard?.cardTheme || 'classic');
     setImageUrl(currentUser.profileCard?.imageUrl || '');
   }, [currentUser]);
@@ -122,7 +124,8 @@ export default function InstructorCard({ currentUser, onSaveProfileCard, onGoHom
       contactEmail,
       contactPhone,
       cardTheme,
-      imageUrl
+      imageUrl,
+      bankAccount
     };
     onSaveProfileCard(updatedCard);
     setIsEditing(false);
@@ -428,7 +431,7 @@ export default function InstructorCard({ currentUser, onSaveProfileCard, onGoHom
           {/* Bottom Footer Row */}
           <div className="flex items-center justify-between relative z-10" id="card-bottom-row">
             {/* Contact details */}
-            <div className="flex items-center space-x-4 text-[10px] font-mono text-neutral-400">
+            <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-[10px] font-mono text-neutral-400">
               <div className="flex items-center space-x-1">
                 <Mail className="w-3 h-3 text-neutral-500" />
                 <span>{contactEmail || currentUser.email}</span>
@@ -437,6 +440,12 @@ export default function InstructorCard({ currentUser, onSaveProfileCard, onGoHom
                 <div className="flex items-center space-x-1">
                   <Phone className="w-3 h-3 text-neutral-500" />
                   <span>{contactPhone}</span>
+                </div>
+              )}
+              {bankAccount && (
+                <div className="flex items-center space-x-1 text-kpcia-gold/80">
+                  <CreditCard className="w-3 h-3 text-kpcia-gold/60" />
+                  <span>{bankAccount}</span>
                 </div>
               )}
             </div>
@@ -802,6 +811,19 @@ export default function InstructorCard({ currentUser, onSaveProfileCard, onGoHom
                   id="form-phone"
                 />
               </div>
+            </div>
+
+            {/* Bank Account Number */}
+            <div>
+              <label className="text-[10px] font-mono text-neutral-400 uppercase block mb-1">정산 계좌정보 (은행명 및 계좌번호)</label>
+              <input 
+                type="text" 
+                placeholder="예: 신한은행 110-123-456789 (예금주: 홍길동)" 
+                value={bankAccount} 
+                onChange={(e) => setBankAccount(e.target.value)} 
+                className="w-full px-3.5 py-2 rounded-lg bg-neutral-950 border border-neutral-800 text-xs font-medium text-neutral-100 focus:border-kpcia-gold focus:outline-none"
+                id="form-bank-account"
+              />
             </div>
 
             {/* Action Buttons */}
