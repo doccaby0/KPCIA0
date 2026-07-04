@@ -1,0 +1,1206 @@
+import React, { useState, useEffect } from 'react';
+import { UserProfile, LectureRequest, EducationalProgram, MileageTransaction, InstructorTier, DigitalBadge, PartnershipProposal } from './types';
+import { StorageService, generateBadgeForTier } from './lib/firebase';
+import Header from './components/Header';
+import InstructorCard from './components/InstructorCard';
+import LectureBoard from './components/LectureBoard';
+import ProgramBoard from './components/ProgramBoard';
+import AdminPanel from './components/AdminPanel';
+import AppSimulator from './components/AppSimulator';
+import PendingApprovalView from './components/PendingApprovalView';
+import BadgeCabinet from './components/BadgeCabinet';
+import PartnershipProposalBoard from './components/PartnershipProposalBoard';
+import KPCIALogo from './components/KPCIALogo';
+
+import { Award, BookOpen, GraduationCap, CheckCircle, ShieldAlert, Sparkles, TrendingUp, Compass, ArrowRight, UserCheck, Plus, LogIn, X } from 'lucide-react';
+
+export default function App() {
+  const [users, setUsers] = useState<UserProfile[]>([]);
+  const [currentUser, setCurrentUser] = useState<UserProfile | null>(null);
+  const [lectures, setLectures] = useState<LectureRequest[]>([]);
+  const [programs, setPrograms] = useState<EducationalProgram[]>([]);
+  const [transactions, setTransactions] = useState<MileageTransaction[]>([]);
+  const [proposals, setProposals] = useState<PartnershipProposal[]>([]);
+
+  // Navigation state
+  const [activeTab, setActiveTab] = useState<string>('home');
+  const [activeMobileTab, setActiveMobileTab] = useState<string>('lectures');
+  const [isMobileSimulated, setIsMobileSimulated] = useState<boolean>(false);
+
+  // Gateway Registration States
+  const [showGatewayRegister, setShowGatewayRegister] = useState<boolean>(false);
+  const [gwName, setGwName] = useState<string>('');
+  const [gwEmail, setGwEmail] = useState<string>('');
+  const [gwTier, setGwTier] = useState<InstructorTier>('Prestige Member');
+  const [gwTitle, setGwTitle] = useState<string>('');
+  const [gwPhone, setGwPhone] = useState<string>('');
+  const [verificationStep, setVerificationStep] = useState<'input' | 'verify'>('input');
+  const [verificationCode, setVerificationCode] = useState<string>('');
+  const [generatedCode, setGeneratedCode] = useState<string>('');
+  const [verificationError, setVerificationError] = useState<string>('');
+
+  // Notification Toast alert
+  const [toast, setToast] = useState<{ message: string; type: 'success' | 'info' } | null>(null);
+
+  const triggerToast = (message: string, type: 'success' | 'info' = 'success') => {
+    setToast({ message, type });
+    setTimeout(() => {
+      setToast(null);
+    }, 5000);
+  };
+
+  // Initial Data Sync on startup
+  useEffect(() => {
+    const syncData = async () => {
+      // 1. Seed empty database
+      await StorageService.seedDatabaseIfEmpty();
+
+      // 2. Fetch all collections
+      const loadedUsers = await StorageService.getUsers();
+      const loadedLectures = await StorageService.getLectures();
+      const loadedPrograms = await StorageService.getPrograms();
+      const loadedTransactions = await StorageService.getTransactions();
+      const loadedProposals = await StorageService.getProposals();
+
+      setUsers(loadedUsers);
+      setLectures(loadedLectures);
+      setPrograms(loadedPrograms);
+      setTransactions(loadedTransactions);
+      setProposals(loadedProposals);
+
+      // 3. Set default current user as MZ세대 소통 강사 (김도현) to start with
+      const defaultUser = loadedUsers.find(u => u.uid === 'user_associate') || loadedUsers[0];
+      setCurrentUser(defaultUser);
+    };
+
+    syncData();
+  }, []);
+
+  // Sync back currentUser updates to the general users list and storage
+  const handleUpdateCurrentUser = async (updatedUser: UserProfile) => {
+    setCurrentUser(updatedUser);
+    setUsers(prev => prev.map(u => u.uid === updatedUser.uid ? updatedUser : u));
+    await StorageService.saveUser(updatedUser);
+  };
+
+  // Handlers
+  // 1. Switch Active Testing Account Persona
+  const handleUserChange = (userId: string) => {
+    const selected = users.find(u => u.uid === userId);
+    if (selected) {
+      setCurrentUser(selected);
+      triggerToast(`${selected.name} [현재 등급: ${selected.tier}] 계정으로 성공적으로 전환되었습니다.`, 'info');
+    }
+  };
+
+  // 2. Apply for Lecture Request
+  const handleApplyLecture = async (lectureId: string) => {
+    if (!currentUser) return;
+
+    const lecture = lectures.find(l => l.id === lectureId);
+    if (!lecture) return;
+
+    if (lecture.applicants.includes(currentUser.uid)) {
+      triggerToast('이미 본 강의에 출강을 신청하셨습니다.', 'info');
+      return;
+    }
+
+    const updatedLecture: LectureRequest = {
+      ...lecture,
+      applicants: [...lecture.applicants, currentUser.uid]
+    };
+
+    const updatedLectures = lectures.map(l => l.id === lectureId ? updatedLecture : l);
+    setLectures(updatedLectures);
+    await StorageService.saveLecture(updatedLecture);
+
+    triggerToast(`'${lecture.title}' 과정에 성공적으로 출강 신청이 접수되었습니다! 운영사무국의 배정 승인을 대기합니다.`);
+  };
+
+  // 3. Post a new lecture request (Admin Only)
+  const handleAddLecture = async (lectureData: any) => {
+    const newId = `lect_00${lectures.length + 1}_${Date.now().toString().slice(-4)}`;
+    const newLecture: LectureRequest = {
+      ...lectureData,
+      id: newId,
+      status: 'open',
+      applicants: [],
+      createdAt: new Date().toISOString()
+    };
+
+    const updatedLectures = [...lectures, newLecture];
+    setLectures(updatedLectures);
+    await StorageService.saveLecture(newLecture);
+
+    triggerToast(`신규 기업 출강 강의 공고 '${newLecture.title}'가 전체 위원회 게시판에 실시간으로 게시되었습니다.`);
+  };
+
+  // 4. Register a new custom Educational Program
+  const handleRegisterProgram = async (programData: any) => {
+    if (!currentUser) return;
+
+    const newId = `prog_00${programs.length + 1}_${Date.now().toString().slice(-4)}`;
+    const newProgram: EducationalProgram = {
+      ...programData,
+      id: newId,
+      authorId: currentUser.uid,
+      authorName: currentUser.name,
+      createdAt: new Date().toISOString()
+    };
+
+    // 1. Save program
+    const updatedPrograms = [...programs, newProgram];
+    setPrograms(updatedPrograms);
+    await StorageService.saveProgram(newProgram);
+
+    // 2. Log mileage transaction for ledger records (but do NOT automatically update user.mileage)
+    const newTx: MileageTransaction = {
+      id: `tx_${Date.now()}`,
+      userId: currentUser.uid,
+      userName: currentUser.name,
+      type: 'program_register',
+      amount: 1000,
+      description: `'${newProgram.title}' 독창적 명품 교육 프로그램 신규 등재 완료 (마일리지 수동 지급 승인 대기: +1,000 M)`,
+      createdAt: new Date().toISOString()
+    };
+    setTransactions(prev => [...prev, newTx]);
+    await StorageService.addTransaction(newTx);
+
+    triggerToast(`'${newProgram.title}' 과정 등재 성공! 등재 마일리지는 협회 관리자가 검토 후 수동 지급합니다.`);
+  };
+
+  // 5. Upgrade User Grade / Tier (Admin Only)
+  const handleUpgradeUserTier = async (userId: string, targetTier: InstructorTier) => {
+    const targetUser = users.find(u => u.uid === userId);
+    if (!targetUser) return;
+
+    if (targetUser.tier === targetTier) return;
+
+    // Generate badge automatically for the upgraded tier!
+    const newBadge = generateBadgeForTier(targetTier);
+    
+    // Merge existing badges, avoid duplicate of same tier
+    const updatedBadges = [...targetUser.badges];
+    if (!updatedBadges.some(b => b.tier === targetTier)) {
+      updatedBadges.push(newBadge);
+    }
+
+    const updatedUser: UserProfile = {
+      ...targetUser,
+      tier: targetTier,
+      badges: updatedBadges,
+      updatedAt: new Date().toISOString()
+    };
+
+    // Sync back
+    setUsers(prev => prev.map(u => u.uid === userId ? updatedUser : u));
+    await StorageService.saveUser(updatedUser);
+
+    // If upgraded user is current user, update local view immediately
+    if (currentUser && currentUser.uid === userId) {
+      setCurrentUser(updatedUser);
+    }
+
+    // Append Admin upgrade transaction
+    const newTx: MileageTransaction = {
+      id: `tx_up_${Date.now()}`,
+      userId: targetUser.uid,
+      userName: targetUser.name,
+      type: 'admin_adjust',
+      amount: 0,
+      description: `강사 등급 공식 승격: ${targetUser.tier} → ${targetTier} [디지털 배지 ${newBadge.title} 자동 수여]`,
+      createdAt: new Date().toISOString()
+    };
+    setTransactions(prev => [...prev, newTx]);
+    await StorageService.addTransaction(newTx);
+
+    triggerToast(`${targetUser.name} 강사님의 등급이 '${targetTier}'로 정식 승격 및 디지털 영예 배지가 발송되었습니다!`, 'success');
+  };
+
+  // 6. Assign lecturer (Admin Only)
+  const handleAssignLecturer = async (lectureId: string, userId: string, userName: string) => {
+    const lecture = lectures.find(l => l.id === lectureId);
+    if (!lecture) return;
+
+    const updatedLecture: LectureRequest = {
+      ...lecture,
+      status: 'assigned',
+      assignedTo: userId,
+      assignedName: userName
+    };
+
+    setLectures(prev => prev.map(l => l.id === lectureId ? updatedLecture : l));
+    await StorageService.saveLecture(updatedLecture);
+
+    triggerToast(`'${lecture.title}' 공고에 ${userName} 강사님이 공식 배정되었습니다.`);
+  };
+
+  // 7. Complete Lecture & Pay Royalty to Creator & Lecturer Fee (Admin Only)
+  const handleCompleteLecture = async (lectureId: string) => {
+    const lecture = lectures.find(l => l.id === lectureId);
+    if (!lecture || lecture.status !== 'assigned' || !lecture.assignedTo) return;
+
+    // Mark as Completed
+    const updatedLecture: LectureRequest = {
+      ...lecture,
+      status: 'completed'
+    };
+
+    setLectures(prev => prev.map(l => l.id === lectureId ? updatedLecture : l));
+    await StorageService.saveLecture(updatedLecture);
+
+    // Payout logic
+    const lecturerId = lecture.assignedTo;
+    const lecturer = users.find(u => u.uid === lecturerId);
+
+    // Lecture completion reward: e.g. +3,000 M payout to lecturer (We log ledger tx but let admin edit manually)
+    if (lecturer) {
+      // Add payout transaction
+      const lecturerTx: MileageTransaction = {
+        id: `tx_pay_${Date.now()}`,
+        userId: lecturerId,
+        userName: lecturer.name,
+        type: 'lecture_payout',
+        amount: 3000,
+        description: `'${lecture.title}' 출강 수행 완료에 따른 수동 정산 대기 (+3,000 M)`,
+        createdAt: new Date().toISOString()
+      };
+      setTransactions(prev => [...prev, lecturerTx]);
+      await StorageService.addTransaction(lecturerTx);
+    }
+
+    // ROYALTY LOGIC: Check if lecture was based on a registered program owned by ANOTHER instructor
+    if (lecture.programId) {
+      const associatedProgram = programs.find(p => p.id === lecture.programId);
+      if (associatedProgram && associatedProgram.authorId !== lecturerId) {
+        // Yes! Pay royalty to the program creator!
+        const creatorId = associatedProgram.authorId;
+        const creator = users.find(u => u.uid === creatorId);
+
+        if (creator) {
+          // Add royalty transaction log
+          const royaltyTx: MileageTransaction = {
+            id: `tx_royalty_${Date.now()}`,
+            userId: creatorId,
+            userName: creator.name,
+            type: 'royalty',
+            amount: associatedProgram.royaltyRate,
+            description: `타 강사(${lecturer?.name || '협회강사'})가 '${associatedProgram.title}' 교안으로 출강 완료함에 따른 저작권 마일리지 누적 대기 (+${associatedProgram.royaltyRate.toLocaleString()} M)`,
+            relatedId: lectureId,
+            createdAt: new Date().toISOString()
+          };
+          setTransactions(prev => [...prev, royaltyTx]);
+          await StorageService.addTransaction(royaltyTx);
+
+          triggerToast(`출강 종료 승인 완료! 마일리지 자동 연동 대신 정산 명세가 트랜잭션 원장에 기록되었습니다. 관리자가 확인 후 수동으로 지급합니다.`);
+          return;
+        }
+      }
+    }
+
+    triggerToast(`'${lecture.title}' 출강 종료 승인이 완료되었습니다. 마일리지 명세가 트랜잭션 원장에 기록되었습니다. (관리자 수동 정산 대기)`);
+  };
+
+  // 8. Manual Mileage Adjustment (Admin Only)
+  const handleAdjustMileage = async (userId: string, amount: number, description: string) => {
+    const targetUser = users.find(u => u.uid === userId);
+    if (!targetUser) return;
+
+    const updatedUser: UserProfile = {
+      ...targetUser,
+      mileage: Math.max(0, targetUser.mileage + amount)
+    };
+
+    setUsers(prev => prev.map(u => u.uid === userId ? updatedUser : u));
+    await StorageService.saveUser(updatedUser);
+
+    if (currentUser && currentUser.uid === userId) {
+      setCurrentUser(updatedUser);
+    }
+
+    // Add transaction log
+    const newTx: MileageTransaction = {
+      id: `tx_adj_${Date.now()}`,
+      userId: targetUser.uid,
+      userName: targetUser.name,
+      type: 'admin_adjust',
+      amount,
+      description,
+      createdAt: new Date().toISOString()
+    };
+    setTransactions(prev => [...prev, newTx]);
+    await StorageService.addTransaction(newTx);
+
+    triggerToast(`${targetUser.name} 강사님의 마일리지가 수동으로 ${amount >= 0 ? `+${amount}` : amount} M 조정 완료되었습니다.`);
+  };
+
+  // 8.05. Update Instructor Lecture Count & Satisfaction Ratings (Admin Only)
+  const handleUpdateUserPerformance = async (userId: string, lectureCount: number, ratings: number[]) => {
+    const targetUser = users.find(u => u.uid === userId);
+    if (!targetUser) return;
+
+    const avg = ratings.length > 0 
+      ? Number((ratings.reduce((sum, val) => sum + val, 0) / ratings.length).toFixed(1)) 
+      : 0;
+
+    const updatedUser: UserProfile = {
+      ...targetUser,
+      lectureCount,
+      lectureRatings: ratings,
+      averageRating: avg,
+      updatedAt: new Date().toISOString()
+    };
+
+    setUsers(prev => prev.map(u => u.uid === userId ? updatedUser : u));
+    await StorageService.saveUser(updatedUser);
+
+    if (currentUser && currentUser.uid === userId) {
+      setCurrentUser(updatedUser);
+    }
+
+    triggerToast(`${targetUser.name} 강사님의 출강 실적(출강 횟수 ${lectureCount}회, 평균 만족도 ${avg}점)이 성공적으로 저장되었습니다!`);
+  };
+
+  // 8.1. Register Partnership Proposal
+  const handleRegisterProposal = async (proposalData: any) => {
+    const newId = `prop_${Date.now()}`;
+    const newProposal: PartnershipProposal = {
+      ...proposalData,
+      id: newId,
+      status: 'pending',
+      createdAt: new Date().toISOString()
+    };
+    setProposals(prev => [...prev, newProposal]);
+    await StorageService.saveProposal(newProposal);
+    triggerToast(`'${newProposal.companyName}'의 공식 제휴 제안서가 등록 접수되었습니다. 최대 3영업일 내로 검토 회신이 전달됩니다.`);
+  };
+
+  // 8.2. Update Partnership Proposal Status (Admin Only)
+  const handleUpdateProposalStatus = async (proposalId: string, status: 'pending' | 'reviewed' | 'accepted' | 'declined') => {
+    const targetProp = proposals.find(p => p.id === proposalId);
+    if (!targetProp) return;
+    const updatedProp: PartnershipProposal = { ...targetProp, status };
+    setProposals(prev => prev.map(p => p.id === proposalId ? updatedProp : p));
+    await StorageService.saveProposal(updatedProp);
+    triggerToast(`제휴 제안서 상태가 '${status === 'accepted' ? '승인 완료' : status === 'declined' ? '반려' : '검토중'}' 상태로 변경되었습니다.`);
+  };
+
+  // 8.3. Update Educational Program Royalty Rate (Admin Only)
+  const handleUpdateProgramRoyalty = async (programId: string, newRoyalty: number) => {
+    const targetProg = programs.find(p => p.id === programId);
+    if (!targetProg) return;
+    const updatedProg: EducationalProgram = { ...targetProg, royaltyRate: newRoyalty };
+    setPrograms(prev => prev.map(p => p.id === programId ? updatedProg : p));
+    await StorageService.saveProgram(updatedProg);
+    triggerToast(`'${targetProg.title}' 교육 과정의 저작권 마일리지 누적이 ${newRoyalty.toLocaleString()} M 으로 조정되었습니다.`);
+  };
+
+  // 8.4. Approve Registered User (Admin Only)
+  const handleApproveUser = async (userId: string) => {
+    const targetUser = users.find(u => u.uid === userId);
+    if (!targetUser) return;
+    const updatedUser: UserProfile = { ...targetUser, isApproved: true };
+    setUsers(prev => prev.map(u => u.uid === userId ? updatedUser : u));
+    await StorageService.saveUser(updatedUser);
+    triggerToast(`'${targetUser.name}' 강사님의 KPCIA 정식 가입 신청이 최종 승인되었습니다!`);
+  };
+
+  // 8.5. Reject/Delete Registered User (Admin Only)
+  const handleRejectUser = async (userId: string) => {
+    const targetUser = users.find(u => u.uid === userId);
+    if (!targetUser) return;
+    setUsers(prev => prev.filter(u => u.uid !== userId));
+    await StorageService.deleteUser(userId);
+    triggerToast(`'${targetUser.name}' 강사님의 가입 신청이 거절 및 파기 처리되었습니다.`, 'info');
+  };
+
+  // 8.6. Approve and finalize Educational Program Copyright (Admin Only)
+  const handleApproveProgram = async (programId: string, updatedProgram: EducationalProgram) => {
+    // Save program to state & storage
+    setPrograms(prev => prev.map(p => p.id === programId ? updatedProgram : p));
+    await StorageService.saveProgram(updatedProgram);
+
+    // Give the author the +1,000 M copyright registration bonus
+    const authorId = updatedProgram.authorId;
+    const authorUser = users.find(u => u.uid === authorId);
+    if (authorUser) {
+      const updatedAuthor: UserProfile = {
+        ...authorUser,
+        mileage: authorUser.mileage + 1000
+      };
+      setUsers(prev => prev.map(u => u.uid === authorId ? updatedAuthor : u));
+      await StorageService.saveUser(updatedAuthor);
+
+      if (currentUser && currentUser.uid === authorId) {
+        setCurrentUser(updatedAuthor);
+      }
+
+      // Add Mileage Transaction
+      const bonusTx: MileageTransaction = {
+        id: `tx_prog_app_${Date.now()}`,
+        userId: authorId,
+        userName: authorUser.name,
+        type: 'program_register',
+        amount: 1000,
+        description: `'${updatedProgram.title}' 교육 콘텐츠 독창적 저작권 최종 공인 승격 축하 마일리지 지급 (+1,000 M)`,
+        createdAt: new Date().toISOString()
+      };
+      setTransactions(prev => [...prev, bonusTx]);
+      await StorageService.addTransaction(bonusTx);
+    }
+
+    triggerToast(`'${updatedProgram.title}' 교육 과정의 저작권 심사·보완이 완료되어 정식 협회 명품 과정으로 최종 확정 및 등재되었습니다!`);
+  };
+
+  // 9. Instructor card save handler
+  const handleSaveProfileCard = async (cardInfo: any) => {
+    if (!currentUser) return;
+    const updatedUser: UserProfile = {
+      ...currentUser,
+      profileCard: cardInfo,
+      updatedAt: new Date().toISOString()
+    };
+    await handleUpdateCurrentUser(updatedUser);
+    triggerToast('강사 프로필 카드 및 인쇄용 템플릿 정보가 안전하게 실시간 저장되었습니다.');
+  };
+
+  // 10. Register / Sign Up New Instructor Profile
+  const handleRegisterUser = async (name: string, email: string, tier: InstructorTier, title: string, phone: string) => {
+    const newUid = `user_${Date.now()}`;
+    const initialBadge = generateBadgeForTier(tier);
+    
+    const newUser: UserProfile = {
+      uid: newUid,
+      email: email,
+      name: name,
+      tier: tier,
+      mileage: 0, // Welcome signup bonus removed as requested
+      isApproved: false, // Default to false; must be approved by Administration (운영사무국)
+      emailVerified: true, // Verification completed before registering
+      profileCard: {
+        title: title || 'KPCIA 공인 전문 강사',
+        bio: `안녕하세요, KPCIA 정식 인증 강사 ${name}입니다. 신규 교육 기획 및 맞춤형 대기업 특강을 진행합니다.`,
+        specialties: [title || '전문 강의 기획', '직무 역량 교육'],
+        career: [`KPCIA 정식 강사 등록 (2026년 7월)`],
+        education: [`대학 졸업 및 실무 교육 이수 완료`],
+        contactEmail: email,
+        contactPhone: phone || '010-0000-0000',
+        cardTheme: 'classic'
+      },
+      badges: [initialBadge],
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString()
+    };
+
+    // State Updates
+    setUsers(prev => [...prev, newUser]);
+    setCurrentUser(newUser);
+
+    // DB / LocalStorage Persistence
+    await StorageService.saveUser(newUser);
+
+    triggerToast(`'${name}' 강사님, KPCIA 프레스티지 가입이 신청되었습니다! 운영사무국 승인을 대기합니다.`, 'success');
+    setActiveTab('home'); // Route to home tab, which will show the pending screen!
+  };
+
+  // 11. Logout current user
+  const handleLogout = () => {
+    setCurrentUser(null);
+    triggerToast('성공적으로 로그아웃되었습니다. 다른 강사 계정으로 로그인하거나 신규 가입을 진행해 주세요.', 'info');
+  };
+
+  // Global Register Modal Renderer with Interactive Email Verification Wizard
+  const renderRegisterModal = () => {
+    if (!showGatewayRegister) return null;
+    return (
+      <div className="fixed inset-0 z-[9999] bg-black/90 backdrop-blur-md flex items-start justify-center p-4 overflow-y-auto font-sans" id="gateway-register-modal">
+        <div className="bg-neutral-900 border-2 border-kpcia-gold/30 rounded-2xl w-full max-w-md overflow-hidden shadow-2xl relative my-auto" id="gateway-register-container">
+          <div className="p-5 border-b border-neutral-800 bg-neutral-950/50 flex justify-between items-center">
+            <div>
+              <h3 className="text-sm font-bold text-neutral-100 flex items-center gap-1.5">
+                <LogIn className="w-4 h-4 text-kpcia-gold" />
+                <span>KPCIA 신규 강사 회원가입</span>
+              </h3>
+              <p className="text-[10px] text-neutral-400 mt-0.5">
+                {verificationStep === 'input' 
+                  ? '협회 공식 명부에 등록하기 위해 필수 정보를 입력해 주세요.' 
+                  : '입력하신 이메일의 소유 여부를 확인합니다.'}
+              </p>
+            </div>
+            <button 
+              onClick={() => {
+                setShowGatewayRegister(false);
+                setGwName('');
+                setGwEmail('');
+                setGwTitle('');
+                setGwPhone('');
+                setVerificationStep('input');
+                setVerificationCode('');
+                setGeneratedCode('');
+                setVerificationError('');
+              }}
+              className="text-neutral-400 hover:text-neutral-200 transition-colors cursor-pointer"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+
+          {verificationStep === 'input' ? (
+            <form 
+              onSubmit={(e) => {
+                e.preventDefault();
+                if (!gwName.trim() || !gwEmail.trim()) return;
+                
+                // Simple email check
+                const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+                if (!emailRegex.test(gwEmail.trim())) {
+                  setVerificationError('유효한 이메일 형식이 아닙니다.');
+                  return;
+                }
+
+                // Generate 6 digit simulated verification code
+                const code = Math.floor(100000 + Math.random() * 900000).toString();
+                setGeneratedCode(code);
+                setVerificationStep('verify');
+                setVerificationCode('');
+                setVerificationError('');
+                triggerToast('이메일 주소로 인증코드가 발송되었습니다. (하단 시뮬레이션 창을 확인하세요!)', 'info');
+              }} 
+              className="p-5 space-y-4 text-left font-sans"
+            >
+              {verificationError && (
+                <div className="p-3 rounded-lg bg-red-950/50 border border-red-900/50 text-[11px] text-red-400 font-medium">
+                  {verificationError}
+                </div>
+              )}
+
+              <div className="space-y-1.5">
+                <label className="block text-[10px] font-bold text-neutral-400 uppercase tracking-wide">성명 <span className="text-kpcia-gold">*</span></label>
+                <input
+                  type="text"
+                  required
+                  value={gwName}
+                  onChange={(e) => setGwName(e.target.value)}
+                  placeholder="예: 김성우 강사"
+                  className="w-full px-3 py-2 bg-neutral-950 border border-neutral-800 rounded-lg text-xs text-neutral-100 focus:border-kpcia-gold/50 outline-none"
+                />
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="block text-[10px] font-bold text-neutral-400 uppercase tracking-wide">이메일 주소 <span className="text-kpcia-gold">*</span></label>
+                <input
+                  type="email"
+                  required
+                  value={gwEmail}
+                  onChange={(e) => setGwEmail(e.target.value)}
+                  placeholder="sungwoo@kpcia.or.kr"
+                  className="w-full px-3 py-2 bg-neutral-950 border border-neutral-800 rounded-lg text-xs text-neutral-100 focus:border-kpcia-gold/50 outline-none"
+                />
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="block text-[10px] font-bold text-neutral-400 uppercase tracking-wide">연락처 (휴대폰)</label>
+                <input
+                  type="tel"
+                  value={gwPhone}
+                  onChange={(e) => setGwPhone(e.target.value)}
+                  placeholder="010-9999-8888"
+                  className="w-full px-3 py-2 bg-neutral-950 border border-neutral-800 rounded-lg text-xs text-neutral-100 focus:border-kpcia-gold/50 outline-none"
+                />
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="block text-[10px] font-bold text-neutral-400 uppercase tracking-wide">핵심 강의 전문 분야</label>
+                <input
+                  type="text"
+                  value={gwTitle}
+                  onChange={(e) => setGwTitle(e.target.value)}
+                  placeholder="예: HRD 조직문화 및 리더십 혁신"
+                  className="w-full px-3 py-2 bg-neutral-950 border border-neutral-800 rounded-lg text-xs text-neutral-100 focus:border-kpcia-gold/50 outline-none"
+                />
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="block text-[10px] font-bold text-neutral-400 uppercase tracking-wide">인증 등급 (회원 정책 고정)</label>
+                <div className="w-full px-3 py-2.5 bg-neutral-950/80 border border-neutral-800 rounded-lg text-xs text-neutral-300 font-mono flex justify-between items-center">
+                  <span>Prestige Member (일반 회원)</span>
+                  <span className="text-[10px] text-kpcia-gold bg-kpcia-gold/10 px-2 py-0.5 rounded border border-kpcia-gold/25 font-sans font-bold">기본 적용</span>
+                </div>
+                <p className="text-[9px] text-neutral-500 font-sans mt-1">
+                  ※ KPCIA 정관에 의거, 신규 가입 강사는 최초 Prestige Member(일반 회원) 등급으로 자동 등록되며, 출강 이력 만족도 산정에 의해 순차적으로 등급 승격 자격이 부여됩니다.
+                </p>
+              </div>
+
+              <div className="pt-3 border-t border-neutral-800/60 flex space-x-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowGatewayRegister(false);
+                    setGwName('');
+                    setGwEmail('');
+                    setGwTitle('');
+                    setGwPhone('');
+                    setVerificationError('');
+                  }}
+                  className="flex-1 py-2 bg-neutral-950 hover:bg-neutral-900 border border-neutral-800 text-neutral-300 text-xs font-bold rounded-lg transition-all"
+                >
+                  취소
+                </button>
+                <button
+                  type="submit"
+                  className="flex-1 py-2 bg-kpcia-gold hover:bg-kpcia-gold-hover text-kpcia-dark text-xs font-extrabold rounded-lg transition-all shadow-md shadow-kpcia-gold/10"
+                >
+                  이메일 인증 요청
+                </button>
+              </div>
+            </form>
+          ) : (
+            <div className="p-5 space-y-4 text-left font-sans">
+              <div className="space-y-2">
+                <span className="text-[10px] font-bold text-kpcia-gold uppercase tracking-wider block">STEP 2: 이메일 검증 진행 중</span>
+                <p className="text-xs text-neutral-300 leading-relaxed">
+                  입력하신 이메일 주소 <strong className="text-neutral-100">{gwEmail}</strong>의 실제 소유주 확인을 위해 모의 전송된 6자리 코드를 아래에 기입해 주세요.
+                </p>
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="block text-[10px] font-bold text-neutral-400 uppercase tracking-wide">6자리 인증코드 입력</label>
+                <input
+                  type="text"
+                  maxLength={6}
+                  value={verificationCode}
+                  onChange={(e) => setVerificationCode(e.target.value.replace(/[^0-9]/g, ''))}
+                  placeholder="XXXXXX"
+                  className="w-full px-4 py-3 bg-neutral-950 border border-neutral-800 rounded-lg text-lg text-center tracking-widest font-mono text-kpcia-gold focus:border-kpcia-gold outline-none"
+                />
+                {verificationError && (
+                  <p className="text-[10px] text-red-400 font-medium mt-1">※ {verificationError}</p>
+                )}
+              </div>
+
+              {/* Simulated Mailbox Widget for Developer preview and testing */}
+              <div className="bg-neutral-950/80 border border-neutral-800 p-3 rounded-xl space-y-2">
+                <div className="flex items-center justify-between text-[9px] font-mono text-neutral-500">
+                  <span className="text-kpcia-gold font-bold">✉ KPCIA 모의 이메일 전송 수신함</span>
+                  <span className="bg-kpcia-gold/10 text-kpcia-gold px-1.5 rounded">SIMULATOR ACTIVE</span>
+                </div>
+                <div className="text-[11px] font-mono space-y-1 text-neutral-300 border-t border-neutral-900 pt-1.5">
+                  <div><strong>수신:</strong> {gwEmail}</div>
+                  <div><strong>제목:</strong> KPCIA 강사 회원 검증용 인증 코드</div>
+                  <div className="mt-2 text-center p-2 bg-neutral-900 border border-neutral-800 text-base font-bold tracking-widest text-kpcia-gold select-all">
+                    {generatedCode}
+                  </div>
+                </div>
+                <p className="text-[9px] text-neutral-500 font-sans leading-normal">
+                  ※ 실제 가입을 시험해볼 수 있도록 시스템에서 가상의 메일함으로 코드를 실시간 발송해 시각화한 모듈입니다. 위 숫자를 클릭해 복사하여 상단 칸에 입력하세요.
+                </p>
+              </div>
+
+              <div className="pt-3 border-t border-neutral-800/60 flex space-x-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setVerificationStep('input');
+                    setVerificationError('');
+                  }}
+                  className="flex-1 py-2 bg-neutral-950 hover:bg-neutral-900 border border-neutral-800 text-neutral-300 text-xs font-bold rounded-lg transition-all"
+                >
+                  이전 단계로
+                </button>
+                <button
+                  onClick={() => {
+                    if (verificationCode === generatedCode) {
+                      handleRegisterUser(gwName.trim(), gwEmail.trim(), gwTier, gwTitle.trim(), gwPhone.trim());
+                      
+                      // Reset and Close
+                      setShowGatewayRegister(false);
+                      setGwName('');
+                      setGwEmail('');
+                      setGwTitle('');
+                      setGwPhone('');
+                      setVerificationStep('input');
+                      setVerificationCode('');
+                      setGeneratedCode('');
+                      setVerificationError('');
+                    } else {
+                      setVerificationError('인증코드가 일치하지 않습니다. 시뮬레이터 수신함에 적힌 코드를 입력해 주세요.');
+                    }
+                  }}
+                  className="flex-1 py-2 bg-kpcia-gold hover:bg-kpcia-gold-hover text-kpcia-dark text-xs font-extrabold rounded-lg transition-all shadow-md shadow-kpcia-gold/10"
+                >
+                  인증 완료 및 가입
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  };
+
+  const isPendingApproval = currentUser && currentUser.uid !== 'guest' && !currentUser.isAdmin && currentUser.isApproved === false;
+
+  if (users.length === 0) {
+    return (
+      <div className="flex items-center justify-center min-h-screen bg-kpcia-dark text-neutral-400">
+        <div className="text-center space-y-3">
+          <div className="w-12 h-12 rounded-full border-2 border-kpcia-gold border-t-transparent animate-spin mx-auto" />
+          <p className="text-sm font-mono tracking-wider">KPCIA PRESTIGE PLATFORM INITIALIZING...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (!currentUser) {
+    return (
+      <div className="min-h-screen bg-neutral-950 flex flex-col items-center justify-start md:justify-center p-4 py-10 sm:py-14 text-neutral-100 relative overflow-y-auto" id="gateway-root">
+        {/* Decorative gold spotlight effect */}
+        <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[600px] h-[300px] bg-gradient-to-b from-kpcia-gold/10 to-transparent blur-3xl pointer-events-none" />
+        
+        {/* Toast Notification */}
+        {toast && (
+          <div className="fixed bottom-6 right-6 z-50 px-5 py-4 rounded-xl border border-kpcia-gold/40 bg-neutral-900 shadow-2xl flex items-center space-x-3 max-w-md animate-in slide-in-from-bottom-5 duration-300" id="gateway-toast">
+            <div className="w-6 h-6 rounded-full bg-kpcia-gold/15 flex items-center justify-center text-kpcia-gold shrink-0">★</div>
+            <p className="text-xs font-medium leading-relaxed">{toast.message}</p>
+          </div>
+        )}
+
+        {/* Portal Card */}
+        <div className="w-full max-w-2xl bg-neutral-900/60 border border-neutral-800 rounded-3xl p-6 sm:p-10 backdrop-blur-xl shadow-2xl space-y-8 relative z-10 my-auto" id="gateway-card">
+          
+          {/* Header info */}
+          <div className="text-center space-y-3">
+            <div className="w-16 h-16 rounded-2xl bg-neutral-950 border border-kpcia-gold flex items-center justify-center shadow-2xl shadow-kpcia-gold/20 mx-auto">
+              <span className="font-display font-black text-3xl text-kpcia-gold tracking-widest">K</span>
+            </div>
+            <div className="space-y-1">
+              <span className="text-[10px] font-mono tracking-widest font-bold text-kpcia-gold uppercase bg-kpcia-gold/5 border border-kpcia-gold/15 px-2.5 py-0.5 rounded inline-block">
+                비영리 협회
+              </span>
+              <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-neutral-100 font-display">
+                한국프레스티지기업강사협회
+              </h1>
+              <p className="text-[11px] sm:text-xs text-neutral-400 font-sans tracking-wide">
+                KPCIA PRESTIGE INSTRUCTOR PORTAL GATEWAY
+              </p>
+            </div>
+          </div>
+
+          <div className="border-t border-neutral-800/80 pt-6 space-y-6">
+            <div className="space-y-3">
+              <h2 className="text-xs font-bold text-neutral-400 uppercase tracking-widest text-center">
+                기존 등록 강사 계정 선택
+              </h2>
+              
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 max-h-[220px] overflow-y-auto pr-1 animate-in fade-in duration-500" id="gateway-accounts">
+                {users.map((user) => (
+                  <button
+                    key={user.uid}
+                    onClick={() => {
+                      setCurrentUser(user);
+                      triggerToast(`환영합니다, ${user.name} 강사님!`);
+                    }}
+                    className="p-3.5 rounded-xl bg-neutral-950/80 border border-neutral-800 hover:border-kpcia-gold/60 text-left transition-all group flex items-center justify-between cursor-pointer"
+                  >
+                    <div>
+                      <div className="text-xs font-extrabold text-neutral-100 group-hover:text-kpcia-gold transition-colors flex items-center gap-1">
+                        {user.name}
+                        {user.isAdmin && <span className="text-[9px] bg-kpcia-gold/15 text-kpcia-gold border border-kpcia-gold/20 px-1 rounded">ADMIN</span>}
+                      </div>
+                      <div className="text-[10px] text-neutral-400 mt-0.5">{user.tier}</div>
+                    </div>
+                    <div className="text-right">
+                      <span className="text-[10px] font-mono font-bold text-kpcia-gold">{new Intl.NumberFormat().format(user.mileage)} M</span>
+                      <p className="text-[8px] text-neutral-500">마일리지</p>
+                    </div>
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Registration Call To Action inside Gateway */}
+            <div className="bg-gradient-to-r from-kpcia-gold/5 via-kpcia-gold/10 to-kpcia-gold/5 border border-kpcia-gold/20 rounded-2xl p-5 text-center space-y-3">
+              <div>
+                <h3 className="text-xs font-bold text-kpcia-gold">협회 회원으로 아직 등록되지 않으셨나요?</h3>
+                <p className="text-[10px] text-neutral-400 mt-1 leading-normal font-sans">
+                  KPCIA의 정식 강사 단원으로 등록하고, 즉시 디지털 배지 및 프레스티지 공인 인증서 수령 혜택을 받으세요.
+                </p>
+              </div>
+              <button
+                onClick={() => {
+                  setShowGatewayRegister(true);
+                }}
+                className="px-6 py-2.5 bg-kpcia-gold hover:bg-kpcia-gold-hover text-kpcia-dark text-xs font-extrabold rounded-xl transition-all flex items-center justify-center gap-1 mx-auto cursor-pointer shadow-lg shadow-kpcia-gold/10"
+                id="gateway-signup-trigger"
+              >
+                <Plus className="w-3.5 h-3.5" />
+                <span>신규 강사 회원가입 완료하고 시작하기</span>
+              </button>
+            </div>
+
+            {/* Corporate/Guest proposal entrance */}
+            <div className="pt-2 text-center">
+              <span className="text-[9px] font-mono tracking-widest text-neutral-500 uppercase block mb-2">기업 협력 및 미가입 방문자 전용</span>
+              <button
+                onClick={() => {
+                  const guestUser: UserProfile = {
+                    uid: 'guest',
+                    email: 'guest@kpcia.org',
+                    name: '비회원 게스트',
+                    tier: 'Prestige Member',
+                    mileage: 0,
+                    profileCard: {
+                      title: '비회원 게스트',
+                      bio: '비회원 상태로 제휴 제안 및 협회 소개를 확인하는 중입니다.',
+                      specialties: [],
+                      career: [],
+                      education: [],
+                      contactEmail: 'guest@kpcia.org',
+                      contactPhone: '',
+                      cardTheme: 'classic'
+                    },
+                    badges: [],
+                    createdAt: new Date().toISOString(),
+                    updatedAt: new Date().toISOString(),
+                    isAdmin: false
+                  };
+                  setCurrentUser(guestUser);
+                  setActiveTab('proposal'); // Land directly on the proposal tab!
+                  triggerToast('비회원 게스트 상태로 접속했습니다. 제휴 및 협력 제안이 가능합니다.', 'info');
+                }}
+                className="w-full max-w-md py-3 bg-neutral-900/80 hover:bg-neutral-800 border border-neutral-800 hover:border-kpcia-gold/40 text-neutral-300 hover:text-kpcia-gold text-xs font-bold rounded-xl transition-all flex items-center justify-center gap-2 mx-auto cursor-pointer shadow-md"
+                id="gateway-guest-btn"
+              >
+                ★ 비회원으로 제휴 및 협력 제안하러 바로가기 →
+              </button>
+            </div>
+          </div>
+        </div>
+
+        {/* INLINE REGISTRATION PANEL */}
+        {renderRegisterModal()}
+      </div>
+    );
+  }
+
+  return (
+    <div className="min-h-screen flex flex-col bg-neutral-950 text-neutral-100 selection:bg-kpcia-gold selection:text-kpcia-dark" id="app-root">
+      
+      {/* Toast Notification */}
+      {toast && (
+        <div 
+          className={`fixed bottom-6 right-6 z-50 px-5 py-4 rounded-xl border shadow-2xl flex items-center space-x-3 max-w-md animate-in slide-in-from-bottom-5 duration-300 ${
+            toast.type === 'success' 
+              ? 'bg-neutral-900 border-kpcia-gold/40 text-neutral-100' 
+              : 'bg-neutral-900 border-neutral-700 text-neutral-200'
+          }`}
+          id="global-toast"
+        >
+          <div className="w-6 h-6 rounded-full bg-kpcia-gold/15 flex items-center justify-center text-kpcia-gold shrink-0">
+            ★
+          </div>
+          <p className="text-xs font-medium leading-relaxed">{toast.message}</p>
+        </div>
+      )}
+
+      {/* Header component with User switcher */}
+      <Header
+        currentUser={currentUser}
+        allUsers={users}
+        onUserChange={handleUserChange}
+        activeTab={activeTab}
+        onTabChange={(tab) => {
+          setActiveTab(tab);
+          setIsMobileSimulated(false); // Disable simulator preview when navigating desktop tabs
+        }}
+        isMobileSimulated={isMobileSimulated}
+        onToggleSimulator={() => setIsMobileSimulated(!isMobileSimulated)}
+        onOpenRegister={() => setShowGatewayRegister(true)}
+        onLogout={handleLogout}
+      />
+
+      {/* Main Content Area */}
+      <main className="flex-1 max-w-7xl mx-auto w-full px-4 sm:px-6 lg:px-8 py-8 no-print" id="main-content">
+        {isMobileSimulated ? (
+          /* Dual Display: Mobile Simulator on Left, Guide / Explanation on Right */
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-center justify-center min-h-[680px]" id="simulator-view">
+            <div className="lg:col-span-5 flex justify-center">
+              <AppSimulator
+                currentUser={currentUser}
+                lectures={lectures}
+                programs={programs}
+                activeMobileTab={activeMobileTab}
+                onMobileTabChange={setActiveMobileTab}
+                onApplyLecture={handleApplyLecture}
+                onTabChange={setActiveTab}
+              />
+            </div>
+            
+            <div className="lg:col-span-7 space-y-6 max-w-lg" id="simulator-sidebar">
+              <div className="space-y-2">
+                <span className="text-[10px] font-mono tracking-widest font-bold text-kpcia-gold uppercase bg-kpcia-gold/5 border border-kpcia-gold/15 px-2.5 py-1 rounded inline-block">
+                  HYBRID INSTRUCTOR APP EMULATION
+                </span>
+                <h2 className="text-2xl font-bold tracking-tight text-neutral-100 font-display">
+                  회원용 하이브리드 강의 매칭 모바일 앱
+                </h2>
+                <p className="text-sm text-neutral-400 leading-relaxed font-sans">
+                  스마트폰 디바이스 프레임을 통해 협회 회원들이 현장 출강 중이나 이동 시 휴대폰으로 간편하게 출강 공고를 확인하고 강의를 선택 신청할 수 있는 모바일 전용 UI/UX 시뮬레이터입니다.
+                </p>
+              </div>
+
+              <div className="space-y-4 bg-neutral-900/50 border border-neutral-800 p-5 rounded-xl text-xs" id="mobile-guide">
+                <h4 className="font-bold text-neutral-200 uppercase font-display tracking-wider flex items-center gap-1.5 border-b border-neutral-800 pb-2 mb-3">
+                  <Compass className="w-4 h-4 text-kpcia-gold" /> 모바일 앱 주요 기능 체험 순서
+                </h4>
+                <ul className="space-y-3 font-sans text-neutral-300">
+                  <li className="flex items-start gap-2.5">
+                    <span className="w-5 h-5 rounded-full bg-neutral-800 flex items-center justify-center text-[10px] font-bold text-kpcia-gold shrink-0">1</span>
+                    <span>상단 우측 이메일 위젯을 클릭하여 원하는 <strong>강사 계정 등급</strong>으로 전환해 보세요.</span>
+                  </li>
+                  <li className="flex items-start gap-2.5">
+                    <span className="w-5 h-5 rounded-full bg-neutral-800 flex items-center justify-center text-[10px] font-bold text-kpcia-gold shrink-0">2</span>
+                    <span>모바일 화면 하단의 <strong>[강의요청]</strong> 탭에서 등급에 맞는 공고를 확인 후 <strong>[출강 신청]</strong> 버튼을 탭하세요.</span>
+                  </li>
+                  <li className="flex items-start gap-2.5">
+                    <span className="w-5 h-5 rounded-full bg-neutral-800 flex items-center justify-center text-[10px] font-bold text-kpcia-gold shrink-0">3</span>
+                    <span>우측 상단 <strong>[웹사이트 보기]</strong> 버튼을 누르면 정식 PC 홈페이지로 복귀해 강사 카드를 다운로드하고 관리할 수 있습니다.</span>
+                  </li>
+                </ul>
+              </div>
+
+              <button
+                onClick={() => setIsMobileSimulated(false)}
+                className="inline-flex items-center space-x-1.5 text-xs text-kpcia-gold hover:text-kpcia-gold-hover font-bold"
+                id="back-to-web-btn"
+              >
+                <span>KPCIA 공식 PC 홈페이지 포털로 돌아가기</span>
+                <ArrowRight className="w-3.5 h-3.5" />
+              </button>
+            </div>
+          </div>
+        ) : (
+          /* Desktop Corporate Website view based on tabs */
+          <div className="space-y-8" id="desktop-portal">
+            {/* Tab 1: Home (협회 소개 및 웰컴 포털) */}
+            {activeTab === 'home' && (
+              <div className="space-y-12 animate-in fade-in duration-500" id="portal-home">
+                {/* Hero section */}
+                <div className="text-center max-w-3xl mx-auto space-y-5 py-6">
+                  {/* Reconstructed Association Logo */}
+                  <div className="flex justify-center mb-2">
+                    <div className="max-w-md w-full bg-neutral-950/40 p-4 rounded-2xl border border-neutral-800/40 backdrop-blur-xs">
+                      <KPCIALogo variant="hero" theme="dark" />
+                    </div>
+                  </div>
+
+                  <div className="inline-flex items-center space-x-2 border border-kpcia-gold/30 rounded-full px-3.5 py-1 bg-kpcia-gold/5 shadow-inner">
+                    <span className="w-2 h-2 rounded-full bg-kpcia-gold animate-ping" />
+                    <span className="text-[10px] font-mono tracking-widest font-bold text-kpcia-gold uppercase">KPCIA PRESTIGE FORUM</span>
+                  </div>
+                  <h2 className="text-3xl sm:text-4xl font-extrabold tracking-tight text-neutral-100 font-display">
+                    대한민국 최고의 기업 교육 명가 <br />
+                    <span className="text-gradient bg-gradient-to-r from-kpcia-gold via-amber-200 to-kpcia-gold bg-clip-text text-transparent">한국 프레스티지 기업 강사 협회</span>
+                  </h2>
+                  <p className="text-sm sm:text-base text-neutral-400 font-sans max-w-2xl mx-auto leading-relaxed">
+                    KPCIA는 검증된 교육 설계 역량과 독창적 마일리지 저작권 공유 모델을 결합하여, 최고 권위의 기업 출강을 리드하는 기업 파견 전문 강사 공식 인증 협회입니다.
+                  </p>
+
+                  <div className="flex flex-wrap items-center justify-center gap-3 pt-4">
+                    <button
+                      onClick={() => setActiveTab('lectures')}
+                      className="px-6 py-2.5 bg-kpcia-gold hover:bg-kpcia-gold-hover text-kpcia-dark font-bold text-xs rounded-xl transition-all shadow-lg shadow-kpcia-gold/15 flex items-center gap-2"
+                      id="hero-go-lectures"
+                    >
+                      <span>출강 매칭 공고 보기</span>
+                      <ArrowRight className="w-4 h-4" />
+                    </button>
+                    <button
+                      onClick={() => setIsMobileSimulated(true)}
+                      className="px-6 py-2.5 bg-neutral-900 border border-neutral-800 hover:border-kpcia-gold/40 text-neutral-300 font-bold text-xs rounded-xl transition-all"
+                      id="hero-go-mobile"
+                    >
+                      강사용 모바일 앱 체험
+                    </button>
+                  </div>
+                </div>
+
+                {/* Features bento-style highlights */}
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-6" id="home-bento">
+                  <div 
+                    onClick={() => document.getElementById('tier-guide-block')?.scrollIntoView({ behavior: 'smooth' })}
+                    className="bg-neutral-900/40 border border-neutral-800 p-6 rounded-xl space-y-3 cursor-pointer hover:border-kpcia-gold/40 hover:bg-neutral-900/60 hover:shadow-xl hover:scale-[1.02] transition-all duration-300 group"
+                  >
+                    <div className="w-9 h-9 rounded-lg bg-kpcia-gold/10 border border-kpcia-gold/20 flex items-center justify-center text-kpcia-gold group-hover:bg-kpcia-gold/25 transition-colors">
+                      <Award className="w-5 h-5" />
+                    </div>
+                    <h3 className="font-display font-bold text-sm text-neutral-200 flex items-center gap-1.5 group-hover:text-kpcia-gold transition-colors">
+                      <span>5단계 프리미엄 등급제</span>
+                      <span className="text-[9px] font-sans text-neutral-500 font-normal group-hover:translate-x-0.5 transition-transform">→</span>
+                    </h3>
+                    <p className="text-xs text-neutral-400 leading-relaxed font-sans">
+                      Prestige 멤버(일반회원)부터 정교한 공인 어소시에이트 및 대표급 엘리트까지 검증된 실무 전문가 코스를 상세 조회합니다. (클릭 시 이동)
+                    </p>
+                  </div>
+
+                  <div 
+                    onClick={() => setActiveTab('programs')}
+                    className="bg-neutral-900/40 border border-neutral-800 p-6 rounded-xl space-y-3 cursor-pointer hover:border-kpcia-gold/40 hover:bg-neutral-900/60 hover:shadow-xl hover:scale-[1.02] transition-all duration-300 group"
+                  >
+                    <div className="w-9 h-9 rounded-lg bg-kpcia-gold/10 border border-kpcia-gold/20 flex items-center justify-center text-kpcia-gold group-hover:bg-kpcia-gold/25 transition-colors">
+                      <BookOpen className="w-5 h-5" />
+                    </div>
+                    <h3 className="font-display font-bold text-sm text-neutral-200 flex items-center gap-1.5 group-hover:text-kpcia-gold transition-colors">
+                      <span>기획 교안 저작권 마일리지 누적</span>
+                      <span className="text-[9px] font-sans text-neutral-500 font-normal group-hover:translate-x-0.5 transition-transform">→</span>
+                    </h3>
+                    <p className="text-xs text-neutral-400 leading-relaxed font-sans">
+                      자신만의 시그니처 프로그램을 협회에 등재하고, 타 강사가 해당 교안으로 외부 강의 완료 시 기획 저작자에게 자동으로 마일리지가 분배 보장됩니다.
+                    </p>
+                  </div>
+
+                  <div 
+                    onClick={() => setActiveTab('profile')}
+                    className="bg-neutral-900/40 border border-neutral-800 p-6 rounded-xl space-y-3 cursor-pointer hover:border-kpcia-gold/40 hover:bg-neutral-900/60 hover:shadow-xl hover:scale-[1.02] transition-all duration-300 group"
+                  >
+                    <div className="w-9 h-9 rounded-lg bg-kpcia-gold/10 border border-kpcia-gold/20 flex items-center justify-center text-kpcia-gold group-hover:bg-kpcia-gold/25 transition-colors">
+                      <UserCheck className="w-5 h-5" />
+                    </div>
+                    <h3 className="font-display font-bold text-sm text-neutral-200 flex items-center gap-1.5 group-hover:text-kpcia-gold transition-colors">
+                      <span>PDF 출력형 강사 정보 카드</span>
+                      <span className="text-[9px] font-sans text-neutral-500 font-normal group-hover:translate-x-0.5 transition-transform">→</span>
+                    </h3>
+                    <p className="text-xs text-neutral-400 leading-relaxed font-sans">
+                      회원 본인의 출강 약력, 이력, 자격 증명 및 획득 디지털 배지를 한 장의 럭셔리 실물 프리미엄 카드로 렌더링하고, PDF 저장 및 출력을 지원합니다.
+                    </p>
+                  </div>
+                </div>
+
+                {/* Prestige Tier Guideline Display */}
+                <div className="bg-neutral-900/30 border border-neutral-800 rounded-xl p-8 space-y-6" id="tier-guide-block">
+                  <div className="text-center max-w-xl mx-auto space-y-1.5">
+                    <h3 className="font-display font-bold text-sm text-kpcia-gold uppercase tracking-wider">PRESTIGE MEMBERSHIP GRADATION</h3>
+                    <h4 className="font-display font-bold text-lg text-neutral-200">KPCIA 공식 강사 등급 기준표</h4>
+                    <p className="text-xs text-neutral-400 font-sans">협회 등급 위원회 심사를 거쳐 등급이 자동으로 변경되며, 등급 상향 즉시 전용 훈장이 발송됩니다.</p>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4" id="tiers-showcase">
+                    {[
+                      { title: 'Prestige Member', kor: '프레스티지 멤버', desc: '일반 회원 (초기 가입 단계)', badge: '🎖️ Member' },
+                      { title: 'Prestige Associate', kor: '프레스티지 어소시에이트', desc: '10강의 출강 & 누적 만족도 4.5 이상 / 5.0 만점', badge: '🥉 Bronze' },
+                      { title: 'Prestige Professional', kor: '프레스티지 프로페셔널', desc: '100강의 출강 & 누적 만족도 4.6 이상 / 5.0 만점', badge: '🥈 Silver' },
+                      { title: 'Prestige Master', kor: '프레스티지 마스터', desc: '1000강의 출강 & 누적 만족도 4.8 이상 / 5.0 만점', badge: '🥇 Ruby' },
+                      { title: 'Prestige Elite', kor: '프레스티지 엘리트', desc: '10000강의 출강 & 누적 만족도 4.9 이상 / 5.0 만점', badge: '👑 Emerald' }
+                    ].map((t) => (
+                      <div key={t.title} className="p-5 rounded-xl border border-neutral-800 bg-neutral-950/80 space-y-2 text-center flex flex-col justify-between" id={`tier-showcase-${t.title.replace(' ', '')}`}>
+                        <div className="space-y-2">
+                          <div className="text-xs font-bold text-kpcia-gold font-mono">{t.badge}</div>
+                          <h5 className="font-display font-bold text-[11px] text-neutral-200">{t.title}</h5>
+                          <p className="text-[10px] text-neutral-400 font-sans font-semibold">{t.kor}</p>
+                        </div>
+                        <p className="text-[10px] text-neutral-500 leading-normal font-sans pt-1.5 border-t border-neutral-900 mt-2">{t.desc}</p>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Tab 2: Lectures (강의 요청 게시판) */}
+            {activeTab === 'lectures' && (
+              isPendingApproval ? (
+                <PendingApprovalView currentUser={currentUser} setActiveTab={setActiveTab} />
+              ) : (
+                <LectureBoard
+                  currentUser={currentUser}
+                  lectures={lectures}
+                  programs={programs}
+                  onApplyLecture={handleApplyLecture}
+                  onAddLecture={handleAddLecture}
+                />
+              )
+            )}
+
+            {/* Tab 3: Programs (프로그램 공유 게시판) */}
+            {activeTab === 'programs' && (
+              isPendingApproval ? (
+                <PendingApprovalView currentUser={currentUser} setActiveTab={setActiveTab} />
+              ) : (
+                <ProgramBoard
+                  currentUser={currentUser}
+                  programs={programs}
+                  onRegisterProgram={handleRegisterProgram}
+                />
+              )
+            )}
+
+            {/* Tab 4: Profile / Resume Card Generator */}
+            {activeTab === 'profile' && (
+              isPendingApproval ? (
+                <PendingApprovalView currentUser={currentUser} setActiveTab={setActiveTab} />
+              ) : (
+                <InstructorCard
+                  currentUser={currentUser}
+                  onSaveProfileCard={handleSaveProfileCard}
+                  onGoHome={() => setActiveTab('home')}
+                />
+              )
+            )}
+
+            {/* Tab 4.5: Partnership Proposal Tab */}
+            {activeTab === 'proposal' && (
+              <PartnershipProposalBoard
+                currentUser={currentUser}
+                proposals={proposals}
+                onSubmitProposal={handleRegisterProposal}
+              />
+            )}
+
+            {/* Tab 5: Admin Panel Control Room */}
+            {activeTab === 'admin' && currentUser.isAdmin && (
+              <AdminPanel
+                users={users}
+                lectures={lectures}
+                transactions={transactions}
+                programs={programs}
+                proposals={proposals}
+                onUpgradeUserTier={handleUpgradeUserTier}
+                onAssignLecturer={handleAssignLecturer}
+                onCompleteLecture={handleCompleteLecture}
+                onAdjustMileage={handleAdjustMileage}
+                onUpdateProgramRoyalty={handleUpdateProgramRoyalty}
+                onUpdateProposalStatus={handleUpdateProposalStatus}
+                onApproveUser={handleApproveUser}
+                onRejectUser={handleRejectUser}
+                onApproveProgram={handleApproveProgram}
+                onUpdateUserPerformance={handleUpdateUserPerformance}
+              />
+            )}
+          </div>
+        )}
+      </main>
+
+      {/* Corporate Footprint Footer */}
+      <footer className="mt-auto border-t border-neutral-900 bg-kpcia-dark py-8 text-xs text-neutral-500 no-print" id="footer">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col md:flex-row items-center justify-between gap-4" id="footer-container">
+          <div className="space-y-1.5 text-center md:text-left" id="footer-branding">
+            <p className="font-display font-bold text-neutral-400">
+              KPCIA 한국프레스티지기업강사협회 (비영리 협회)
+            </p>
+            <p className="text-[10px] font-sans">
+              충청북도 충주시 성남동 365번지 | 연락처: 010-6400-0924
+            </p>
+          </div>
+          <div className="flex flex-wrap items-center justify-center gap-4 text-[10px] font-mono text-neutral-400" id="footer-specs">
+            <span>© 2026 KPCIA. All Rights Reserved.</span>
+            <span className="w-1.5 h-1.5 rounded-full bg-kpcia-gold" />
+            <span>프레스티지 강사 전용 시스템 v2.4</span>
+          </div>
+        </div>
+      </footer>
+
+      {/* Global Registration Modal for logged-in users too */}
+      {renderRegisterModal()}
+    </div>
+  );
+}

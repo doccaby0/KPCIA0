@@ -1,0 +1,1401 @@
+import React, { useState } from 'react';
+import { UserProfile, LectureRequest, MileageTransaction, InstructorTier, EducationalProgram, PartnershipProposal } from '../types';
+import { 
+  Shield, 
+  Users, 
+  Award, 
+  CheckSquare, 
+  Plus, 
+  DollarSign, 
+  History, 
+  AlertCircle, 
+  TrendingUp, 
+  CheckCircle, 
+  ArrowRightLeft, 
+  BookOpen, 
+  Handshake, 
+  Check, 
+  Search, 
+  LayoutDashboard, 
+  UserCheck, 
+  Coins, 
+  FileText, 
+  ChevronRight, 
+  Activity 
+} from 'lucide-react';
+
+interface AdminPanelProps {
+  users: UserProfile[];
+  lectures: LectureRequest[];
+  transactions: MileageTransaction[];
+  programs: EducationalProgram[];
+  proposals: PartnershipProposal[];
+  onUpgradeUserTier: (userId: string, newTier: InstructorTier) => void;
+  onAssignLecturer: (lectureId: string, userId: string, userName: string) => void;
+  onCompleteLecture: (lectureId: string) => void;
+  onAdjustMileage: (userId: string, amount: number, description: string) => void;
+  onUpdateProgramRoyalty: (programId: string, newRoyalty: number) => void;
+  onUpdateProposalStatus: (proposalId: string, status: 'pending' | 'reviewed' | 'accepted' | 'declined') => void;
+  onApproveUser?: (userId: string) => void;
+  onRejectUser?: (userId: string) => void;
+  onApproveProgram?: (programId: string, updatedProgram: EducationalProgram) => void;
+  onUpdateUserPerformance?: (userId: string, lectureCount: number, ratings: number[]) => void;
+}
+
+export default function AdminPanel({
+  users,
+  lectures,
+  transactions,
+  programs,
+  proposals,
+  onUpgradeUserTier,
+  onAssignLecturer,
+  onCompleteLecture,
+  onAdjustMileage,
+  onUpdateProgramRoyalty,
+  onUpdateProposalStatus,
+  onApproveUser,
+  onRejectUser,
+  onApproveProgram,
+  onUpdateUserPerformance
+}: AdminPanelProps) {
+  // Navigation State
+  const [activeTab, setActiveTab] = useState<'dashboard' | 'approvals' | 'lectures' | 'members' | 'proposals'>('dashboard');
+  
+  // Search States
+  const [memberSearch, setMemberSearch] = useState('');
+  const [txSearch, setTxSearch] = useState('');
+  
+  // Handlers state
+  const [selectedUser, setSelectedUser] = useState<string>('');
+  const [newTier, setNewTier] = useState<InstructorTier>('Prestige Associate');
+  const [adjustAmount, setAdjustAmount] = useState<number>(1000);
+  const [adjustReason, setAdjustReason] = useState('특별 우수 교안 가산 마일리지 지급');
+  const [mileageInputs, setMileageInputs] = useState<Record<string, string>>({});
+  const [royaltyInputs, setRoyaltyInputs] = useState<Record<string, string>>({});
+
+  // Performance and ratings states
+  const [expandedUserId, setExpandedUserId] = useState<string | null>(null);
+  const [perfLectureCount, setPerfLectureCount] = useState<string>('0');
+  const [perfRatings, setPerfRatings] = useState<number[]>([]);
+  const [newRatingInput, setNewRatingInput] = useState<string>('');
+
+  const startEditingPerformance = (user: UserProfile) => {
+    if (expandedUserId === user.uid) {
+      setExpandedUserId(null);
+    } else {
+      setExpandedUserId(user.uid);
+      setPerfLectureCount((user.lectureCount || 0).toString());
+      setPerfRatings(user.lectureRatings || []);
+      setNewRatingInput('');
+    }
+  };
+
+  const handleSavePerformance = (userId: string) => {
+    if (!onUpdateUserPerformance) return;
+    const count = parseInt(perfLectureCount, 10);
+    onUpdateUserPerformance(userId, isNaN(count) ? 0 : count, perfRatings);
+    setExpandedUserId(null);
+  };
+
+  const handleAddRating = () => {
+    const r = parseFloat(newRatingInput);
+    if (isNaN(r) || r < 0 || r > 100) return;
+    const ratingValue = Number(r.toFixed(1));
+    const updatedRatings = [...perfRatings, ratingValue];
+    setPerfRatings(updatedRatings);
+    setNewRatingInput('');
+    
+    // Increment lecture count by 1 automatically when a score is added
+    const currentCount = parseInt(perfLectureCount, 10);
+    const nextCount = isNaN(currentCount) ? 1 : currentCount + 1;
+    setPerfLectureCount(nextCount.toString());
+  };
+
+  const handleRemoveRating = (indexToRemove: number) => {
+    const updatedRatings = perfRatings.filter((_, idx) => idx !== indexToRemove);
+    setPerfRatings(updatedRatings);
+    
+    // Decrement lecture count by 1 automatically (down to minimum 0)
+    const currentCount = parseInt(perfLectureCount, 10);
+    if (!isNaN(currentCount) && currentCount > 0) {
+      setPerfLectureCount((currentCount - 1).toString());
+    }
+  };
+
+  // Editing and approval states for Educational Programs
+  const [editingProgramId, setEditingProgramId] = useState<string | null>(null);
+  const [editTitle, setEditTitle] = useState('');
+  const [editDescription, setEditDescription] = useState('');
+  const [editTargetAudience, setEditTargetAudience] = useState('');
+  const [editCurriculumInput, setEditCurriculumInput] = useState('');
+  const [editRoyaltyRate, setEditRoyaltyRate] = useState<number>(5000);
+
+  const startEditingProgram = (program: EducationalProgram) => {
+    setEditingProgramId(program.id);
+    setEditTitle(program.title);
+    setEditDescription(program.description);
+    setEditTargetAudience(program.targetAudience);
+    setEditCurriculumInput(program.curriculum.join('\n'));
+    setEditRoyaltyRate(program.royaltyRate || 5000);
+  };
+
+  const handleSaveAndApproveProgram = (programId: string) => {
+    if (!onApproveProgram) return;
+    const curriculum = editCurriculumInput
+      .split('\n')
+      .map(line => line.trim())
+      .filter(line => line.length > 0);
+
+    const originalProg = programs.find(p => p.id === programId);
+    if (!originalProg) return;
+
+    const updatedProg: EducationalProgram = {
+      ...originalProg,
+      title: editTitle,
+      description: editDescription,
+      targetAudience: editTargetAudience,
+      curriculum: curriculum.length > 0 ? curriculum : originalProg.curriculum,
+      royaltyRate: Number(editRoyaltyRate),
+      isApproved: true, // Mark approved!
+    };
+
+    onApproveProgram(programId, updatedProg);
+    setEditingProgramId(null);
+  };
+
+  const tiers: InstructorTier[] = [
+    'Prestige Member',
+    'Prestige Associate',
+    'Prestige Professional',
+    'Prestige Master',
+    'Prestige Elite'
+  ];
+
+  const handleRoyaltyChange = (programId: string, value: string) => {
+    setRoyaltyInputs(prev => ({
+      ...prev,
+      [programId]: value
+    }));
+  };
+
+  const handleApplyRoyalty = (programId: string, currentRoyalty: number) => {
+    const inputVal = royaltyInputs[programId];
+    if (inputVal === undefined || inputVal === '') return;
+    const targetVal = parseInt(inputVal, 10);
+    if (isNaN(targetVal) || targetVal < 0) return;
+    onUpdateProgramRoyalty(programId, targetVal);
+    
+    // Clear input state for this program
+    setRoyaltyInputs(prev => {
+      const copy = { ...prev };
+      delete copy[programId];
+      return copy;
+    });
+  };
+
+  const handleUpgrade = (userId: string, targetTier: InstructorTier) => {
+    onUpgradeUserTier(userId, targetTier);
+  };
+
+  const handleMileageChange = (userId: string, value: string) => {
+    setMileageInputs(prev => ({
+      ...prev,
+      [userId]: value
+    }));
+  };
+
+  const handleApplyDirectMileage = (userId: string, currentMileage: number) => {
+    const inputVal = mileageInputs[userId];
+    if (inputVal === undefined || inputVal === '') return;
+    const targetVal = parseInt(inputVal, 10);
+    if (isNaN(targetVal) || targetVal < 0) return;
+    
+    const diff = targetVal - currentMileage;
+    onAdjustMileage(userId, diff, `관리자 마일리지 수동 직접 변경 (최종: ${targetVal.toLocaleString()} M)`);
+    // Clear input
+    setMileageInputs(prev => {
+      const copy = { ...prev };
+      delete copy[userId];
+      return copy;
+    });
+  };
+
+  const handleAdjustSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedUser || !adjustAmount) return;
+    onAdjustMileage(selectedUser, adjustAmount, adjustReason);
+    setAdjustAmount(1000);
+    setAdjustReason('특별 우수 교안 가산 마일리지 지급');
+  };
+
+  // Filter lists
+  const pendingLectures = lectures.filter(l => l.status !== 'completed');
+  const completedLectures = lectures.filter(l => l.status === 'completed');
+  const pendingApprovals = users.filter(u => !u.isAdmin && u.isApproved === false);
+  const approvedUsers = users.filter(u => !u.isAdmin && u.isApproved !== false);
+  const pendingPrograms = programs.filter(p => p.isApproved === false);
+  const pendingProposals = proposals.filter(p => p.status === 'pending');
+
+  // KPI Calculations
+  const totalApprovedInstructorsCount = approvedUsers.length;
+  const pendingApprovalsCount = pendingApprovals.length;
+  const pendingProgramsCount = pendingPrograms.length;
+  const activeLecturesCount = pendingLectures.length;
+  const completedLecturesCount = completedLectures.length;
+  const totalMileageIssued = users.reduce((sum, u) => sum + (u.mileage || 0), 0);
+  const pendingProposalsCount = pendingProposals.length;
+
+  // Filtered lists based on search bar
+  const filteredApprovedUsers = approvedUsers.filter(u =>
+    u.name.toLowerCase().includes(memberSearch.toLowerCase()) ||
+    u.tier.toLowerCase().includes(memberSearch.toLowerCase()) ||
+    (u.profileCard?.title && u.profileCard.title.toLowerCase().includes(memberSearch.toLowerCase()))
+  );
+
+  const filteredTransactions = transactions.filter(tx =>
+    tx.userName.toLowerCase().includes(txSearch.toLowerCase()) ||
+    tx.description.toLowerCase().includes(txSearch.toLowerCase()) ||
+    tx.type.toLowerCase().includes(txSearch.toLowerCase())
+  );
+
+  return (
+    <div className="space-y-6" id="admin-panel-main">
+      {/* 1. Admin Header Panel */}
+      <div className="bg-neutral-900 border border-neutral-800 p-6 rounded-2xl relative overflow-hidden" id="admin-banner">
+        <div className="absolute top-0 right-0 w-80 h-80 bg-kpcia-gold/5 rounded-full blur-3xl pointer-events-none" />
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+          <div className="space-y-1.5 z-10 text-left">
+            <span className="text-[10px] font-mono tracking-widest font-extrabold text-kpcia-gold uppercase flex items-center gap-1.5">
+              <Shield className="w-3.5 h-3.5" /> KPCIA EXECUTIVE CONTROL TOWER
+            </span>
+            <h2 className="text-xl md:text-2xl font-bold tracking-tight text-neutral-100 font-display">
+              협회 총괄 운영사무국 통제실
+            </h2>
+            <p className="text-xs text-neutral-400 font-sans leading-relaxed">
+              가입 승인, 저작권 심사, 강의 매칭 배정, 특별 기여 마일리지 수동 정산 및 실시간 거래 장부를 실시간 원격 통제합니다.
+            </p>
+          </div>
+          <div className="flex items-center gap-3 bg-neutral-950 border border-neutral-800/80 rounded-xl px-4 py-3 z-10 text-left shrink-0">
+            <Activity className="w-5 h-5 text-kpcia-gold animate-pulse" />
+            <div>
+              <div className="text-lg font-mono font-extrabold text-kpcia-gold">{users.length}명</div>
+              <p className="text-[10px] text-neutral-500 font-sans">KPCIA 누적 가입 회원</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* 2. Interactive Bento KPIs (Clicking shifts active tab) */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4" id="admin-bento-kpis">
+        {/* KPI 1: Signups pending */}
+        <button
+          onClick={() => setActiveTab('approvals')}
+          className={`p-4 rounded-xl border text-left transition-all duration-300 relative group overflow-hidden cursor-pointer ${
+            pendingApprovalsCount > 0 
+              ? 'bg-amber-950/10 border-amber-500/30 hover:border-amber-500/60 shadow-lg shadow-amber-500/5' 
+              : 'bg-neutral-900/40 border-neutral-800 hover:border-neutral-700'
+          }`}
+          id="kpi-signups"
+        >
+          <div className="flex justify-between items-start mb-2">
+            <span className="text-[10px] font-mono font-bold text-neutral-500 group-hover:text-neutral-400 transition-colors">가입 신청 대기</span>
+            <Users className={`w-4 h-4 ${pendingApprovalsCount > 0 ? 'text-amber-500' : 'text-neutral-500'}`} />
+          </div>
+          <div className="flex items-baseline gap-1">
+            <span className={`text-xl font-mono font-bold ${pendingApprovalsCount > 0 ? 'text-amber-500' : 'text-neutral-200'}`}>
+              {pendingApprovalsCount}
+            </span>
+            <span className="text-[10px] text-neutral-500">명</span>
+          </div>
+          <div className="text-[9px] text-neutral-500 font-sans mt-2 flex items-center gap-0.5 group-hover:text-kpcia-gold transition-colors">
+            자세히 검토하기 <ChevronRight className="w-3 h-3" />
+          </div>
+          {pendingApprovalsCount > 0 && (
+            <div className="absolute top-0 right-0 w-1.5 h-1.5 bg-amber-500 rounded-bl-full" />
+          )}
+        </button>
+
+        {/* KPI 2: Course copyrights pending */}
+        <button
+          onClick={() => setActiveTab('approvals')}
+          className={`p-4 rounded-xl border text-left transition-all duration-300 relative group overflow-hidden cursor-pointer ${
+            pendingProgramsCount > 0 
+              ? 'bg-kpcia-gold/10 border-kpcia-gold/30 hover:border-kpcia-gold/60 shadow-lg shadow-kpcia-gold/5' 
+              : 'bg-neutral-900/40 border-neutral-800 hover:border-neutral-700'
+          }`}
+          id="kpi-copyrights"
+        >
+          <div className="flex justify-between items-start mb-2">
+            <span className="text-[10px] font-mono font-bold text-neutral-500 group-hover:text-neutral-400 transition-colors">저작권 심사 대기</span>
+            <BookOpen className={`w-4 h-4 ${pendingProgramsCount > 0 ? 'text-kpcia-gold' : 'text-neutral-500'}`} />
+          </div>
+          <div className="flex items-baseline gap-1">
+            <span className={`text-xl font-mono font-bold ${pendingProgramsCount > 0 ? 'text-kpcia-gold' : 'text-neutral-200'}`}>
+              {pendingProgramsCount}
+            </span>
+            <span className="text-[10px] text-neutral-500">건</span>
+          </div>
+          <div className="text-[9px] text-neutral-500 font-sans mt-2 flex items-center gap-0.5 group-hover:text-kpcia-gold transition-colors">
+            자세히 검토하기 <ChevronRight className="w-3 h-3" />
+          </div>
+          {pendingProgramsCount > 0 && (
+            <div className="absolute top-0 right-0 w-1.5 h-1.5 bg-kpcia-gold rounded-bl-full" />
+          )}
+        </button>
+
+        {/* KPI 3: Open Matching */}
+        <button
+          onClick={() => setActiveTab('lectures')}
+          className="p-4 rounded-xl border border-neutral-800 bg-neutral-900/40 text-left transition-all duration-300 relative group hover:border-neutral-700 cursor-pointer"
+          id="kpi-matchings"
+        >
+          <div className="flex justify-between items-start mb-2">
+            <span className="text-[10px] font-mono font-bold text-neutral-500 group-hover:text-neutral-400 transition-colors">활성 출강 배정</span>
+            <CheckSquare className="w-4 h-4 text-sky-400" />
+          </div>
+          <div className="flex items-baseline gap-1">
+            <span className="text-xl font-mono font-bold text-sky-400">
+              {activeLecturesCount}
+            </span>
+            <span className="text-[10px] text-neutral-500 font-sans">건 매칭중</span>
+          </div>
+          <div className="text-[9px] text-neutral-500 font-sans mt-2 flex items-center gap-0.5 group-hover:text-kpcia-gold transition-colors">
+            강사 배정 및 정산실 <ChevronRight className="w-3 h-3" />
+          </div>
+        </button>
+
+        {/* KPI 4: Issued Mileage */}
+        <button
+          onClick={() => setActiveTab('members')}
+          className="p-4 rounded-xl border border-neutral-800 bg-neutral-900/40 text-left transition-all duration-300 relative group hover:border-neutral-700 cursor-pointer"
+          id="kpi-mileage"
+        >
+          <div className="flex justify-between items-start mb-2">
+            <span className="text-[10px] font-mono font-bold text-neutral-500 group-hover:text-neutral-400 transition-colors">전체 발행 마일리지</span>
+            <Coins className="w-4 h-4 text-emerald-400" />
+          </div>
+          <div className="flex items-baseline gap-1">
+            <span className="text-lg md:text-xl font-mono font-bold text-emerald-400">
+              {totalMileageIssued.toLocaleString()}
+            </span>
+            <span className="text-[10px] text-neutral-500 font-mono"> M</span>
+          </div>
+          <div className="text-[9px] text-neutral-500 font-sans mt-2 flex items-center gap-0.5 group-hover:text-kpcia-gold transition-colors">
+            등급 및 마일리지 조율 <ChevronRight className="w-3 h-3" />
+          </div>
+        </button>
+      </div>
+
+      {/* 3. Sleek Tab Navigation System */}
+      <div className="border-b border-neutral-800 flex flex-wrap gap-2 pt-2" id="admin-tab-bar">
+        <button
+          onClick={() => setActiveTab('dashboard')}
+          className={`flex items-center gap-2 px-4 py-2.5 text-xs font-bold border-b-2 transition-all cursor-pointer ${
+            activeTab === 'dashboard'
+              ? 'border-kpcia-gold text-kpcia-gold bg-neutral-900/20'
+              : 'border-transparent text-neutral-400 hover:text-neutral-200'
+          }`}
+          id="tab-btn-dashboard"
+        >
+          <LayoutDashboard className="w-4 h-4" />
+          <span>대시보드 개요</span>
+        </button>
+
+        <button
+          onClick={() => setActiveTab('approvals')}
+          className={`flex items-center gap-2 px-4 py-2.5 text-xs font-bold border-b-2 transition-all relative cursor-pointer ${
+            activeTab === 'approvals'
+              ? 'border-kpcia-gold text-kpcia-gold bg-neutral-900/20'
+              : 'border-transparent text-neutral-400 hover:text-neutral-200'
+          }`}
+          id="tab-btn-approvals"
+        >
+          <UserCheck className="w-4 h-4" />
+          <span>가입 및 저작권 심사처</span>
+          {(pendingApprovalsCount > 0 || pendingProgramsCount > 0) && (
+            <span className="ml-1 px-1.5 py-0.5 text-[9px] font-bold bg-amber-500 text-neutral-950 rounded-full animate-pulse">
+              {pendingApprovalsCount + pendingProgramsCount}
+            </span>
+          )}
+        </button>
+
+        <button
+          onClick={() => setActiveTab('lectures')}
+          className={`flex items-center gap-2 px-4 py-2.5 text-xs font-bold border-b-2 transition-all relative cursor-pointer ${
+            activeTab === 'lectures'
+              ? 'border-kpcia-gold text-kpcia-gold bg-neutral-900/20'
+              : 'border-transparent text-neutral-400 hover:text-neutral-200'
+          }`}
+          id="tab-btn-lectures"
+        >
+          <CheckSquare className="w-4 h-4" />
+          <span>출강 배정 및 정산실</span>
+          {activeLecturesCount > 0 && (
+            <span className="ml-1 px-1.5 py-0.5 text-[9px] font-bold bg-sky-500 text-neutral-950 rounded-full">
+              {activeLecturesCount}
+            </span>
+          )}
+        </button>
+
+        <button
+          onClick={() => setActiveTab('members')}
+          className={`flex items-center gap-2 px-4 py-2.5 text-xs font-bold border-b-2 transition-all cursor-pointer ${
+            activeTab === 'members'
+              ? 'border-kpcia-gold text-kpcia-gold bg-neutral-900/20'
+              : 'border-transparent text-neutral-400 hover:text-neutral-200'
+          }`}
+          id="tab-btn-members"
+        >
+          <Coins className="w-4 h-4" />
+          <span>강사 & 마일리지 관리</span>
+        </button>
+
+        <button
+          onClick={() => setActiveTab('proposals')}
+          className={`flex items-center gap-2 px-4 py-2.5 text-xs font-bold border-b-2 transition-all relative cursor-pointer ${
+            activeTab === 'proposals'
+              ? 'border-kpcia-gold text-kpcia-gold bg-neutral-900/20'
+              : 'border-transparent text-neutral-400 hover:text-neutral-200'
+          }`}
+          id="tab-btn-proposals"
+        >
+          <Handshake className="w-4 h-4" />
+          <span>기업 제휴 제안서</span>
+          {pendingProposalsCount > 0 && (
+            <span className="ml-1 px-1.5 py-0.5 text-[9px] font-bold bg-amber-500 text-neutral-950 rounded-full">
+              {pendingProposalsCount}
+            </span>
+          )}
+        </button>
+      </div>
+
+      {/* 4. Tab Content Router */}
+      <div className="space-y-6" id="admin-tab-content">
+        
+        {/* ==================== TAB 1: DASHBOARD OVERVIEW ==================== */}
+        {activeTab === 'dashboard' && (
+          <div className="space-y-6 animate-in fade-in duration-200" id="pane-dashboard">
+            {/* Quick Summary Grid */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              <div className="bg-neutral-900/50 border border-neutral-800 p-5 rounded-xl text-left space-y-2">
+                <span className="text-[10px] font-mono font-bold text-neutral-500 uppercase">강의 매칭 지표</span>
+                <div className="flex items-center justify-between">
+                  <span className="text-xs text-neutral-400">성공적으로 마무리된 출강</span>
+                  <span className="text-sm font-mono font-bold text-neutral-200">{completedLecturesCount}건</span>
+                </div>
+                <div className="flex items-center justify-between pt-1 border-t border-neutral-850">
+                  <span className="text-xs text-neutral-400">현재 접수·진행 중인 출강</span>
+                  <span className="text-sm font-mono font-bold text-sky-400">{activeLecturesCount}건</span>
+                </div>
+              </div>
+
+              <div className="bg-neutral-900/50 border border-neutral-800 p-5 rounded-xl text-left space-y-2">
+                <span className="text-[10px] font-mono font-bold text-neutral-500 uppercase">콘텐츠 라이선스 지표</span>
+                <div className="flex items-center justify-between">
+                  <span className="text-xs text-neutral-400">협회 공식 공인 프로그램</span>
+                  <span className="text-sm font-mono font-bold text-kpcia-gold">{programs.filter(p => p.isApproved !== false).length}건</span>
+                </div>
+                <div className="flex items-center justify-between pt-1 border-t border-neutral-850">
+                  <span className="text-xs text-neutral-400">저작권 신규 심사 대기</span>
+                  <span className="text-sm font-mono font-bold text-amber-500">{pendingProgramsCount}건</span>
+                </div>
+              </div>
+
+              <div className="bg-neutral-900/50 border border-neutral-800 p-5 rounded-xl text-left space-y-2">
+                <span className="text-[10px] font-mono font-bold text-neutral-500 uppercase">비즈니스 파트너십</span>
+                <div className="flex items-center justify-between">
+                  <span className="text-xs text-neutral-400">검토 대기 중인 기업제안</span>
+                  <span className="text-sm font-mono font-bold text-amber-500">{pendingProposalsCount}건</span>
+                </div>
+                <div className="flex items-center justify-between pt-1 border-t border-neutral-850">
+                  <span className="text-xs text-neutral-400">전체 접수 제휴 제안</span>
+                  <span className="text-sm font-mono font-bold text-neutral-200">{proposals.length}건</span>
+                </div>
+              </div>
+            </div>
+
+            {/* Notification alert banner */}
+            {(pendingApprovalsCount > 0 || pendingProgramsCount > 0) && (
+              <div className="bg-amber-500/10 border border-amber-500/20 p-4 rounded-xl flex flex-col sm:flex-row items-center justify-between gap-3 text-left">
+                <div className="flex items-center gap-3">
+                  <AlertCircle className="w-5 h-5 text-amber-500 shrink-0" />
+                  <div>
+                    <h4 className="text-xs font-bold text-amber-500">운영사무국 처리 대기 사항 안내</h4>
+                    <p className="text-[10px] text-neutral-400 mt-0.5">
+                      가입 신청 승인 <strong className="text-amber-500">{pendingApprovalsCount}명</strong>, 신규 교육 콘텐츠 저작권 심사 <strong className="text-kpcia-gold">{pendingProgramsCount}건</strong>이 접수되어 처리를 기다리고 있습니다.
+                    </p>
+                  </div>
+                </div>
+                <button
+                  onClick={() => setActiveTab('approvals')}
+                  className="px-4 py-1.5 bg-amber-500 hover:bg-amber-600 text-neutral-950 text-[10px] font-extrabold rounded-lg transition-all shrink-0 cursor-pointer"
+                >
+                  지금 즉시 결재하기
+                </button>
+              </div>
+            )}
+
+            {/* Transaction Ledger Log (Searchable block on Dashboard) */}
+            <div className="bg-neutral-900/50 border border-neutral-800 rounded-xl p-5" id="ledger-panel">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-neutral-800/80 pb-3 mb-4">
+                <h3 className="text-xs font-bold font-display uppercase tracking-wider text-neutral-300 flex items-center gap-1.5">
+                  <History className="w-4 h-4 text-kpcia-gold" /> KPCIA 마일리지 누적 트랜잭션 원장 (실시간 감사 장부)
+                </h3>
+                <div className="relative max-w-xs w-full sm:w-64">
+                  <Search className="absolute left-3 top-2.5 w-3.5 h-3.5 text-neutral-500" />
+                  <input
+                    type="text"
+                    placeholder="강사명 또는 거래 내용 검색..."
+                    value={txSearch}
+                    onChange={(e) => setTxSearch(e.target.value)}
+                    className="w-full pl-9 pr-3.5 py-1.5 rounded-lg bg-neutral-950 border border-neutral-800 text-[10px] text-neutral-100 placeholder-neutral-500 focus:border-kpcia-gold focus:outline-none"
+                  />
+                </div>
+              </div>
+
+              {filteredTransactions.length === 0 ? (
+                <div className="text-center py-12 text-xs text-neutral-500">
+                  {txSearch ? '검색어와 일치하는 트랜잭션 기록이 없습니다.' : '기록된 마일리지 거래가 존재하지 않습니다.'}
+                </div>
+              ) : (
+                <div className="space-y-2 max-h-[350px] overflow-y-auto pr-1" id="ledger-logs">
+                  {[...filteredTransactions].reverse().map((tx) => (
+                    <div 
+                      key={tx.id} 
+                      className="p-3 rounded bg-neutral-950 border border-neutral-800/60 flex items-center justify-between text-xs font-mono hover:border-neutral-800 transition-all text-left gap-4"
+                      id={`ledger-tx-${tx.id}`}
+                    >
+                      <div className="flex items-center space-x-3 truncate">
+                        <div className="text-[10px] text-neutral-500 font-mono shrink-0">{tx.createdAt.split('T')[1]?.substring(0, 5) || '00:00'}</div>
+                        <div className="flex items-center space-x-1 bg-neutral-900 border border-neutral-800 rounded px-1.5 py-0.5 text-[8px] font-bold uppercase shrink-0">
+                          <ArrowRightLeft className="w-3.5 h-3.5 text-kpcia-gold" />
+                          <span>{tx.type}</span>
+                        </div>
+                        <div className="text-neutral-300 font-sans font-medium truncate">
+                          <strong className="text-neutral-200">{tx.userName}</strong>: {tx.description}
+                        </div>
+                      </div>
+                      <div className={`font-bold shrink-0 font-mono ${tx.amount >= 0 ? 'text-emerald-500' : 'text-red-500'}`}>
+                        {tx.amount >= 0 ? `+${tx.amount.toLocaleString()}` : tx.amount.toLocaleString()} M
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* ==================== TAB 2: APPROVALS DESK ==================== */}
+        {activeTab === 'approvals' && (
+          <div className="space-y-6 animate-in fade-in duration-200" id="pane-approvals">
+            
+            {/* Split Signups and Programs Copyrights */}
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+              
+              {/* Left Column: New Instructor Signups (4 cols on lg, or let's do full widths split vertically) */}
+              <div className="lg:col-span-5 bg-neutral-900/50 border border-neutral-800 rounded-xl p-5 text-left" id="pending-approvals-panel">
+                <h3 className="text-xs font-bold font-display uppercase tracking-wider text-neutral-300 flex items-center justify-between border-b border-neutral-800/80 pb-2 mb-4">
+                  <span className="flex items-center gap-1.5 text-amber-500">
+                    <Users className="w-4 h-4" />
+                    <span>가입 승인 대기 목록 ({pendingApprovalsCount}명)</span>
+                  </span>
+                  <span className="text-[9px] bg-neutral-950 px-2 py-0.5 rounded text-neutral-400 font-mono">
+                    Signups Desk
+                  </span>
+                </h3>
+
+                {pendingApprovalsCount === 0 ? (
+                  <div className="text-center py-12 text-xs text-neutral-500 font-sans" id="no-pending-approvals">
+                    승인 대기 중인 신규 강사 신청건이 없습니다.
+                  </div>
+                ) : (
+                  <div className="space-y-4" id="pending-approvals-grid">
+                    {pendingApprovals.map((user) => (
+                      <div 
+                        key={user.uid} 
+                        className="p-4 rounded-xl bg-neutral-950 border border-amber-500/20 relative overflow-hidden flex flex-col justify-between hover:border-amber-500/40 transition-all space-y-3"
+                        id={`pending-card-${user.uid}`}
+                      >
+                        <div className="absolute top-0 right-0 bg-amber-500/10 text-amber-500 text-[8px] font-mono tracking-widest uppercase px-2 py-0.5 rounded-bl border-l border-b border-amber-500/15">
+                          PENDING
+                        </div>
+
+                        <div className="space-y-1 text-left">
+                          <div className="text-xs font-bold text-neutral-100 flex items-center gap-1.5">
+                            {user.name}
+                            <span className="text-[9px] font-mono font-bold text-kpcia-gold bg-kpcia-gold/10 px-1.5 py-0.5 rounded border border-kpcia-gold/25">
+                              {user.tier}
+                            </span>
+                          </div>
+                          <div className="text-[10px] text-neutral-400 font-sans space-y-0.5 pt-1">
+                            <div>이메일: <strong className="text-neutral-300">{user.email}</strong></div>
+                            {user.profileCard?.contactPhone && (
+                              <div>연락처: <span className="text-neutral-300">{user.profileCard.contactPhone}</span></div>
+                            )}
+                            {user.profileCard?.title && (
+                              <div>전문 분야: <span className="text-neutral-300">{user.profileCard.title}</span></div>
+                            )}
+                          </div>
+                        </div>
+
+                        <div className="pt-2 border-t border-neutral-900 flex space-x-2">
+                          <button
+                            onClick={() => onRejectUser && onRejectUser(user.uid)}
+                            className="flex-1 py-1.5 bg-neutral-900 hover:bg-neutral-850 border border-neutral-800 text-neutral-400 hover:text-neutral-300 text-[10px] font-bold rounded-lg transition-all cursor-pointer"
+                            id={`reject-btn-${user.uid}`}
+                          >
+                            가입 거절
+                          </button>
+                          <button
+                            onClick={() => onApproveUser && onApproveUser(user.uid)}
+                            className="flex-1 py-1.5 bg-emerald-500 hover:bg-emerald-600 text-neutral-950 text-[10px] font-extrabold rounded-lg transition-all flex items-center justify-center gap-1 cursor-pointer shadow-md shadow-emerald-500/10"
+                            id={`approve-btn-${user.uid}`}
+                          >
+                            <Check className="w-3 h-3 text-neutral-950" />
+                            <span>최종 승인</span>
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {/* Right Column: New Course Programs (7 cols on lg) */}
+              <div className="lg:col-span-7 bg-neutral-900/50 border border-neutral-800 rounded-xl p-5 text-left" id="pending-programs-panel">
+                <h3 className="text-xs font-bold font-display uppercase tracking-wider text-neutral-300 flex items-center justify-between border-b border-neutral-800/80 pb-2 mb-4">
+                  <span className="flex items-center gap-1.5 text-kpcia-gold">
+                    <BookOpen className="w-4 h-4" />
+                    <span>콘텐츠 독창적 저작권 등록 심사처 ({pendingProgramsCount}건)</span>
+                  </span>
+                  <span className="text-[9px] bg-neutral-950 px-2 py-0.5 rounded text-neutral-400 font-mono">
+                    Copyright Review
+                  </span>
+                </h3>
+
+                {pendingProgramsCount === 0 ? (
+                  <div className="text-center py-12 text-xs text-neutral-500 font-sans" id="no-pending-programs">
+                    저작권 심사 및 수정보완을 대기 중인 신규 교육 콘텐츠 신청건이 없습니다.
+                  </div>
+                ) : (
+                  <div className="space-y-4" id="pending-programs-list">
+                    {pendingPrograms.map((program) => {
+                      const isEditing = editingProgramId === program.id;
+
+                      return (
+                        <div 
+                          key={program.id} 
+                          className={`p-4 rounded-xl border relative transition-all space-y-4 text-left ${
+                            isEditing 
+                              ? 'border-kpcia-gold bg-neutral-950 shadow-lg shadow-kpcia-gold/5' 
+                              : 'bg-neutral-950 border-neutral-850 hover:border-neutral-800'
+                          }`}
+                          id={`pending-program-${program.id}`}
+                        >
+                          <div className="flex items-start justify-between">
+                            <div>
+                              <span className="text-[9px] font-mono font-bold text-neutral-500 block">PROG ID: {program.id.toUpperCase()}</span>
+                              <h4 className="text-sm font-bold text-neutral-100 font-display mt-0.5">{program.title}</h4>
+                              <p className="text-[10px] text-neutral-400 mt-1 font-sans">
+                                제안 강사: <strong className="text-neutral-300">{program.authorName}</strong> | 대상: <span className="text-neutral-300">{program.targetAudience}</span>
+                              </p>
+                            </div>
+                            {!isEditing && (
+                              <button
+                                onClick={() => startEditingProgram(program)}
+                                className="px-3 py-1.5 bg-neutral-900 hover:bg-neutral-850 border border-kpcia-gold/40 hover:border-kpcia-gold text-kpcia-gold text-[10px] font-bold rounded-lg transition-all cursor-pointer shrink-0"
+                                id={`edit-prog-btn-${program.id}`}
+                              >
+                                심사·보완 및 최종 공인하기
+                              </button>
+                            )}
+                          </div>
+
+                          {!isEditing ? (
+                            <div className="text-xs space-y-2">
+                              <div className="bg-neutral-900/50 p-3 rounded-lg border border-neutral-800/40">
+                                <span className="text-[9px] font-mono text-neutral-500 block mb-1">기획 의도 및 내용 개요</span>
+                                <p className="text-neutral-300 leading-relaxed font-sans">{program.description}</p>
+                              </div>
+                              <div className="bg-neutral-900/30 p-3 rounded-lg border border-neutral-850">
+                                <span className="text-[9px] font-mono text-neutral-500 block mb-1">초안 커리큘럼</span>
+                                <ul className="list-disc list-inside space-y-1 text-neutral-400 font-sans">
+                                  {program.curriculum.map((item, idx) => (
+                                    <li key={idx} className="text-[11px]">{item}</li>
+                                  ))}
+                                </ul>
+                              </div>
+                            </div>
+                          ) : (
+                            <div className="bg-neutral-900/30 border border-neutral-800 p-4 rounded-lg space-y-4 animate-in fade-in duration-200">
+                              <div className="border-b border-neutral-800 pb-2">
+                                <span className="text-xs font-bold text-kpcia-gold">운영사무국 프로그램 수정보완 편집기</span>
+                                <p className="text-[10px] text-neutral-400 mt-0.5">강사의 오리지널 기획을 정교화하고 승인 시 지급될 마일리지를 책정합니다.</p>
+                              </div>
+
+                              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <div>
+                                  <label className="text-[9px] font-mono text-neutral-400 block mb-1">프로그램 명칭 수정</label>
+                                  <input
+                                    type="text"
+                                    value={editTitle}
+                                    onChange={(e) => setEditTitle(e.target.value)}
+                                    onKeyDown={(e) => {
+                                      if (e.key === 'Enter') {
+                                        handleSaveAndApproveProgram(program.id);
+                                      }
+                                    }}
+                                    className="w-full px-3 py-1.5 rounded-lg bg-neutral-950 border border-neutral-800 text-xs font-semibold text-neutral-100 focus:border-kpcia-gold focus:outline-none"
+                                  />
+                                </div>
+                                <div>
+                                  <label className="text-[9px] font-mono text-neutral-400 block mb-1">교육 대상 수정</label>
+                                  <input
+                                    type="text"
+                                    value={editTargetAudience}
+                                    onChange={(e) => setEditTargetAudience(e.target.value)}
+                                    onKeyDown={(e) => {
+                                      if (e.key === 'Enter') {
+                                        handleSaveAndApproveProgram(program.id);
+                                      }
+                                    }}
+                                    className="w-full px-3 py-1.5 rounded-lg bg-neutral-950 border border-neutral-800 text-xs font-semibold text-neutral-100 focus:border-kpcia-gold focus:outline-none"
+                                  />
+                                </div>
+                              </div>
+
+                              <div>
+                                <label className="text-[9px] font-mono text-neutral-400 block mb-1">기획 의도 및 개요 수정</label>
+                                <textarea
+                                  rows={2}
+                                  value={editDescription}
+                                  onChange={(e) => setEditDescription(e.target.value)}
+                                  className="w-full px-3 py-1.5 rounded-lg bg-neutral-950 border border-neutral-800 text-xs font-medium text-neutral-200 focus:border-kpcia-gold focus:outline-none resize-none"
+                                />
+                              </div>
+
+                              <div>
+                                <label className="text-[9px] font-mono text-neutral-400 block mb-1">커리큘럼 보완 (줄바꿈 단위 구분)</label>
+                                <textarea
+                                  rows={3}
+                                  value={editCurriculumInput}
+                                  onChange={(e) => setEditCurriculumInput(e.target.value)}
+                                  className="w-full px-3 py-1.5 rounded-lg bg-neutral-950 border border-neutral-800 text-xs font-mono text-neutral-200 focus:border-kpcia-gold focus:outline-none resize-none"
+                                />
+                              </div>
+
+                              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 items-end pt-2 border-t border-neutral-850">
+                                <div>
+                                  <label className="text-[9px] font-mono text-amber-500 block mb-1">★ 승인 지급 마일리지 누적 비율 (M)</label>
+                                  <input
+                                    type="number"
+                                    value={editRoyaltyRate}
+                                    onChange={(e) => setEditRoyaltyRate(Number(e.target.value))}
+                                    onKeyDown={(e) => {
+                                      if (e.key === 'Enter') {
+                                        handleSaveAndApproveProgram(program.id);
+                                      }
+                                    }}
+                                    min={0}
+                                    className="w-full px-3 py-1.5 rounded-lg bg-neutral-950 border border-amber-500/40 text-xs font-bold font-mono text-kpcia-gold focus:border-kpcia-gold focus:outline-none"
+                                  />
+                                </div>
+                                <div className="flex justify-end space-x-2">
+                                  <button
+                                    type="button"
+                                    onClick={() => setEditingProgramId(null)}
+                                    className="px-3 py-1.5 border border-neutral-800 bg-neutral-950 text-neutral-400 text-xs font-bold rounded-lg hover:bg-neutral-900 cursor-pointer"
+                                  >
+                                    수정 취소
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => handleSaveAndApproveProgram(program.id)}
+                                    className="px-4 py-1.5 bg-emerald-500 hover:bg-emerald-600 text-neutral-950 text-xs font-extrabold rounded-lg flex items-center gap-1 shadow-md shadow-emerald-500/10 cursor-pointer"
+                                    id={`approve-prog-confirm-${program.id}`}
+                                  >
+                                    <Check className="w-4 h-4 text-neutral-950" />
+                                    <span>심사 완료 및 저작권 승인</span>
+                                  </button>
+                                </div>
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* ==================== TAB 3: LECTURE MATCHING & SETTLEMENTS ==================== */}
+        {activeTab === 'lectures' && (
+          <div className="bg-neutral-900/50 border border-neutral-800 rounded-xl p-5 text-left animate-in fade-in duration-200" id="matching-panel">
+            <h3 className="text-xs font-bold font-display uppercase tracking-wider text-neutral-300 flex items-center gap-1.5 mb-2 border-b border-neutral-800/80 pb-2">
+              <CheckSquare className="w-4 h-4 text-kpcia-gold" /> 출강 신청 강사 심사 & 강의 최종 정산 관리국
+            </h3>
+            <p className="text-[11px] text-neutral-400 mb-5 leading-relaxed">
+              신청을 접수한 강사들의 등급 및 적합성을 평가하여 최종 배정하고, 강사의 출강이 성공적으로 끝났을 시 출강료와 프로그램 저작 마일리지를 자동 안전 분할 정산 지급합니다.
+            </p>
+
+            <div className="space-y-4" id="matching-list">
+              {pendingLectures.length === 0 ? (
+                <div className="text-center py-12 text-xs text-neutral-500">
+                  대기 중이거나 수행 중인 출강 프로젝트 건이 없습니다.
+                </div>
+              ) : (
+                pendingLectures.map((lecture) => {
+                  const appliedUsers = users.filter(u => lecture.applicants.includes(u.uid));
+
+                  return (
+                    <div 
+                      key={lecture.id}
+                      className="p-4 rounded-xl bg-neutral-950 border border-neutral-850 flex flex-col md:flex-row md:items-center justify-between gap-4 text-left hover:border-neutral-800 transition-all"
+                      id={`admin-matching-row-${lecture.id}`}
+                    >
+                      <div className="space-y-2 max-w-lg">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <span className={`text-[9px] px-2 py-0.5 rounded border font-bold uppercase font-mono ${
+                            lecture.status === 'open' 
+                              ? 'bg-amber-500/10 text-amber-500 border-amber-500/20' 
+                              : 'bg-emerald-500/10 text-emerald-500 border-emerald-500/20'
+                          }`}>
+                            {lecture.status === 'open' ? '강사 매칭·접수중' : '출강 수행·교육중'}
+                          </span>
+                          <span className="text-[10px] text-neutral-500 font-mono">ID: {lecture.id}</span>
+                          <span className="text-[10px] text-neutral-400">예산: <strong className="text-neutral-300 font-mono">{lecture.budget.toLocaleString()} KRW</strong></span>
+                        </div>
+                        
+                        <h4 className="text-sm font-bold text-neutral-200 font-display">{lecture.title}</h4>
+                        <div className="text-[10px] text-neutral-400 font-sans grid grid-cols-2 gap-x-4 gap-y-1">
+                          <div>요청 장소: <span className="text-neutral-300">{lecture.location}</span></div>
+                          <div>요청 날짜: <span className="text-neutral-300">{lecture.date || '추후 결정'}</span></div>
+                        </div>
+
+                        {lecture.programId && (
+                          <div className="text-[9px] text-kpcia-gold font-bold bg-kpcia-gold/10 px-2.5 py-1 rounded inline-block border border-kpcia-gold/15 mt-1">
+                            독점 공인 교안 연계: {lecture.programTitle} (+{lecture.mileageRoyalty.toLocaleString()} M 저작권 라이선스료 지급 대기)
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Matching Action Module */}
+                      <div className="flex flex-col sm:flex-row sm:items-center gap-3 shrink-0 pt-3 md:pt-0 border-t md:border-t-0 border-neutral-900" id={`admin-matching-actions-${lecture.id}`}>
+                        
+                        {/* Status 1: Open for application - Admin selects the candidate to assign */}
+                        {lecture.status === 'open' && (
+                          <div className="space-y-1.5 w-full sm:w-auto">
+                            <span className="text-[9px] font-mono text-neutral-500 block uppercase">출강 신청자 목록 ({appliedUsers.length}명)</span>
+                            {appliedUsers.length === 0 ? (
+                              <span className="text-[10px] text-neutral-500 block italic">강사의 출강 신청을 실시간 대기 중입니다.</span>
+                            ) : (
+                              <div className="flex flex-wrap gap-1.5 max-w-sm">
+                                {appliedUsers.map((u) => (
+                                  <button
+                                    key={u.uid}
+                                    onClick={() => onAssignLecturer(lecture.id, u.uid, u.name)}
+                                    className="px-3 py-1.5 rounded-lg bg-neutral-900 border border-neutral-700 hover:border-kpcia-gold text-[10px] font-bold text-neutral-300 hover:text-kpcia-gold transition-all flex items-center space-x-1 cursor-pointer"
+                                    id={`assign-btn-${lecture.id}-${u.uid}`}
+                                  >
+                                    <span>{u.name} ({u.tier.split(' ')[1] || u.tier}) 배정</span>
+                                  </button>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+                        )}
+
+                        {/* Status 2: Assigned & Ongoing - Admin marks lecture completed to pay mileage */}
+                        {lecture.status === 'assigned' && (
+                          <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3 w-full sm:w-auto">
+                            <div className="text-xs text-neutral-400">
+                              수행 강사: <strong className="text-neutral-200">{lecture.assignedName}</strong>
+                            </div>
+                            <button
+                              onClick={() => onCompleteLecture(lecture.id)}
+                              className="w-full sm:w-auto px-4 py-2 bg-kpcia-gold text-kpcia-dark text-xs font-extrabold rounded-lg hover:bg-kpcia-gold-hover transition-all flex items-center justify-center space-x-1 shadow-lg shadow-kpcia-gold/10 cursor-pointer"
+                              id={`complete-btn-${lecture.id}`}
+                            >
+                              <CheckCircle className="w-4 h-4 text-kpcia-dark" />
+                              <span>출강 완료 승인 & 마일리지 즉시 정산</span>
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* ==================== TAB 4: MEMBERS & MILEAGE ==================== */}
+        {activeTab === 'members' && (
+          <div className="space-y-6 animate-in fade-in duration-200" id="pane-members">
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-6" id="admin-row-1">
+              
+              {/* Left Column: Member Tier & Search (7 Cols) */}
+              <div className="lg:col-span-7 bg-neutral-900/50 border border-neutral-800 rounded-xl p-5 text-left" id="user-tier-management-panel">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-neutral-800/80 pb-3 mb-4">
+                  <h3 className="text-xs font-bold font-display uppercase tracking-wider text-neutral-300 flex items-center gap-1.5">
+                    <Users className="w-4 h-4 text-kpcia-gold" /> 회원 등급 승격 및 정밀 자격 관리
+                  </h3>
+                  <div className="relative w-full sm:w-48">
+                    <Search className="absolute left-2.5 top-2 w-3.5 h-3.5 text-neutral-500" />
+                    <input
+                      type="text"
+                      placeholder="강사 명칭 검색..."
+                      value={memberSearch}
+                      onChange={(e) => setMemberSearch(e.target.value)}
+                      className="w-full pl-8 pr-3 py-1 rounded-lg bg-neutral-950 border border-neutral-800 text-[10px] text-neutral-100 placeholder-neutral-500 focus:border-kpcia-gold focus:outline-none"
+                    />
+                  </div>
+                </div>
+
+                <div className="space-y-3.5 max-h-[460px] overflow-y-auto pr-1">
+                  {filteredApprovedUsers.length === 0 ? (
+                    <div className="text-center py-12 text-xs text-neutral-500">
+                      검색 조건에 맞는 회원이 존재하지 않습니다.
+                    </div>
+                  ) : (
+                    filteredApprovedUsers.map((user) => {
+                      if (user.isAdmin) return null; // Avoid editing admin here
+                      const isExpanded = expandedUserId === user.uid;
+                      return (
+                        <div key={user.uid} className="space-y-2 border border-neutral-800/40 p-1.5 rounded-xl bg-neutral-950/20" id={`user-performance-wrapper-${user.uid}`}>
+                          <div 
+                            className="flex flex-col xl:flex-row xl:items-center justify-between p-3.5 rounded-lg bg-neutral-950 border border-neutral-850 hover:border-neutral-800 transition-all gap-4 text-left"
+                            id={`admin-user-row-${user.uid}`}
+                          >
+                            <div className="space-y-1">
+                              <div className="text-xs font-bold text-neutral-100 flex items-center gap-1.5">
+                                {user.name}
+                                <span className="text-[9px] font-mono font-bold text-kpcia-gold bg-kpcia-gold/10 px-1.5 py-0.5 rounded border border-kpcia-gold/20">
+                                  {user.mileage.toLocaleString()} M
+                                </span>
+                              </div>
+                              <div className="text-[10px] text-neutral-400 font-sans flex items-center gap-1.5">
+                                <span>등급 권한:</span>
+                                <strong className="text-neutral-200">{user.tier}</strong>
+                              </div>
+                              <div className="text-[10px] text-neutral-400 font-sans flex flex-wrap items-center gap-x-2 gap-y-0.5 pt-0.5">
+                                <span>출강 실적: <strong className="text-neutral-200 font-mono">{user.lectureCount || 0}회</strong></span>
+                                <span className="text-neutral-600 font-mono">|</span>
+                                <span>평균 만족도: <strong className="text-amber-500 font-mono">{user.averageRating !== undefined ? user.averageRating.toFixed(1) : '0.0'}점</strong></span>
+                              </div>
+                            </div>
+
+                            <div className="flex flex-wrap items-center gap-2.5">
+                              {/* Direct Mileage Editing */}
+                              <div className="flex items-center space-x-1.5 bg-neutral-900 border border-neutral-850 px-2 py-1 rounded-lg" id={`mileage-direct-container-${user.uid}`}>
+                                <span className="text-[9px] text-neutral-400 font-sans">수동입력:</span>
+                                <input
+                                  type="number"
+                                  title="마일리지 정밀 조정"
+                                  value={mileageInputs[user.uid] !== undefined ? mileageInputs[user.uid] : user.mileage}
+                                  onChange={(e) => handleMileageChange(user.uid, e.target.value)}
+                                  onKeyDown={(e) => {
+                                    if (e.key === 'Enter') {
+                                      handleApplyDirectMileage(user.uid, user.mileage);
+                                    }
+                                  }}
+                                  className="w-16 px-1.5 py-0.5 rounded bg-neutral-950 border border-neutral-700 text-[10px] text-center font-mono text-kpcia-gold focus:border-kpcia-gold focus:outline-none"
+                                  id={`input-mileage-${user.uid}`}
+                                />
+                                <span className="text-[9px] text-neutral-500 font-mono">M</span>
+                                {mileageInputs[user.uid] !== undefined && mileageInputs[user.uid] !== user.mileage.toString() && (
+                                  <button
+                                    onClick={() => handleApplyDirectMileage(user.uid, user.mileage)}
+                                    className="px-2 py-0.5 rounded bg-kpcia-gold hover:bg-kpcia-gold-hover text-kpcia-dark text-[9px] font-extrabold transition-all shadow cursor-pointer"
+                                    id={`apply-mileage-btn-${user.uid}`}
+                                  >
+                                    저장
+                                  </button>
+                                )}
+                              </div>
+
+                              {/* Tier Change Dropdown */}
+                              <div className="flex items-center space-x-1">
+                                <span className="text-[9px] text-neutral-400 font-sans">등급변경:</span>
+                                <select
+                                  value={user.tier}
+                                  onChange={(e) => handleUpgrade(user.uid, e.target.value as any)}
+                                  className="px-2 py-1 rounded bg-neutral-900 border border-neutral-700 text-[10px] font-semibold text-neutral-300 focus:border-kpcia-gold focus:outline-none cursor-pointer"
+                                  id={`select-tier-${user.uid}`}
+                                >
+                                  {tiers.map((t) => (
+                                    <option key={t} value={t}>{t}</option>
+                                  ))}
+                                </select>
+                              </div>
+
+                              {/* Perform & Rating Edit Trigger Button */}
+                              <button
+                                onClick={() => startEditingPerformance(user)}
+                                className={`px-2 py-1 rounded text-[10px] font-bold transition-all flex items-center gap-1 cursor-pointer ${
+                                  isExpanded 
+                                    ? 'bg-kpcia-gold text-neutral-950 shadow-md shadow-kpcia-gold/10' 
+                                    : 'bg-neutral-900 text-neutral-300 border border-neutral-800 hover:border-kpcia-gold/50'
+                                }`}
+                                id={`perf-btn-${user.uid}`}
+                              >
+                                <Activity className="w-3.5 h-3.5" />
+                                <span>실적·평가</span>
+                              </button>
+                            </div>
+                          </div>
+
+                          {/* expandable panel for rating/lecture counts */}
+                          {isExpanded && (
+                            <div className="p-4 rounded-lg bg-neutral-900/60 border border-kpcia-gold/20 space-y-4 animate-in slide-in-from-top-2 duration-200" id={`perf-panel-${user.uid}`}>
+                              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-neutral-800 pb-2">
+                                <span className="text-[11px] font-bold text-kpcia-gold flex items-center gap-1">
+                                  ★ {user.name} 강사 출강 실적 및 만족도 평가 관리
+                                </span>
+                                <span className="text-[9px] font-mono text-neutral-400">
+                                  최근 수정: {user.updatedAt ? user.updatedAt.split('T')[0] : '기록 없음'}
+                                </span>
+                              </div>
+
+                              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                {/* Left: Lecture count input & new rating input */}
+                                <div className="space-y-3">
+                                  <div>
+                                    <label className="text-[10px] font-bold text-neutral-400 block mb-1">총 출강 횟수 (직접 기재 가능)</label>
+                                    <div className="flex items-center space-x-2">
+                                      <input
+                                        type="number"
+                                        min={0}
+                                        value={perfLectureCount}
+                                        onChange={(e) => setPerfLectureCount(e.target.value)}
+                                        onKeyDown={(e) => {
+                                          if (e.key === 'Enter') {
+                                            handleSavePerformance(user.uid);
+                                          }
+                                        }}
+                                        className="w-24 px-2.5 py-1 rounded bg-neutral-950 border border-neutral-800 text-xs text-neutral-100 focus:border-kpcia-gold focus:outline-none font-mono"
+                                        id={`perf-lecture-input-${user.uid}`}
+                                      />
+                                      <span className="text-xs text-neutral-400">회</span>
+                                    </div>
+                                    <p className="text-[9px] text-neutral-500 mt-1">※ 강의 만족도 점수를 추가하면 자동으로 출강 횟수가 가산됩니다.</p>
+                                  </div>
+
+                                  <div className="pt-2 border-t border-neutral-800/60">
+                                    <label className="text-[10px] font-bold text-neutral-400 block mb-1">개별 강의 만족도 점수 추가 (0 ~ 100점)</label>
+                                    <div className="flex items-center space-x-2">
+                                      <input
+                                        type="number"
+                                        min={0}
+                                        max={100}
+                                        placeholder="예: 98"
+                                        value={newRatingInput}
+                                        onChange={(e) => setNewRatingInput(e.target.value)}
+                                        onKeyDown={(e) => {
+                                          if (e.key === 'Enter') {
+                                            e.preventDefault();
+                                            handleAddRating();
+                                          }
+                                        }}
+                                        className="w-24 px-2.5 py-1 rounded bg-neutral-950 border border-neutral-800 text-xs text-neutral-100 focus:border-kpcia-gold focus:outline-none font-mono"
+                                        id={`perf-rating-input-${user.uid}`}
+                                      />
+                                      <span className="text-xs text-neutral-400">점</span>
+                                      <button
+                                        type="button"
+                                        onClick={handleAddRating}
+                                        disabled={!newRatingInput}
+                                        className="px-3 py-1 bg-neutral-800 hover:bg-neutral-700 text-neutral-200 hover:text-kpcia-gold text-[10px] font-bold rounded transition-all cursor-pointer disabled:opacity-40"
+                                        id={`perf-add-rating-btn-${user.uid}`}
+                                      >
+                                        추가
+                                      </button>
+                                    </div>
+                                  </div>
+                                </div>
+
+                                {/* Right: Existing Ratings list & calculated average */}
+                                <div className="space-y-3 bg-neutral-950/40 p-3 rounded-lg border border-neutral-850">
+                                  <div className="flex items-center justify-between text-[10px] font-bold text-neutral-400">
+                                    <span>등록된 만족도 평가 목록 ({perfRatings.length}건)</span>
+                                    <span className="text-kpcia-gold font-mono">
+                                      평균: {perfRatings.length > 0 ? (perfRatings.reduce((a, b) => a + b, 0) / perfRatings.length).toFixed(1) : '0.0'}점
+                                    </span>
+                                  </div>
+
+                                  {perfRatings.length === 0 ? (
+                                    <div className="text-center py-6 text-[10px] text-neutral-500 italic">
+                                      등록된 만족도 점수가 없습니다. 점수를 추가해 주십시오.
+                                    </div>
+                                  ) : (
+                                    <div className="flex flex-wrap gap-2 max-h-24 overflow-y-auto pr-1">
+                                      {perfRatings.map((rating, idx) => (
+                                        <div 
+                                          key={idx} 
+                                          className="flex items-center space-x-1.5 px-2 py-1 rounded bg-neutral-950 border border-neutral-800 text-[10px] font-mono text-neutral-300"
+                                        >
+                                          <span>{rating}점</span>
+                                          <button
+                                            type="button"
+                                            onClick={() => handleRemoveRating(idx)}
+                                            className="text-red-500 hover:text-red-400 transition-colors text-[9px] font-black cursor-pointer"
+                                            title="삭제"
+                                          >
+                                            ✕
+                                          </button>
+                                        </div>
+                                      ))}
+                                    </div>
+                                  )}
+                                </div>
+                              </div>
+
+                              {/* Actions: Save or Cancel */}
+                              <div className="flex justify-end space-x-2 pt-2 border-t border-neutral-800">
+                                <button
+                                  type="button"
+                                  onClick={() => setExpandedUserId(null)}
+                                  className="px-3 py-1.5 border border-neutral-800 bg-neutral-950 text-neutral-400 text-xs font-bold rounded-lg hover:bg-neutral-900 cursor-pointer"
+                                  id={`cancel-perf-${user.uid}`}
+                                >
+                                  취소
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => handleSavePerformance(user.uid)}
+                                  className="px-4 py-1.5 bg-emerald-500 hover:bg-emerald-600 text-neutral-950 text-xs font-extrabold rounded-lg flex items-center gap-1 shadow-md shadow-emerald-500/10 cursor-pointer"
+                                  id={`save-perf-${user.uid}`}
+                                >
+                                  <Check className="w-3.5 h-3.5 text-neutral-950" />
+                                  <span>실적 및 평가 저장</span>
+                                </button>
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })
+                  )}
+                </div>
+              </div>
+
+              {/* Right Column: Special Adjustments (5 Cols) */}
+              <div className="lg:col-span-5 space-y-6">
+                
+                {/* Special Hand Adjustment Form */}
+                <div className="bg-neutral-900/50 border border-neutral-800 rounded-xl p-5 text-left" id="mileage-adjust-panel">
+                  <h3 className="text-xs font-bold font-display uppercase tracking-wider text-neutral-300 flex items-center gap-1.5 mb-3 border-b border-neutral-800/80 pb-2">
+                    <DollarSign className="w-4 h-4 text-kpcia-gold" /> 특별 공로 마일리지 직접 수동 변동 처리
+                  </h3>
+                  <form onSubmit={handleAdjustSubmit} className="space-y-4" id="mileage-adjust-form">
+                    <div>
+                      <label className="text-[9px] font-mono text-neutral-400 block mb-1">지급 대상 강사 지정</label>
+                      <select
+                        value={selectedUser}
+                        onChange={(e) => setSelectedUser(e.target.value)}
+                        required
+                        className="w-full px-3 py-2 rounded-lg bg-neutral-950 border border-neutral-800 text-xs font-medium text-neutral-100 focus:border-kpcia-gold focus:outline-none cursor-pointer"
+                        id="form-adjust-user"
+                      >
+                        <option value="">강사를 선택하십시오</option>
+                        {approvedUsers.map(u => (
+                          <option key={u.uid} value={u.uid}>{u.name} ({u.tier.split(' ')[1] || u.tier})</option>
+                        ))}
+                      </select>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <label className="text-[9px] font-mono text-neutral-400 block mb-1">변동 마일리지 값</label>
+                        <input
+                          type="number"
+                          placeholder="예: 3000"
+                          value={adjustAmount}
+                          onChange={(e) => setAdjustAmount(Number(e.target.value))}
+                          required
+                          className="w-full px-3 py-1.5 rounded-lg bg-neutral-950 border border-neutral-800 text-xs font-medium text-neutral-100 focus:border-kpcia-gold focus:outline-none"
+                          id="form-adjust-amount"
+                        />
+                      </div>
+                      <div>
+                        <label className="text-[9px] font-mono text-neutral-400 block mb-1">변동 형식</label>
+                        <div className="px-3 py-1.5 bg-neutral-950 border border-neutral-800 rounded-lg text-xs font-bold text-neutral-300">
+                          {adjustAmount >= 0 ? '가산 (+) 처리' : '차감 (-) 처리'}
+                        </div>
+                      </div>
+                    </div>
+
+                    <div>
+                      <label className="text-[9px] font-mono text-neutral-400 block mb-1">변동 지급 사유</label>
+                      <input
+                        type="text"
+                        placeholder="사유를 기재하십시오."
+                        value={adjustReason}
+                        onChange={(e) => setAdjustReason(e.target.value)}
+                        required
+                        className="w-full px-3 py-1.5 rounded-lg bg-neutral-950 border border-neutral-800 text-xs font-medium text-neutral-100 focus:border-kpcia-gold focus:outline-none"
+                        id="form-adjust-reason"
+                      />
+                    </div>
+
+                    <button
+                      type="submit"
+                      disabled={!selectedUser}
+                      className="w-full py-2 bg-neutral-950 hover:bg-neutral-900 border border-kpcia-gold text-kpcia-gold font-bold text-xs rounded-lg transition-all disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
+                      id="form-adjust-submit-btn"
+                    >
+                      마일리지 수동 정산 발행 실행
+                    </button>
+                  </form>
+                </div>
+
+                {/* Educational Program Mileage Adjustments */}
+                <div className="bg-neutral-900/50 border border-neutral-800 rounded-xl p-5 text-left" id="program-royalty-management">
+                  <h3 className="text-xs font-bold font-display uppercase tracking-wider text-neutral-300 flex items-center gap-1.5 mb-3 border-b border-neutral-800/80 pb-2">
+                    <BookOpen className="w-4 h-4 text-kpcia-gold" /> 등재 교육 콘텐츠별 정산 마일리지 조율
+                  </h3>
+                  <div className="space-y-3 max-h-[220px] overflow-y-auto pr-1">
+                    {programs.filter(p => p.isApproved !== false).map((program) => (
+                      <div 
+                        key={program.id}
+                        className="p-3 rounded-lg bg-neutral-950 border border-neutral-850 flex items-center justify-between gap-3 text-left"
+                      >
+                        <div className="truncate">
+                          <h4 className="text-xs font-bold text-neutral-200 truncate">{program.title}</h4>
+                          <p className="text-[9px] text-neutral-400">저작자: {program.authorName}</p>
+                        </div>
+
+                        <div className="flex items-center space-x-1.5 shrink-0">
+                          <input
+                            type="number"
+                            title="콘텐츠 마일리지 조정"
+                            value={royaltyInputs[program.id] !== undefined ? royaltyInputs[program.id] : program.royaltyRate}
+                            onChange={(e) => handleRoyaltyChange(program.id, e.target.value)}
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter') {
+                                handleApplyRoyalty(program.id, program.royaltyRate);
+                              }
+                            }}
+                            className="w-16 px-1.5 py-0.5 rounded bg-neutral-900 border border-neutral-700 text-[10px] text-center font-mono text-kpcia-gold focus:border-kpcia-gold focus:outline-none"
+                            id={`input-royalty-${program.id}`}
+                          />
+                          <span className="text-[9px] text-neutral-500 font-mono">M</span>
+                          {royaltyInputs[program.id] !== undefined && royaltyInputs[program.id] !== program.royaltyRate.toString() && (
+                            <button
+                              onClick={() => handleApplyRoyalty(program.id, program.royaltyRate)}
+                              className="p-1 px-2 rounded bg-kpcia-gold hover:bg-kpcia-gold-hover text-kpcia-dark text-[9px] font-extrabold transition-all cursor-pointer"
+                              id={`save-royalty-btn-${program.id}`}
+                            >
+                              저장
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* ==================== TAB 5: CORPORATE PARTNERSHIPS ==================== */}
+        {activeTab === 'proposals' && (
+          <div className="bg-neutral-900/50 border border-neutral-800 rounded-xl p-5 text-left animate-in fade-in duration-200" id="proposals-review-management">
+            <h3 className="text-xs font-bold font-display uppercase tracking-wider text-neutral-300 flex items-center gap-1.5 mb-2 border-b border-neutral-800/80 pb-2">
+              <Handshake className="w-4 h-4 text-kpcia-gold" /> 외부 기관 제휴 및 협력 사업 제안서 검토 본부
+            </h3>
+            <p className="text-[11px] text-neutral-400 mb-5 leading-relaxed">
+              지자체, 정부부처 및 공기업·대기업들로부터 접수된 교육 출강 제휴 제안서를 실시간 모니터링하고 심사 답변을 처리합니다.
+            </p>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4" id="proposals-list">
+              {proposals.length === 0 ? (
+                <div className="col-span-2 text-center py-12 text-xs text-neutral-500">
+                  접수되어 검토 중인 비즈니스 제휴서가 존재하지 않습니다.
+                </div>
+              ) : (
+                proposals.map((prop) => (
+                  <div 
+                    key={prop.id}
+                    className="p-4 rounded-xl bg-neutral-950 border border-neutral-850 space-y-3.5 hover:border-neutral-800 transition-all flex flex-col justify-between"
+                  >
+                    <div className="space-y-3">
+                      <div className="flex items-start justify-between gap-2">
+                        <div>
+                          <span className="text-[10px] text-kpcia-gold font-bold font-display uppercase block">{prop.companyName}</span>
+                          <p className="text-[9px] text-neutral-400 mt-0.5 font-sans">
+                            제안자: {prop.proposerName} | 이메일: {prop.email}
+                          </p>
+                        </div>
+                        <span className={`text-[9px] font-extrabold px-2 py-0.5 rounded-full border shrink-0 ${
+                          prop.status === 'accepted' ? 'bg-emerald-500/10 text-emerald-500 border-emerald-500/20' :
+                          prop.status === 'declined' ? 'bg-red-500/10 text-red-500 border-red-500/20' :
+                          prop.status === 'reviewed' ? 'bg-sky-500/10 text-sky-400 border-sky-500/20' :
+                          'bg-amber-500/10 text-amber-500 border-amber-500/20'
+                        }`}>
+                          {prop.status === 'accepted' ? '제휴 승인 완료' :
+                           prop.status === 'declined' ? '제휴 반려 처리' :
+                           prop.status === 'reviewed' ? '검토 완료' : '접수 검토중'}
+                        </span>
+                      </div>
+
+                      <div className="space-y-1.5 text-left">
+                        <h4 className="text-xs font-bold text-neutral-100">{prop.title}</h4>
+                        <div className="text-[10px] text-neutral-300 font-sans leading-relaxed whitespace-pre-wrap bg-neutral-900/60 p-3 rounded-lg border border-neutral-850 max-h-40 overflow-y-auto">
+                          {prop.content}
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Status Action Buttons */}
+                    <div className="flex justify-end gap-1.5 pt-3 border-t border-neutral-900">
+                      <button
+                        onClick={() => onUpdateProposalStatus(prop.id, 'reviewed')}
+                        className={`px-3 py-1 rounded text-[9px] font-bold border transition-all cursor-pointer ${
+                          prop.status === 'reviewed' 
+                            ? 'bg-sky-500 text-neutral-950 border-transparent font-extrabold' 
+                            : 'bg-transparent text-neutral-400 border-neutral-800 hover:text-sky-400 hover:border-sky-500/30'
+                        }`}
+                      >
+                        검토완료
+                      </button>
+                      <button
+                        onClick={() => onUpdateProposalStatus(prop.id, 'accepted')}
+                        className={`px-3 py-1 rounded text-[9px] font-bold border transition-all cursor-pointer ${
+                          prop.status === 'accepted' 
+                            ? 'bg-emerald-500 text-neutral-950 border-transparent font-extrabold' 
+                            : 'bg-transparent text-neutral-400 border-neutral-800 hover:text-emerald-400 hover:border-emerald-500/30'
+                        }`}
+                      >
+                        사업승인
+                      </button>
+                      <button
+                        onClick={() => onUpdateProposalStatus(prop.id, 'declined')}
+                        className={`px-3 py-1 rounded text-[9px] font-bold border transition-all cursor-pointer ${
+                          prop.status === 'declined' 
+                            ? 'bg-red-500 text-neutral-950 border-transparent font-extrabold' 
+                            : 'bg-transparent text-neutral-400 border-neutral-800 hover:text-red-400 hover:border-red-500/30'
+                        }`}
+                      >
+                        정중히 반려
+                      </button>
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
+        )}
+
+      </div>
+    </div>
+  );
+}
