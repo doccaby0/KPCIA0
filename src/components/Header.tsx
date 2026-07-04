@@ -140,44 +140,55 @@ export default function Header({
                   </button>
                 </div>
 
-                <div className="px-2 py-1 text-[10px] font-mono tracking-wider text-neutral-500 uppercase">
-                  강사 계정 빠른 전환 (테스트용)
-                </div>
-                
-                <div className="max-h-[180px] overflow-y-auto pr-1 space-y-1.5 custom-scrollbar" id="dropdown-users-list">
-                  {allUsers.map((user) => {
-                    const isSelected = user.uid === currentUser.uid;
-                    return (
-                      <button
-                        key={user.uid}
-                        onClick={() => {
-                          onUserChange(user.uid);
-                          setDropdownOpen(false);
-                        }}
-                        className={`w-full text-left p-2 rounded-lg flex items-center justify-between transition-all ${
-                          isSelected
-                            ? 'bg-kpcia-gold/10 border border-kpcia-gold/25'
-                            : 'hover:bg-neutral-900 border border-transparent'
-                        }`}
-                        id={`switcher-user-${user.uid}`}
-                      >
-                        <div>
-                          <div className="text-xs font-bold text-neutral-200 flex items-center gap-1">
-                            {user.name}
-                            {user.isAdmin && <Shield className="w-3 h-3 text-kpcia-gold" />}
-                          </div>
-                          <div className="text-[10px] text-neutral-400 mt-0.5">{user.tier}</div>
-                        </div>
-                        <div className="text-right">
-                          <div className="text-xs font-mono font-bold text-kpcia-gold">
-                            {formatMileage(user.mileage)} M
-                          </div>
-                          <div className="text-[9px] text-neutral-500 font-sans">마일리지</div>
-                        </div>
-                      </button>
-                    );
-                  })}
-                </div>
+                {currentUser?.isAdmin && (
+                  <>
+                    <div className="px-2 py-1 text-[10px] font-mono tracking-wider text-neutral-500 uppercase">
+                      강사 계정 빠른 전환 (테스트용)
+                    </div>
+                    
+                    <div className="max-h-[180px] overflow-y-auto pr-1 space-y-1.5 custom-scrollbar" id="dropdown-users-list">
+                      {allUsers.map((user) => {
+                        const isSelected = user.uid === currentUser.uid;
+                        return (
+                          <button
+                            key={user.uid}
+                            onClick={() => {
+                              onUserChange(user.uid);
+                              setDropdownOpen(false);
+                            }}
+                            className={`w-full text-left p-2 rounded-lg flex items-center justify-between transition-all ${
+                              isSelected
+                                ? 'bg-kpcia-gold/10 border border-kpcia-gold/25'
+                                : 'hover:bg-neutral-900 border border-transparent'
+                            }`}
+                            id={`switcher-user-${user.uid}`}
+                          >
+                            <div>
+                              <div className="text-xs font-bold text-neutral-200 flex items-center gap-1">
+                                {user.name}
+                                {user.isAdmin && <Shield className="w-3 h-3 text-kpcia-gold" />}
+                              </div>
+                              <div className="text-[10px] text-neutral-400 mt-0.5 flex items-center gap-1.5 flex-wrap">
+                                <span>{user.tier}</span>
+                                {user.lectureCount !== undefined && user.lectureCount >= 10 && (
+                                  <span className="text-[8px] font-extrabold px-1 py-0.2 rounded border leading-none bg-kpcia-gold/10 text-kpcia-gold border-kpcia-gold/20">
+                                    {user.lectureCount >= 10000 ? '👑 10K Club' : user.lectureCount >= 1000 ? '🔴 1K Club' : user.lectureCount >= 100 ? '🔵 100 Club' : '🟤 10 Club'}
+                                  </span>
+                                )}
+                              </div>
+                            </div>
+                            <div className="text-right">
+                              <div className="text-xs font-mono font-bold text-kpcia-gold">
+                                {formatMileage(user.mileage)} M
+                              </div>
+                              <div className="text-[9px] text-neutral-500 font-sans">마일리지</div>
+                            </div>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </>
+                )}
                 
                 {/* SignUp / Register New Instructor Trigger */}
                 <div className="pt-2 border-t border-neutral-800/80 mt-1 space-y-1.5">

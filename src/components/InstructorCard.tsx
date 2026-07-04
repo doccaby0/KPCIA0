@@ -2,6 +2,21 @@ import React, { useState, useEffect } from 'react';
 import { UserProfile, InstructorCardInfo } from '../types';
 import { Mail, Phone, MapPin, Award, Download, Save, RefreshCw, Plus, Trash2, Printer, X, User, FileUp, FileText, CheckCircle2, AlertCircle, Sparkles, Building, Loader2 } from 'lucide-react';
 
+export function getLectureMilestoneBadge(lectureCount?: number) {
+  if (lectureCount === undefined || lectureCount < 10) return null;
+  if (lectureCount >= 10000) {
+    return { name: '👑 Prestige 10K Club', color: 'text-emerald-400 bg-emerald-950/50 border-emerald-500/30 font-bold', desc: '출강 10,000회 돌파 최고의 명사' };
+  }
+  if (lectureCount >= 1000) {
+    return { name: '🔴 Prestige 1K Club', color: 'text-red-400 bg-red-950/50 border-red-500/30 font-bold', desc: '출강 1,000회 돌파 수석 가이드' };
+  }
+  if (lectureCount >= 100) {
+    return { name: '🔵 Prestige 100 Club', color: 'text-sky-400 bg-sky-950/50 border-sky-500/30 font-bold', desc: '출강 100회 돌파 실전 전문가' };
+  }
+  // lectureCount >= 10
+  return { name: '🟤 Prestige 10 Club', color: 'text-amber-500 bg-amber-950/50 border-amber-500/30 font-bold', desc: '출강 10회 돌파 입증된 강사' };
+}
+
 interface InstructorCardProps {
   currentUser: UserProfile;
   onSaveProfileCard: (cardInfo: InstructorCardInfo) => void;
@@ -339,8 +354,19 @@ export default function InstructorCard({ currentUser, onSaveProfileCard, onGoHom
               </div>
               <div className="text-[9px] font-mono text-neutral-400 mt-1">마일리지 {currentUser.mileage.toLocaleString()} M</div>
               {currentUser.lectureCount !== undefined && currentUser.lectureCount > 0 && (
-                <div className="text-[9px] font-mono text-neutral-400">출강 {currentUser.lectureCount}회 | 평점 {currentUser.averageRating !== undefined ? currentUser.averageRating.toFixed(1) : '0.0'}점</div>
+                <div className="text-[9px] font-mono text-neutral-400 font-bold">출강 {currentUser.lectureCount}회 | 평점 {currentUser.averageRating !== undefined ? currentUser.averageRating.toFixed(1) : '0.0'}점</div>
               )}
+              {currentUser.lectureCount !== undefined && currentUser.lectureCount >= 10 && (() => {
+                const milestone = getLectureMilestoneBadge(currentUser.lectureCount);
+                if (!milestone) return null;
+                return (
+                  <div className="mt-1 flex justify-end">
+                    <span className={`inline-block text-[7px] px-1.5 py-0.5 rounded border leading-none font-extrabold tracking-tight ${milestone.color}`} title={milestone.desc}>
+                      {milestone.name}
+                    </span>
+                  </div>
+                );
+              })()}
             </div>
           </div>
 

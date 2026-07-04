@@ -24,6 +24,74 @@ import {
   Activity 
 } from 'lucide-react';
 
+export function getLectureMilestoneBadge(lectureCount?: number) {
+  if (lectureCount === undefined || lectureCount < 10) return null;
+  if (lectureCount >= 10000) {
+    return { name: '👑 Prestige 10K Club', color: 'text-emerald-400 bg-emerald-950/50 border-emerald-500/30 font-bold', desc: '출강 10,000회 돌파 최고의 명사' };
+  }
+  if (lectureCount >= 1000) {
+    return { name: '🔴 Prestige 1K Club', color: 'text-red-400 bg-red-950/50 border-red-500/30 font-bold', desc: '출강 1,000회 돌파 수석 가이드' };
+  }
+  if (lectureCount >= 100) {
+    return { name: '🔵 Prestige 100 Club', color: 'text-sky-400 bg-sky-950/50 border-sky-500/30 font-bold', desc: '출강 100회 돌파 실전 전문가' };
+  }
+  // lectureCount >= 10
+  return { name: '🟤 Prestige 10 Club', color: 'text-amber-500 bg-amber-950/50 border-amber-500/30 font-bold', desc: '출강 10회 돌파 입증된 강사' };
+}
+
+export function getNextTier(currentTier: InstructorTier): InstructorTier | null {
+  switch (currentTier) {
+    case 'Prestige Member': return 'Prestige Associate';
+    case 'Prestige Associate': return 'Prestige Professional';
+    case 'Prestige Professional': return 'Prestige Master';
+    case 'Prestige Master': return 'Prestige Elite';
+    default: return null;
+  }
+}
+
+export function getPromotionRequirement(currentTier: InstructorTier) {
+  switch (currentTier) {
+    case 'Prestige Member':
+      return { requiredLectures: 10, requiredRating: 4.5, ratingPercent: 90 };
+    case 'Prestige Associate':
+      return { requiredLectures: 100, requiredRating: 4.6, ratingPercent: 92 };
+    case 'Prestige Professional':
+      return { requiredLectures: 1000, requiredRating: 4.7, ratingPercent: 94 };
+    case 'Prestige Master':
+      return { requiredLectures: 10000, requiredRating: 4.8, ratingPercent: 96 };
+    default:
+      return null;
+  }
+}
+
+export function getPromotionStatus(user: UserProfile) {
+  const currentTier = user.tier;
+  const nextTier = getNextTier(currentTier);
+  if (!nextTier) return null;
+
+  const req = getPromotionRequirement(currentTier);
+  if (!req) return null;
+
+  const currentLectures = user.lectureCount || 0;
+  const currentAvgRating = user.averageRating || 0;
+  const currentAvgRating5 = Number((currentAvgRating / 20).toFixed(2));
+
+  const hasEnoughLectures = currentLectures >= req.requiredLectures;
+  const hasEnoughRating = currentAvgRating5 >= req.requiredRating || currentAvgRating >= req.ratingPercent;
+
+  const isEligible = hasEnoughLectures && hasEnoughRating;
+
+  return {
+    nextTier,
+    requiredLectures: req.requiredLectures,
+    requiredRating: req.requiredRating,
+    ratingPercent: req.ratingPercent,
+    currentLectures,
+    currentAvgRating5,
+    isEligible,
+  };
+}
+
 interface AdminPanelProps {
   users: UserProfile[];
   lectures: LectureRequest[];
@@ -40,6 +108,7 @@ interface AdminPanelProps {
   onRejectUser?: (userId: string) => void;
   onApproveProgram?: (programId: string, updatedProgram: EducationalProgram) => void;
   onUpdateUserPerformance?: (userId: string, lectureCount: number, ratings: number[]) => void;
+  onDeleteUser?: (userId: string) => void;
 }
 
 export default function AdminPanel({
@@ -57,7 +126,8 @@ export default function AdminPanel({
   onApproveUser,
   onRejectUser,
   onApproveProgram,
-  onUpdateUserPerformance
+  onUpdateUserPerformance,
+  onDeleteUser
 }: AdminPanelProps) {
   // Navigation State
   const [activeTab, setActiveTab] = useState<'dashboard' | 'approvals' | 'lectures' | 'members' | 'proposals'>('dashboard');
@@ -65,6 +135,7 @@ export default function AdminPanel({
   // Search States
   const [memberSearch, setMemberSearch] = useState('');
   const [txSearch, setTxSearch] = useState('');
+  const [deletingUserId, setDeletingUserId] = useState<string | null>(null);
   
   // Handlers state
   const [selectedUser, setSelectedUser] = useState<string>('');
@@ -536,6 +607,102 @@ export default function AdminPanel({
               </div>
             )}
 
+            {/* 승급 예정 강사 현황 (Promotion Eligible Instructors) */}
+            <div className="bg-neutral-900/50 border border-neutral-800 rounded-xl p-5" id="promotion-eligible-panel">
+              <div className="border-b border-neutral-800/80 pb-3 mb-4 flex items-center justify-between">
+                <h3 className="text-xs font-bold font-display uppercase tracking-wider text-neutral-300 flex items-center gap-1.5">
+                  <Award className="w-4 h-4 text-kpcia-gold animate-pulse" /> KPCIA 승급 대상 강사 심사대 (기본 승급 요건 부합자)
+                </h3>
+                <span className="text-[9px] bg-kpcia-gold/10 border border-kpcia-gold/20 text-kpcia-gold px-2 py-0.5 rounded font-bold font-mono uppercase">
+                  PROMOTIONS DESK
+                </span>
+              </div>
+
+              {(() => {
+                const eligibleUsers = approvedUsers.filter(u => {
+                  if (u.isAdmin) return false;
+                  const status = getPromotionStatus(u);
+                  return status && status.isEligible;
+                });
+
+                if (eligibleUsers.length === 0) {
+                  return (
+                    <div className="text-center py-6 text-xs text-neutral-500 font-sans">
+                      현재 각 등급별 승급 요건(10/100/1000/10000강의 및 평점 만족도)을 모두 충족하여 승급을 앞두고 있는 강사가 없습니다.
+                    </div>
+                  );
+                }
+
+                return (
+                  <div className="space-y-4">
+                    {eligibleUsers.map(user => {
+                      const status = getPromotionStatus(user);
+                      if (!status) return null;
+                      return (
+                        <div 
+                          key={user.uid}
+                          className="p-4 rounded-xl bg-gradient-to-r from-kpcia-gold/5 via-neutral-950 to-neutral-950 border border-kpcia-gold/30 flex flex-col md:flex-row md:items-center justify-between gap-4 text-left"
+                          id={`promo-user-${user.uid}`}
+                        >
+                          <div className="space-y-2 flex-1">
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <span className="text-xs font-extrabold text-neutral-100">{user.name} 강사님</span>
+                              <div className="flex items-center gap-1 text-[10px]">
+                                <span className="bg-neutral-900 border border-neutral-850 text-neutral-400 px-2 py-0.5 rounded">
+                                  {user.tier}
+                                </span>
+                                <span className="text-kpcia-gold font-bold">➔</span>
+                                <span className="bg-kpcia-gold/15 border border-kpcia-gold/30 text-kpcia-gold px-2 py-0.5 rounded font-extrabold">
+                                  {status.nextTier}
+                                </span>
+                              </div>
+                            </div>
+
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-[11px] font-sans">
+                              {/* Stat 1: Lecture count */}
+                              <div className="bg-neutral-900/40 p-2 rounded-lg border border-neutral-850">
+                                <div className="flex justify-between text-[10px] text-neutral-500 mb-1">
+                                  <span>누적 출강 실적</span>
+                                  <span className="font-mono text-neutral-400">기준: {status.requiredLectures}회 이상</span>
+                                </div>
+                                <div className="flex items-center justify-between">
+                                  <span className="font-extrabold text-neutral-200 font-mono">{status.currentLectures}회</span>
+                                  <span className="text-emerald-500 font-bold text-[10px]">요건 충족 (100%+)</span>
+                                </div>
+                              </div>
+
+                              {/* Stat 2: Satisfaction avg */}
+                              <div className="bg-neutral-900/40 p-2 rounded-lg border border-neutral-850">
+                                <div className="flex justify-between text-[10px] text-neutral-500 mb-1">
+                                  <span>누적 평균 만족도</span>
+                                  <span className="font-mono text-neutral-400">기준: {status.requiredRating}점 (90+점) 이상</span>
+                                </div>
+                                <div className="flex items-center justify-between">
+                                  <span className="font-extrabold text-kpcia-gold font-mono">
+                                    {(user.averageRating ? user.averageRating / 20 : 0).toFixed(2)} / 5.0점 ({user.averageRating?.toFixed(1)}점)
+                                  </span>
+                                  <span className="text-emerald-500 font-bold text-[10px]">요건 충족</span>
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+
+                          <button
+                            onClick={() => onUpgradeUserTier(user.uid, status.nextTier)}
+                            className="px-4 py-2 bg-kpcia-gold hover:bg-kpcia-gold-hover text-kpcia-dark text-[10px] font-extrabold rounded-xl transition-all shadow-lg shadow-kpcia-gold/10 shrink-0 flex items-center justify-center gap-1 cursor-pointer self-start md:self-center"
+                            id={`approve-promo-btn-${user.uid}`}
+                          >
+                            <Award className="w-3.5 h-3.5 text-kpcia-dark" />
+                            <span>상위 등급 즉시 승격 승인</span>
+                          </button>
+                        </div>
+                      );
+                    })}
+                  </div>
+                );
+              })()}
+            </div>
+
             {/* Transaction Ledger Log (Searchable block on Dashboard) */}
             <div className="bg-neutral-900/50 border border-neutral-800 rounded-xl p-5" id="ledger-panel">
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-neutral-800/80 pb-3 mb-4">
@@ -974,11 +1141,20 @@ export default function AdminPanel({
                             id={`admin-user-row-${user.uid}`}
                           >
                             <div className="space-y-1">
-                              <div className="text-xs font-bold text-neutral-100 flex items-center gap-1.5">
-                                {user.name}
+                              <div className="text-xs font-bold text-neutral-100 flex flex-wrap items-center gap-1.5">
+                                <span>{user.name}</span>
                                 <span className="text-[9px] font-mono font-bold text-kpcia-gold bg-kpcia-gold/10 px-1.5 py-0.5 rounded border border-kpcia-gold/20">
                                   {user.mileage.toLocaleString()} M
                                 </span>
+                                {user.lectureCount !== undefined && user.lectureCount >= 10 && (() => {
+                                  const milestone = getLectureMilestoneBadge(user.lectureCount);
+                                  if (!milestone) return null;
+                                  return (
+                                    <span className={`text-[8px] font-extrabold px-1.5 py-0.5 rounded border ${milestone.color}`} title={milestone.desc}>
+                                      {milestone.name}
+                                    </span>
+                                  );
+                                })()}
                               </div>
                               <div className="text-[10px] text-neutral-400 font-sans flex items-center gap-1.5">
                                 <span>등급 권한:</span>
@@ -1048,6 +1224,39 @@ export default function AdminPanel({
                                 <Activity className="w-3.5 h-3.5" />
                                 <span>실적·평가</span>
                               </button>
+
+                              {/* Member Deletion / Withdrawal */}
+                              {deletingUserId === user.uid ? (
+                                <div className="flex items-center space-x-1 animate-in fade-in zoom-in-95 bg-red-950/20 px-1.5 py-1 rounded border border-red-900/30" id={`deleting-confirm-container-${user.uid}`}>
+                                  <span className="text-[9px] text-red-400 font-bold mr-1">정말 탈퇴 처리합니까?</span>
+                                  <button
+                                    onClick={() => {
+                                      if (onDeleteUser) onDeleteUser(user.uid);
+                                      setDeletingUserId(null);
+                                    }}
+                                    className="px-2 py-0.5 bg-red-600 hover:bg-red-500 text-white text-[9px] font-extrabold rounded transition-all cursor-pointer shadow shadow-red-600/20"
+                                    id={`confirm-delete-btn-${user.uid}`}
+                                  >
+                                    확인
+                                  </button>
+                                  <button
+                                    onClick={() => setDeletingUserId(null)}
+                                    className="px-2 py-0.5 bg-neutral-900 hover:bg-neutral-800 text-neutral-400 text-[9px] font-bold rounded border border-neutral-850 transition-all cursor-pointer"
+                                    id={`cancel-delete-btn-${user.uid}`}
+                                  >
+                                    취소
+                                  </button>
+                                </div>
+                              ) : (
+                                <button
+                                  onClick={() => setDeletingUserId(user.uid)}
+                                  className="px-2 py-1 rounded text-[10px] font-bold text-red-400 bg-red-950/20 border border-red-900/30 hover:border-red-700/60 hover:text-red-300 hover:bg-red-950/40 transition-all flex items-center gap-1 cursor-pointer"
+                                  id={`delete-btn-${user.uid}`}
+                                  title="강사 협회 회원 탈퇴 처리"
+                                >
+                                  <span>회원 탈퇴</span>
+                                </button>
+                              )}
                             </div>
                           </div>
 

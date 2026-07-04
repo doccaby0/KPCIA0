@@ -711,4 +711,47 @@ export class StorageService {
       await deleteDoc(doc(db, 'users', userId));
     }, null);
   }
+
+  // Clear local storage and Firestore data and restore default state
+  static async resetDatabase(): Promise<void> {
+    localStorage.removeItem('kpcia_users');
+    localStorage.removeItem('kpcia_lectures');
+    localStorage.removeItem('kpcia_programs');
+    localStorage.removeItem('kpcia_transactions');
+    localStorage.removeItem('kpcia_proposals');
+
+    if (useFirestore && db) {
+      try {
+        const collections = ['users', 'lectures', 'programs', 'transactions', 'proposals'];
+        for (const colName of collections) {
+          const snap = await getDocs(collection(db, colName));
+          for (const d of snap.docs) {
+            await deleteDoc(doc(db, colName, d.id));
+          }
+        }
+        // Seed initial users
+        for (const u of INITIAL_USERS) {
+          await setDoc(doc(db, 'users', u.uid), u);
+        }
+        // Seed initial lectures
+        for (const l of INITIAL_LECTURES) {
+          await setDoc(doc(db, 'lectures', l.id), l);
+        }
+        // Seed initial programs
+        for (const p of INITIAL_PROGRAMS) {
+          await setDoc(doc(db, 'programs', p.id), p);
+        }
+        // Seed initial transactions
+        for (const tx of INITIAL_TRANSACTIONS) {
+          await setDoc(doc(db, 'transactions', tx.id), tx);
+        }
+        // Seed initial proposals
+        for (const p of INITIAL_PROPOSALS) {
+          await setDoc(doc(db, 'proposals', p.id), p);
+        }
+      } catch (e) {
+        console.warn("Firestore collection delete/reseed failed, fallback to local cache reset.", e);
+      }
+    }
+  }
 }

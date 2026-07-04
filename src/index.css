@@ -100,3 +100,37 @@
   background: rgba(212, 175, 55, 0.5);
 }
 
+/* Readability improvements: raise standard text weights and contrast slightly for dark mode */
+.text-readable-title {
+  color: #FFFFFF !important;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.6);
+}
+
+.text-readable-body {
+  color: #E2E8F0 !important; /* Clear light slate-200 instead of dark dim grays */
+}
+
+/* Premium enhanced hover effect for cards, items, and listings */
+.hover-premium {
+  transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1) !important;
+}
+
+.hover-premium:hover {
+  transform: translateY(-3px) scale(1.015) !important;
+  border-color: rgba(212, 175, 55, 0.6) !important;
+  box-shadow: 0 15px 30px -10px rgba(212, 175, 55, 0.22) !important;
+  background-color: rgba(23, 23, 23, 0.95) !important;
+}
+
+/* Premium button hover effect for primary actions */
+.btn-premium {
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1) !important;
+}
+
+.btn-premium:hover {
+  transform: scale(1.03) !important;
+  box-shadow: 0 10px 22px -5px rgba(212, 175, 55, 0.35) !important;
+  filter: brightness(1.15);
+}
+
+

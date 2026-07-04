@@ -40,6 +40,8 @@ export interface UserProfile {
   isAdmin?: boolean;
   isApproved?: boolean;
   emailVerified?: boolean;
+  loginId?: string;
+  password?: string;
   lectureCount?: number;
   lectureRatings?: number[];
   averageRating?: number;

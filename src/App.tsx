@@ -34,10 +34,17 @@ export default function App() {
   const [gwTier, setGwTier] = useState<InstructorTier>('Prestige Member');
   const [gwTitle, setGwTitle] = useState<string>('');
   const [gwPhone, setGwPhone] = useState<string>('');
+  const [gwLoginId, setGwLoginId] = useState<string>('');
+  const [gwPassword, setGwPassword] = useState<string>('');
   const [verificationStep, setVerificationStep] = useState<'input' | 'verify'>('input');
   const [verificationCode, setVerificationCode] = useState<string>('');
   const [generatedCode, setGeneratedCode] = useState<string>('');
   const [verificationError, setVerificationError] = useState<string>('');
+
+  // Login Form States
+  const [loginId, setLoginId] = useState<string>('');
+  const [loginPassword, setLoginPassword] = useState<string>('');
+  const [loginError, setLoginError] = useState<string>('');
 
   // Notification Toast alert
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'info' } | null>(null);
@@ -68,9 +75,18 @@ export default function App() {
       setTransactions(loadedTransactions);
       setProposals(loadedProposals);
 
-      // 3. Set default current user as MZ세대 소통 강사 (김도현) to start with
-      const defaultUser = loadedUsers.find(u => u.uid === 'user_associate') || loadedUsers[0];
-      setCurrentUser(defaultUser);
+      // 3. Set default login state or load existing session from localStorage
+      const savedUserUid = localStorage.getItem('kpcia_logged_in_uid');
+      if (savedUserUid) {
+        const savedUser = loadedUsers.find(u => u.uid === savedUserUid);
+        if (savedUser) {
+          setCurrentUser(savedUser);
+          return;
+        }
+      }
+      
+      // On fresh start, require login by leaving currentUser as null
+      setCurrentUser(null);
     };
 
     syncData();
@@ -81,6 +97,29 @@ export default function App() {
     setCurrentUser(updatedUser);
     setUsers(prev => prev.map(u => u.uid === updatedUser.uid ? updatedUser : u));
     await StorageService.saveUser(updatedUser);
+  };
+
+  // Reset all modified records to default initial seed lists
+  const handleResetData = async () => {
+    await StorageService.resetDatabase();
+    triggerToast('KPCIA 협회 데이터가 공고 당시의 초기 상태로 정교하게 초기화되었습니다.', 'success');
+    
+    // Reload and sync state
+    const loadedUsers = await StorageService.getUsers();
+    const loadedLectures = await StorageService.getLectures();
+    const loadedPrograms = await StorageService.getPrograms();
+    const loadedTransactions = await StorageService.getTransactions();
+    const loadedProposals = await StorageService.getProposals();
+
+    setUsers(loadedUsers);
+    setLectures(loadedLectures);
+    setPrograms(loadedPrograms);
+    setTransactions(loadedTransactions);
+    setProposals(loadedProposals);
+
+    // Reset login session
+    localStorage.removeItem('kpcia_logged_in_uid');
+    setCurrentUser(null);
   };
 
   // Handlers
@@ -414,6 +453,15 @@ export default function App() {
     triggerToast(`'${targetUser.name}' 강사님의 가입 신청이 거절 및 파기 처리되었습니다.`, 'info');
   };
 
+  // 8.5.1. Delete Approved User (Admin Only)
+  const handleDeleteUser = async (userId: string) => {
+    const targetUser = users.find(u => u.uid === userId);
+    if (!targetUser) return;
+    setUsers(prev => prev.filter(u => u.uid !== userId));
+    await StorageService.deleteUser(userId);
+    triggerToast(`'${targetUser.name}' 강사님이 협회 회원에서 영구 탈퇴 처리되었습니다.`, 'info');
+  };
+
   // 8.6. Approve and finalize Educational Program Copyright (Admin Only)
   const handleApproveProgram = async (programId: string, updatedProgram: EducationalProgram) => {
     // Save program to state & storage
@@ -465,7 +513,7 @@ export default function App() {
   };
 
   // 10. Register / Sign Up New Instructor Profile
-  const handleRegisterUser = async (name: string, email: string, tier: InstructorTier, title: string, phone: string) => {
+  const handleRegisterUser = async (name: string, email: string, tier: InstructorTier, title: string, phone: string, loginId?: string, password?: string) => {
     const newUid = `user_${Date.now()}`;
     const initialBadge = generateBadgeForTier(tier);
     
@@ -477,6 +525,8 @@ export default function App() {
       mileage: 0, // Welcome signup bonus removed as requested
       isApproved: false, // Default to false; must be approved by Administration (운영사무국)
       emailVerified: true, // Verification completed before registering
+      loginId: loginId,
+      password: password,
       profileCard: {
         title: title || 'KPCIA 공인 전문 강사',
         bio: `안녕하세요, KPCIA 정식 인증 강사 ${name}입니다. 신규 교육 기획 및 맞춤형 대기업 특강을 진행합니다.`,
@@ -534,6 +584,8 @@ export default function App() {
                 setGwEmail('');
                 setGwTitle('');
                 setGwPhone('');
+                setGwLoginId('');
+                setGwPassword('');
                 setVerificationStep('input');
                 setVerificationCode('');
                 setGeneratedCode('');
@@ -550,6 +602,19 @@ export default function App() {
               onSubmit={(e) => {
                 e.preventDefault();
                 if (!gwName.trim() || !gwEmail.trim()) return;
+
+                const trimmedId = gwLoginId.trim();
+                const trimmedPw = gwPassword.trim();
+
+                if (!trimmedId || !trimmedPw) {
+                  setVerificationError('로그인용 아이디와 비밀번호를 모두 입력해 주세요.');
+                  return;
+                }
+
+                if (trimmedId.length < 3) {
+                  setVerificationError('아이디는 최소 3글자 이상이어야 합니다.');
+                  return;
+                }
                 
                 // Simple email check
                 const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -584,6 +649,32 @@ export default function App() {
                   placeholder="예: 김성우 강사"
                   className="w-full px-3 py-2 bg-neutral-950 border border-neutral-800 rounded-lg text-xs text-neutral-100 focus:border-kpcia-gold/50 outline-none"
                 />
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div className="space-y-1.5">
+                  <label className="block text-[10px] font-bold text-neutral-400 uppercase tracking-wide">로그인용 아이디 <span className="text-kpcia-gold">*</span></label>
+                  <input
+                    type="text"
+                    required
+                    value={gwLoginId}
+                    onChange={(e) => setGwLoginId(e.target.value.replace(/[^a-zA-Z0-9]/g, ''))}
+                    placeholder="아이디 (영문/숫자)"
+                    className="w-full px-3 py-2 bg-neutral-950 border border-neutral-800 rounded-lg text-xs text-neutral-100 focus:border-kpcia-gold/50 outline-none animate-in fade-in"
+                  />
+                </div>
+
+                <div className="space-y-1.5">
+                  <label className="block text-[10px] font-bold text-neutral-400 uppercase tracking-wide">비밀번호 <span className="text-kpcia-gold">*</span></label>
+                  <input
+                    type="password"
+                    required
+                    value={gwPassword}
+                    onChange={(e) => setGwPassword(e.target.value)}
+                    placeholder="비밀번호"
+                    className="w-full px-3 py-2 bg-neutral-950 border border-neutral-800 rounded-lg text-xs text-neutral-100 focus:border-kpcia-gold/50 outline-none animate-in fade-in"
+                  />
+                </div>
               </div>
 
               <div className="space-y-1.5">
@@ -710,7 +801,7 @@ export default function App() {
                 <button
                   onClick={() => {
                     if (verificationCode === generatedCode) {
-                      handleRegisterUser(gwName.trim(), gwEmail.trim(), gwTier, gwTitle.trim(), gwPhone.trim());
+                      handleRegisterUser(gwName.trim(), gwEmail.trim(), gwTier, gwTitle.trim(), gwPhone.trim(), gwLoginId.trim(), gwPassword.trim());
                       
                       // Reset and Close
                       setShowGatewayRegister(false);
@@ -718,6 +809,8 @@ export default function App() {
                       setGwEmail('');
                       setGwTitle('');
                       setGwPhone('');
+                      setGwLoginId('');
+                      setGwPassword('');
                       setVerificationStep('input');
                       setVerificationCode('');
                       setGeneratedCode('');
@@ -738,6 +831,47 @@ export default function App() {
     );
   };
 
+  const handleMobileLogin = (emailOrName: string, password?: string): boolean => {
+    const trimmedId = emailOrName.trim();
+    const trimmedPw = password ? password.trim() : '';
+
+    if (!trimmedId) {
+      triggerToast('아이디 또는 이메일을 입력해 주세요.', 'info');
+      return false;
+    }
+
+    // 1. Check main operator / office admin credentials
+    if (trimmedId === 'insight9lab' && trimmedPw === '400828') {
+      const adminUser = users.find(u => u.isAdmin);
+      if (adminUser) {
+        setCurrentUser(adminUser);
+        localStorage.setItem('kpcia_logged_in_uid', adminUser.uid);
+        triggerToast('KPCIA 운영사무국 메인 관리자 계정으로 로그인되었습니다.', 'success');
+        return true;
+      }
+    }
+
+    // 2. Check general instructor login
+    const matchedUser = users.find(u => 
+      (u.loginId && u.loginId.toLowerCase() === trimmedId.toLowerCase()) ||
+      (!u.loginId && (u.email.toLowerCase() === trimmedId.toLowerCase() || u.name === trimmedId || u.uid === trimmedId))
+    );
+
+    if (matchedUser) {
+      if (matchedUser.password && matchedUser.password !== trimmedPw) {
+        triggerToast('비밀번호가 일치하지 않습니다.', 'info');
+        return false;
+      }
+      setCurrentUser(matchedUser);
+      localStorage.setItem('kpcia_logged_in_uid', matchedUser.uid);
+      triggerToast(`${matchedUser.name} 강사님 계정으로 로그인되었습니다.`, 'success');
+      return true;
+    }
+
+    triggerToast('아이디 또는 비밀번호가 일치하지 않습니다. (운영사무국 ID: insight9lab / PW: 400828)', 'info');
+    return false;
+  };
+
   const isPendingApproval = currentUser && currentUser.uid !== 'guest' && !currentUser.isAdmin && currentUser.isApproved === false;
 
   if (users.length === 0) {
@@ -751,129 +885,243 @@ export default function App() {
     );
   }
 
-  if (!currentUser) {
+  if (!currentUser && !isMobileSimulated) {
+    const handleLoginSubmit = (e: React.FormEvent) => {
+      e.preventDefault();
+      setLoginError('');
+
+      const trimmedId = loginId.trim();
+      const trimmedPw = loginPassword.trim();
+
+      if (!trimmedId || !trimmedPw) {
+        setLoginError('아이디와 비밀번호를 모두 입력해 주세요.');
+        return;
+      }
+
+      // 1. Check main operator / office admin credentials
+      if (trimmedId === 'insight9lab' && trimmedPw === '400828') {
+        const adminUser = users.find(u => u.isAdmin);
+        if (adminUser) {
+          setCurrentUser(adminUser);
+          localStorage.setItem('kpcia_logged_in_uid', adminUser.uid);
+          triggerToast('KPCIA 운영사무국 메인 관리자 계정으로 로그인되었습니다.', 'success');
+          setLoginId('');
+          setLoginPassword('');
+          return;
+        }
+      }
+
+      // 2. Check general instructor login (by custom loginId, or fallback to email / name for demo accounts)
+      const matchedUser = users.find(u => 
+        (u.loginId && u.loginId.toLowerCase() === trimmedId.toLowerCase()) ||
+        (!u.loginId && (u.email.toLowerCase() === trimmedId.toLowerCase() || u.name === trimmedId || u.uid === trimmedId))
+      );
+
+      if (matchedUser) {
+        // If the user has a registered password, check it
+        if (matchedUser.password && matchedUser.password !== trimmedPw) {
+          setLoginError('비밀번호가 일치하지 않습니다.');
+          return;
+        }
+
+        // Log in the matched instructor
+        setCurrentUser(matchedUser);
+        localStorage.setItem('kpcia_logged_in_uid', matchedUser.uid);
+        triggerToast(`${matchedUser.name} 강사님 계정으로 로그인되었습니다.`, 'success');
+        setLoginId('');
+        setLoginPassword('');
+        return;
+      }
+
+      setLoginError('아이디 또는 비밀번호가 일치하지 않습니다. (운영사무국 ID: insight9lab / PW: 400828)');
+    };
+
     return (
-      <div className="min-h-screen bg-neutral-950 flex flex-col items-center justify-start md:justify-center p-4 py-10 sm:py-14 text-neutral-100 relative overflow-y-auto" id="gateway-root">
+      <div className="min-h-screen bg-neutral-950 flex flex-col items-center justify-start md:justify-center p-4 py-8 sm:py-12 text-neutral-100 relative overflow-y-auto font-sans selection:bg-kpcia-gold selection:text-kpcia-dark" id="gateway-root">
         {/* Decorative gold spotlight effect */}
-        <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[600px] h-[300px] bg-gradient-to-b from-kpcia-gold/10 to-transparent blur-3xl pointer-events-none" />
+        <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[600px] h-[300px] bg-gradient-to-b from-kpcia-gold/15 to-transparent blur-3xl pointer-events-none" />
         
         {/* Toast Notification */}
         {toast && (
           <div className="fixed bottom-6 right-6 z-50 px-5 py-4 rounded-xl border border-kpcia-gold/40 bg-neutral-900 shadow-2xl flex items-center space-x-3 max-w-md animate-in slide-in-from-bottom-5 duration-300" id="gateway-toast">
             <div className="w-6 h-6 rounded-full bg-kpcia-gold/15 flex items-center justify-center text-kpcia-gold shrink-0">★</div>
-            <p className="text-xs font-medium leading-relaxed">{toast.message}</p>
+            <p className="text-xs font-semibold leading-relaxed">{toast.message}</p>
           </div>
         )}
 
         {/* Portal Card */}
-        <div className="w-full max-w-2xl bg-neutral-900/60 border border-neutral-800 rounded-3xl p-6 sm:p-10 backdrop-blur-xl shadow-2xl space-y-8 relative z-10 my-auto" id="gateway-card">
+        <div className="w-full max-w-lg bg-neutral-900/80 border border-neutral-800 rounded-2xl p-6 sm:p-8 backdrop-blur-xl shadow-2xl space-y-6 relative z-10 my-auto" id="gateway-card">
           
           {/* Header info */}
           <div className="text-center space-y-3">
-            <div className="w-16 h-16 rounded-2xl bg-neutral-950 border border-kpcia-gold flex items-center justify-center shadow-2xl shadow-kpcia-gold/20 mx-auto">
-              <span className="font-display font-black text-3xl text-kpcia-gold tracking-widest">K</span>
+            <div className="flex justify-center">
+              <div className="p-3 bg-neutral-950 border-2 border-kpcia-gold/50 rounded-2xl shadow-xl shadow-kpcia-gold/10">
+                <span className="font-display font-black text-2xl text-kpcia-gold tracking-widest">KPCIA</span>
+              </div>
             </div>
             <div className="space-y-1">
-              <span className="text-[10px] font-mono tracking-widest font-bold text-kpcia-gold uppercase bg-kpcia-gold/5 border border-kpcia-gold/15 px-2.5 py-0.5 rounded inline-block">
-                비영리 협회
+              <span className="text-[9px] font-mono tracking-widest font-extrabold text-kpcia-gold uppercase bg-kpcia-gold/15 border border-kpcia-gold/30 px-2 py-0.5 rounded inline-block">
+                강사용 프레스티지 포털
               </span>
-              <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-neutral-100 font-display">
+              <h1 className="text-xl sm:text-2xl font-black tracking-tight text-neutral-100 font-display">
                 한국프레스티지기업강사협회
               </h1>
-              <p className="text-[11px] sm:text-xs text-neutral-400 font-sans tracking-wide">
-                KPCIA PRESTIGE INSTRUCTOR PORTAL GATEWAY
+              <p className="text-[10px] font-mono tracking-wider text-neutral-400">
+                KPCIA SECURE GATEWAY FOR MEMBERS & ADMIN
               </p>
             </div>
           </div>
 
-          <div className="border-t border-neutral-800/80 pt-6 space-y-6">
+          {/* Core Login Form */}
+          <form onSubmit={handleLoginSubmit} className="space-y-4 border-t border-neutral-800/80 pt-5">
+            <div className="text-xs font-bold text-neutral-300 uppercase tracking-wider flex items-center gap-1.5 mb-2">
+              <span className="w-1.5 h-1.5 rounded-full bg-kpcia-gold" />
+              협회 통합 보안 로그인
+            </div>
+
+            {loginError && (
+              <div className="p-3 bg-red-950/50 border border-red-800/60 rounded-xl text-red-200 text-xs font-sans leading-relaxed text-left" id="login-error-box">
+                ⚠ {loginError}
+              </div>
+            )}
+
             <div className="space-y-3">
-              <h2 className="text-xs font-bold text-neutral-400 uppercase tracking-widest text-center">
-                기존 등록 강사 계정 선택
-              </h2>
-              
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 max-h-[220px] overflow-y-auto pr-1 animate-in fade-in duration-500" id="gateway-accounts">
-                {users.map((user) => (
-                  <button
-                    key={user.uid}
-                    onClick={() => {
-                      setCurrentUser(user);
-                      triggerToast(`환영합니다, ${user.name} 강사님!`);
-                    }}
-                    className="p-3.5 rounded-xl bg-neutral-950/80 border border-neutral-800 hover:border-kpcia-gold/60 text-left transition-all group flex items-center justify-between cursor-pointer"
-                  >
-                    <div>
-                      <div className="text-xs font-extrabold text-neutral-100 group-hover:text-kpcia-gold transition-colors flex items-center gap-1">
-                        {user.name}
-                        {user.isAdmin && <span className="text-[9px] bg-kpcia-gold/15 text-kpcia-gold border border-kpcia-gold/20 px-1 rounded">ADMIN</span>}
-                      </div>
-                      <div className="text-[10px] text-neutral-400 mt-0.5">{user.tier}</div>
-                    </div>
-                    <div className="text-right">
-                      <span className="text-[10px] font-mono font-bold text-kpcia-gold">{new Intl.NumberFormat().format(user.mileage)} M</span>
-                      <p className="text-[8px] text-neutral-500">마일리지</p>
-                    </div>
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            {/* Registration Call To Action inside Gateway */}
-            <div className="bg-gradient-to-r from-kpcia-gold/5 via-kpcia-gold/10 to-kpcia-gold/5 border border-kpcia-gold/20 rounded-2xl p-5 text-center space-y-3">
               <div>
-                <h3 className="text-xs font-bold text-kpcia-gold">협회 회원으로 아직 등록되지 않으셨나요?</h3>
-                <p className="text-[10px] text-neutral-400 mt-1 leading-normal font-sans">
-                  KPCIA의 정식 강사 단원으로 등록하고, 즉시 디지털 배지 및 프레스티지 공인 인증서 수령 혜택을 받으세요.
-                </p>
+                <label className="block text-[10px] font-bold text-neutral-400 uppercase tracking-widest mb-1 text-left">
+                  아이디 또는 이메일
+                </label>
+                <input
+                  type="text"
+                  value={loginId}
+                  onChange={(e) => setLoginId(e.target.value)}
+                  placeholder="ID (예: insight9lab) 또는 이메일 주소"
+                  className="w-full px-4 py-2.5 bg-neutral-950 border border-neutral-800 hover:border-kpcia-gold/40 focus:border-kpcia-gold focus:ring-1 focus:ring-kpcia-gold text-neutral-100 rounded-xl text-xs font-sans outline-none transition-all placeholder:text-neutral-600 font-medium"
+                  id="login-id-input"
+                />
               </div>
-              <button
-                onClick={() => {
-                  setShowGatewayRegister(true);
-                }}
-                className="px-6 py-2.5 bg-kpcia-gold hover:bg-kpcia-gold-hover text-kpcia-dark text-xs font-extrabold rounded-xl transition-all flex items-center justify-center gap-1 mx-auto cursor-pointer shadow-lg shadow-kpcia-gold/10"
-                id="gateway-signup-trigger"
-              >
-                <Plus className="w-3.5 h-3.5" />
-                <span>신규 강사 회원가입 완료하고 시작하기</span>
-              </button>
+
+              <div>
+                <label className="block text-[10px] font-bold text-neutral-400 uppercase tracking-widest mb-1 text-left">
+                  비밀번호 (PASSWORD)
+                </label>
+                <input
+                  type="password"
+                  value={loginPassword}
+                  onChange={(e) => setLoginPassword(e.target.value)}
+                  placeholder="비밀번호를 입력하세요"
+                  className="w-full px-4 py-2.5 bg-neutral-950 border border-neutral-800 hover:border-kpcia-gold/40 focus:border-kpcia-gold focus:ring-1 focus:ring-kpcia-gold text-neutral-100 rounded-xl text-xs font-sans outline-none transition-all placeholder:text-neutral-600 font-medium"
+                  id="login-pw-input"
+                />
+              </div>
             </div>
 
-            {/* Corporate/Guest proposal entrance */}
-            <div className="pt-2 text-center">
-              <span className="text-[9px] font-mono tracking-widest text-neutral-500 uppercase block mb-2">기업 협력 및 미가입 방문자 전용</span>
-              <button
-                onClick={() => {
-                  const guestUser: UserProfile = {
-                    uid: 'guest',
-                    email: 'guest@kpcia.org',
-                    name: '비회원 게스트',
-                    tier: 'Prestige Member',
-                    mileage: 0,
-                    profileCard: {
-                      title: '비회원 게스트',
-                      bio: '비회원 상태로 제휴 제안 및 협회 소개를 확인하는 중입니다.',
-                      specialties: [],
-                      career: [],
-                      education: [],
-                      contactEmail: 'guest@kpcia.org',
-                      contactPhone: '',
-                      cardTheme: 'classic'
-                    },
-                    badges: [],
-                    createdAt: new Date().toISOString(),
-                    updatedAt: new Date().toISOString(),
-                    isAdmin: false
-                  };
-                  setCurrentUser(guestUser);
-                  setActiveTab('proposal'); // Land directly on the proposal tab!
-                  triggerToast('비회원 게스트 상태로 접속했습니다. 제휴 및 협력 제안이 가능합니다.', 'info');
-                }}
-                className="w-full max-w-md py-3 bg-neutral-900/80 hover:bg-neutral-800 border border-neutral-800 hover:border-kpcia-gold/40 text-neutral-300 hover:text-kpcia-gold text-xs font-bold rounded-xl transition-all flex items-center justify-center gap-2 mx-auto cursor-pointer shadow-md"
-                id="gateway-guest-btn"
-              >
-                ★ 비회원으로 제휴 및 협력 제안하러 바로가기 →
-              </button>
+            <button
+              type="submit"
+              className="w-full py-3 bg-kpcia-gold hover:bg-kpcia-gold-hover text-kpcia-dark hover:scale-[1.015] active:scale-[0.99] font-black text-xs rounded-xl transition-all duration-300 shadow-xl shadow-kpcia-gold/15 flex items-center justify-center gap-1.5 cursor-pointer mt-5 uppercase"
+              id="login-submit-btn"
+            >
+              <LogIn className="w-4 h-4 text-kpcia-dark" />
+              <span>KPCIA 전용 포털 안전 로그인</span>
+            </button>
+          </form>
+
+          {/* Quick Demo Helper / Fast Select Panel */}
+          <div className="border-t border-neutral-800/80 pt-4 space-y-4">
+            <div className="flex items-center justify-between text-[10px] font-bold text-neutral-400 uppercase tracking-wider">
+              <span>또는 데모 계정 간편 선택 로그인</span>
+              <span className="text-[8px] bg-neutral-800 border border-neutral-700 text-neutral-400 px-1.5 py-0.5 rounded">QUICK ACCESS</span>
             </div>
+
+            <div className="grid grid-cols-2 gap-2 max-h-[160px] overflow-y-auto pr-1" id="gateway-accounts">
+              {users.map((user) => (
+                <button
+                  key={user.uid}
+                  type="button"
+                  onClick={() => {
+                    setCurrentUser(user);
+                    localStorage.setItem('kpcia_logged_in_uid', user.uid);
+                    triggerToast(`환영합니다, ${user.name} 강사님! (데모 로그인)`);
+                  }}
+                  className="p-2.5 rounded-xl bg-neutral-950/80 border border-neutral-850 hover:border-kpcia-gold/60 text-left transition-all duration-300 hover:scale-[1.015] hover:bg-neutral-950 group flex items-center justify-between cursor-pointer shadow-sm hover:shadow-kpcia-gold/5"
+                >
+                  <div className="space-y-0.5">
+                    <div className="text-[10px] font-extrabold text-neutral-200 group-hover:text-kpcia-gold transition-colors flex items-center gap-1">
+                      {user.name}
+                      {user.isAdmin && <span className="text-[7.5px] bg-kpcia-gold/15 text-kpcia-gold border border-kpcia-gold/35 px-1 rounded">MGR</span>}
+                    </div>
+                    <div className="text-[8.5px] text-neutral-400 truncate max-w-[120px]">{user.tier}</div>
+                  </div>
+                  <div className="text-right">
+                    <span className="text-[8.5px] font-mono font-bold text-kpcia-gold">{new Intl.NumberFormat().format(user.mileage)} M</span>
+                  </div>
+                </button>
+              ))}
+            </div>
+
+            {/* Quick credentials instructions */}
+            <div className="p-3 rounded-xl bg-neutral-950/40 border border-neutral-800/60 text-[10px] text-neutral-400 space-y-1 text-left font-sans">
+              <p className="font-bold text-neutral-300">💡 로그인 계정 안내</p>
+              <ul className="list-disc list-inside space-y-0.5 font-sans leading-relaxed text-neutral-400">
+                <li><strong className="text-neutral-200">운영사무국 ID:</strong> <code className="text-kpcia-gold bg-neutral-950 px-1 py-0.5 rounded">insight9lab</code> / 비밀번호: <code className="text-kpcia-gold bg-neutral-950 px-1 py-0.5 rounded">400828</code></li>
+                <li><strong className="text-neutral-200">강사 아이디:</strong> 위에 나열된 강사의 이메일 주소를 입력하고 아무 비밀번호나 입력하여 로그인하실 수 있습니다.</li>
+              </ul>
+            </div>
+
+            {/* Quick Master Reset Button */}
+            <button
+              type="button"
+              onClick={handleResetData}
+              className="w-full py-2.5 bg-red-950/15 hover:bg-red-950/30 text-red-400 hover:text-red-300 border border-red-900/30 hover:border-red-800/50 text-[10px] font-bold rounded-xl transition-all duration-300 flex items-center justify-center gap-1.5 cursor-pointer hover:scale-[1.01]"
+              id="gateway-reset-db-btn"
+            >
+              ♻ KPCIA 출강/프로그램/강사 전체 데이터 초기화
+            </button>
+          </div>
+
+          {/* Registration & Guest CTA */}
+          <div className="border-t border-neutral-800/80 pt-4 flex flex-col sm:flex-row gap-2 justify-between items-center text-xs">
+            <button
+              type="button"
+              onClick={() => setShowGatewayRegister(true)}
+              className="w-full sm:w-auto px-4 py-2 bg-neutral-900 border border-neutral-800 hover:border-kpcia-gold/40 hover:text-kpcia-gold text-[10px] font-extrabold rounded-lg transition-all duration-300 hover:scale-[1.01]"
+              id="gateway-signup-trigger"
+            >
+              신규 강사 회원가입
+            </button>
+
+            <button
+              type="button"
+              onClick={() => {
+                const guestUser: UserProfile = {
+                  uid: 'guest',
+                  email: 'guest@kpcia.org',
+                  name: '비회원 게스트',
+                  tier: 'Prestige Member',
+                  mileage: 0,
+                  profileCard: {
+                    title: '비회원 게스트',
+                    bio: '비회원 상태로 제휴 제안 및 협회 소개를 확인하는 중입니다.',
+                    specialties: [],
+                    career: [],
+                    education: [],
+                    contactEmail: 'guest@kpcia.org',
+                    contactPhone: '',
+                    cardTheme: 'classic'
+                  },
+                  badges: [],
+                  createdAt: new Date().toISOString(),
+                  updatedAt: new Date().toISOString(),
+                  isAdmin: false
+                };
+                setCurrentUser(guestUser);
+                setActiveTab('proposal');
+                triggerToast('비회원 게스트 상태로 접속했습니다. 제휴 제안이 가능합니다.', 'info');
+              }}
+              className="w-full sm:w-auto px-4 py-2 bg-neutral-900 border border-neutral-800 hover:border-kpcia-gold/40 hover:text-kpcia-gold text-[10px] font-extrabold rounded-lg transition-all duration-300 hover:scale-[1.01]"
+              id="gateway-guest-btn"
+            >
+              ★ 비회원 게 제휴 제안 바로가기
+            </button>
           </div>
         </div>
 
@@ -903,81 +1151,45 @@ export default function App() {
         </div>
       )}
 
-      {/* Header component with User switcher */}
-      <Header
-        currentUser={currentUser}
-        allUsers={users}
-        onUserChange={handleUserChange}
-        activeTab={activeTab}
-        onTabChange={(tab) => {
-          setActiveTab(tab);
-          setIsMobileSimulated(false); // Disable simulator preview when navigating desktop tabs
-        }}
-        isMobileSimulated={isMobileSimulated}
-        onToggleSimulator={() => setIsMobileSimulated(!isMobileSimulated)}
-        onOpenRegister={() => setShowGatewayRegister(true)}
-        onLogout={handleLogout}
-      />
+      {/* Header component with User switcher - hidden in mobile simulated mode */}
+      {!isMobileSimulated && (
+        <Header
+          currentUser={currentUser}
+          allUsers={users}
+          onUserChange={handleUserChange}
+          activeTab={activeTab}
+          onTabChange={(tab) => {
+            setActiveTab(tab);
+            setIsMobileSimulated(false); // Disable simulator preview when navigating desktop tabs
+          }}
+          isMobileSimulated={isMobileSimulated}
+          onToggleSimulator={() => setIsMobileSimulated(!isMobileSimulated)}
+          onOpenRegister={() => setShowGatewayRegister(true)}
+          onLogout={handleLogout}
+        />
+      )}
 
       {/* Main Content Area */}
       <main className="flex-1 max-w-7xl mx-auto w-full px-4 sm:px-6 lg:px-8 py-8 no-print" id="main-content">
         {isMobileSimulated ? (
-          /* Dual Display: Mobile Simulator on Left, Guide / Explanation on Right */
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-center justify-center min-h-[680px]" id="simulator-view">
-            <div className="lg:col-span-5 flex justify-center">
-              <AppSimulator
-                currentUser={currentUser}
-                lectures={lectures}
-                programs={programs}
-                activeMobileTab={activeMobileTab}
-                onMobileTabChange={setActiveMobileTab}
-                onApplyLecture={handleApplyLecture}
-                onTabChange={setActiveTab}
-              />
-            </div>
-            
-            <div className="lg:col-span-7 space-y-6 max-w-lg" id="simulator-sidebar">
-              <div className="space-y-2">
-                <span className="text-[10px] font-mono tracking-widest font-bold text-kpcia-gold uppercase bg-kpcia-gold/5 border border-kpcia-gold/15 px-2.5 py-1 rounded inline-block">
-                  HYBRID INSTRUCTOR APP EMULATION
-                </span>
-                <h2 className="text-2xl font-bold tracking-tight text-neutral-100 font-display">
-                  회원용 하이브리드 강의 매칭 모바일 앱
-                </h2>
-                <p className="text-sm text-neutral-400 leading-relaxed font-sans">
-                  스마트폰 디바이스 프레임을 통해 협회 회원들이 현장 출강 중이나 이동 시 휴대폰으로 간편하게 출강 공고를 확인하고 강의를 선택 신청할 수 있는 모바일 전용 UI/UX 시뮬레이터입니다.
-                </p>
-              </div>
-
-              <div className="space-y-4 bg-neutral-900/50 border border-neutral-800 p-5 rounded-xl text-xs" id="mobile-guide">
-                <h4 className="font-bold text-neutral-200 uppercase font-display tracking-wider flex items-center gap-1.5 border-b border-neutral-800 pb-2 mb-3">
-                  <Compass className="w-4 h-4 text-kpcia-gold" /> 모바일 앱 주요 기능 체험 순서
-                </h4>
-                <ul className="space-y-3 font-sans text-neutral-300">
-                  <li className="flex items-start gap-2.5">
-                    <span className="w-5 h-5 rounded-full bg-neutral-800 flex items-center justify-center text-[10px] font-bold text-kpcia-gold shrink-0">1</span>
-                    <span>상단 우측 이메일 위젯을 클릭하여 원하는 <strong>강사 계정 등급</strong>으로 전환해 보세요.</span>
-                  </li>
-                  <li className="flex items-start gap-2.5">
-                    <span className="w-5 h-5 rounded-full bg-neutral-800 flex items-center justify-center text-[10px] font-bold text-kpcia-gold shrink-0">2</span>
-                    <span>모바일 화면 하단의 <strong>[강의요청]</strong> 탭에서 등급에 맞는 공고를 확인 후 <strong>[출강 신청]</strong> 버튼을 탭하세요.</span>
-                  </li>
-                  <li className="flex items-start gap-2.5">
-                    <span className="w-5 h-5 rounded-full bg-neutral-800 flex items-center justify-center text-[10px] font-bold text-kpcia-gold shrink-0">3</span>
-                    <span>우측 상단 <strong>[웹사이트 보기]</strong> 버튼을 누르면 정식 PC 홈페이지로 복귀해 강사 카드를 다운로드하고 관리할 수 있습니다.</span>
-                  </li>
-                </ul>
-              </div>
-
-              <button
-                onClick={() => setIsMobileSimulated(false)}
-                className="inline-flex items-center space-x-1.5 text-xs text-kpcia-gold hover:text-kpcia-gold-hover font-bold"
-                id="back-to-web-btn"
-              >
-                <span>KPCIA 공식 PC 홈페이지 포털로 돌아가기</span>
-                <ArrowRight className="w-3.5 h-3.5" />
-              </button>
-            </div>
+          /* Centered mobile phone simulator with all instructional text removed */
+          <div className="flex flex-col items-center justify-center min-h-[740px] py-4" id="simulator-view">
+            <AppSimulator
+              currentUser={currentUser}
+              allUsers={users}
+              onUserChange={handleUserChange}
+              onLogout={handleLogout}
+              onLogin={handleMobileLogin}
+              lectures={lectures}
+              programs={programs}
+              activeMobileTab={activeMobileTab}
+              onMobileTabChange={setActiveMobileTab}
+              onApplyLecture={handleApplyLecture}
+              onTabChange={(tab) => {
+                setActiveTab(tab);
+                setIsMobileSimulated(false); // Back to homepage / specific portal tab
+              }}
+            />
           </div>
         ) : (
           /* Desktop Corporate Website view based on tabs */
@@ -1029,7 +1241,7 @@ export default function App() {
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-6" id="home-bento">
                   <div 
                     onClick={() => document.getElementById('tier-guide-block')?.scrollIntoView({ behavior: 'smooth' })}
-                    className="bg-neutral-900/40 border border-neutral-800 p-6 rounded-xl space-y-3 cursor-pointer hover:border-kpcia-gold/40 hover:bg-neutral-900/60 hover:shadow-xl hover:scale-[1.02] transition-all duration-300 group"
+                    className="bg-neutral-900/65 border border-neutral-800/80 p-6 rounded-xl space-y-3 cursor-pointer hover-premium transition-all group shadow-md"
                   >
                     <div className="w-9 h-9 rounded-lg bg-kpcia-gold/10 border border-kpcia-gold/20 flex items-center justify-center text-kpcia-gold group-hover:bg-kpcia-gold/25 transition-colors">
                       <Award className="w-5 h-5" />
@@ -1038,14 +1250,14 @@ export default function App() {
                       <span>5단계 프리미엄 등급제</span>
                       <span className="text-[9px] font-sans text-neutral-500 font-normal group-hover:translate-x-0.5 transition-transform">→</span>
                     </h3>
-                    <p className="text-xs text-neutral-400 leading-relaxed font-sans">
+                    <p className="text-xs text-neutral-200 leading-relaxed font-sans font-medium">
                       Prestige 멤버(일반회원)부터 정교한 공인 어소시에이트 및 대표급 엘리트까지 검증된 실무 전문가 코스를 상세 조회합니다. (클릭 시 이동)
                     </p>
                   </div>
 
                   <div 
                     onClick={() => setActiveTab('programs')}
-                    className="bg-neutral-900/40 border border-neutral-800 p-6 rounded-xl space-y-3 cursor-pointer hover:border-kpcia-gold/40 hover:bg-neutral-900/60 hover:shadow-xl hover:scale-[1.02] transition-all duration-300 group"
+                    className="bg-neutral-900/65 border border-neutral-800/80 p-6 rounded-xl space-y-3 cursor-pointer hover-premium transition-all group shadow-md"
                   >
                     <div className="w-9 h-9 rounded-lg bg-kpcia-gold/10 border border-kpcia-gold/20 flex items-center justify-center text-kpcia-gold group-hover:bg-kpcia-gold/25 transition-colors">
                       <BookOpen className="w-5 h-5" />
@@ -1054,14 +1266,14 @@ export default function App() {
                       <span>기획 교안 저작권 마일리지 누적</span>
                       <span className="text-[9px] font-sans text-neutral-500 font-normal group-hover:translate-x-0.5 transition-transform">→</span>
                     </h3>
-                    <p className="text-xs text-neutral-400 leading-relaxed font-sans">
+                    <p className="text-xs text-neutral-200 leading-relaxed font-sans font-medium">
                       자신만의 시그니처 프로그램을 협회에 등재하고, 타 강사가 해당 교안으로 외부 강의 완료 시 기획 저작자에게 자동으로 마일리지가 분배 보장됩니다.
                     </p>
                   </div>
 
                   <div 
                     onClick={() => setActiveTab('profile')}
-                    className="bg-neutral-900/40 border border-neutral-800 p-6 rounded-xl space-y-3 cursor-pointer hover:border-kpcia-gold/40 hover:bg-neutral-900/60 hover:shadow-xl hover:scale-[1.02] transition-all duration-300 group"
+                    className="bg-neutral-900/65 border border-neutral-800/80 p-6 rounded-xl space-y-3 cursor-pointer hover-premium transition-all group shadow-md"
                   >
                     <div className="w-9 h-9 rounded-lg bg-kpcia-gold/10 border border-kpcia-gold/20 flex items-center justify-center text-kpcia-gold group-hover:bg-kpcia-gold/25 transition-colors">
                       <UserCheck className="w-5 h-5" />
@@ -1070,7 +1282,7 @@ export default function App() {
                       <span>PDF 출력형 강사 정보 카드</span>
                       <span className="text-[9px] font-sans text-neutral-500 font-normal group-hover:translate-x-0.5 transition-transform">→</span>
                     </h3>
-                    <p className="text-xs text-neutral-400 leading-relaxed font-sans">
+                    <p className="text-xs text-neutral-200 leading-relaxed font-sans font-medium">
                       회원 본인의 출강 약력, 이력, 자격 증명 및 획득 디지털 배지를 한 장의 럭셔리 실물 프리미엄 카드로 렌더링하고, PDF 저장 및 출력을 지원합니다.
                     </p>
                   </div>
@@ -1092,13 +1304,13 @@ export default function App() {
                       { title: 'Prestige Master', kor: '프레스티지 마스터', desc: '1000강의 출강 & 누적 만족도 4.8 이상 / 5.0 만점', badge: '🥇 Ruby' },
                       { title: 'Prestige Elite', kor: '프레스티지 엘리트', desc: '10000강의 출강 & 누적 만족도 4.9 이상 / 5.0 만점', badge: '👑 Emerald' }
                     ].map((t) => (
-                      <div key={t.title} className="p-5 rounded-xl border border-neutral-800 bg-neutral-950/80 space-y-2 text-center flex flex-col justify-between" id={`tier-showcase-${t.title.replace(' ', '')}`}>
+                      <div key={t.title} className="p-5 rounded-xl border border-neutral-800 bg-neutral-950/80 space-y-2 text-center flex flex-col justify-between hover-premium transition-all duration-300" id={`tier-showcase-${t.title.replace(' ', '')}`}>
                         <div className="space-y-2">
                           <div className="text-xs font-bold text-kpcia-gold font-mono">{t.badge}</div>
                           <h5 className="font-display font-bold text-[11px] text-neutral-200">{t.title}</h5>
-                          <p className="text-[10px] text-neutral-400 font-sans font-semibold">{t.kor}</p>
+                          <p className="text-[10px] text-neutral-350 font-sans font-semibold">{t.kor}</p>
                         </div>
-                        <p className="text-[10px] text-neutral-500 leading-normal font-sans pt-1.5 border-t border-neutral-900 mt-2">{t.desc}</p>
+                        <p className="text-[10px] text-neutral-300 leading-normal font-sans pt-1.5 border-t border-neutral-900 mt-2 font-medium">{t.desc}</p>
                       </div>
                     ))}
                   </div>
@@ -1174,6 +1386,7 @@ export default function App() {
                 onRejectUser={handleRejectUser}
                 onApproveProgram={handleApproveProgram}
                 onUpdateUserPerformance={handleUpdateUserPerformance}
+                onDeleteUser={handleDeleteUser}
               />
             )}
           </div>
