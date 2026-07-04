@@ -570,7 +570,10 @@ export default function App() {
 
   // Global Register Modal Renderer with Interactive Email Verification Wizard
   const renderRegisterModal = () => {
-    if (!showGatewayRegister) return null;
+    return null;
+  };
+
+  const _disabledRegisterModal = () => {
     return (
       <div className="fixed inset-0 z-[9999] bg-black/90 backdrop-blur-md flex items-start justify-center p-4 overflow-y-auto font-sans" id="gateway-register-modal">
         <div className="bg-neutral-900 border-2 border-kpcia-gold/30 rounded-2xl w-full max-w-md overflow-hidden shadow-2xl relative my-auto" id="gateway-register-container">
@@ -877,7 +880,7 @@ export default function App() {
       return true;
     }
 
-    triggerToast('아이디 또는 비밀번호가 일치하지 않습니다. (운영사무국 ID: insight9lab / PW: 400828)', 'info');
+    triggerToast('아이디 또는 비밀번호가 일치하지 않습니다.', 'info');
     return false;
   };
 
@@ -942,7 +945,7 @@ export default function App() {
         return;
       }
 
-      setLoginError('아이디 또는 비밀번호가 일치하지 않습니다. (운영사무국 ID: insight9lab / PW: 400828)');
+      setLoginError('아이디 또는 비밀번호가 일치하지 않습니다.');
     };
 
     return (
@@ -959,7 +962,7 @@ export default function App() {
         )}
 
         {/* Portal Card */}
-        <div className="w-full max-w-lg bg-neutral-900/80 border border-neutral-800 rounded-2xl p-6 sm:p-8 backdrop-blur-xl shadow-2xl space-y-6 relative z-10 my-auto" id="gateway-card">
+        <div className="w-full max-w-lg bg-neutral-900/80 border border-neutral-800 rounded-2xl p-6 sm:p-8 backdrop-blur-xl shadow-2xl space-y-6 relative z-10 my-auto animate-in fade-in duration-300" id="gateway-card">
           
           {/* Header info */}
           <div className="text-center space-y-3">
@@ -973,131 +976,63 @@ export default function App() {
                 강사용 프레스티지 포털
               </span>
               <h1 className="text-xl sm:text-2xl font-black tracking-tight text-neutral-100 font-display">
-                한국프레스티지기업강사협회
+                프레스티지 강사 전용 시스템 v1
               </h1>
-              <p className="text-[10px] font-mono tracking-wider text-neutral-400">
-                KPCIA SECURE GATEWAY FOR MEMBERS & ADMIN
-              </p>
             </div>
           </div>
 
-          {/* Core Login Form */}
-          <form onSubmit={handleLoginSubmit} className="space-y-4 border-t border-neutral-800/80 pt-5">
-            <div className="text-xs font-bold text-neutral-300 uppercase tracking-wider flex items-center gap-1.5 mb-2">
-              <span className="w-1.5 h-1.5 rounded-full bg-kpcia-gold" />
-              협회 통합 보안 로그인
-            </div>
+          {/* ================= LOGIN FORM ================= */}
+          <div className="space-y-6 animate-in fade-in duration-200">
+            <form onSubmit={handleLoginSubmit} className="space-y-4">
+              {loginError && (
+                <div className="p-3 bg-red-950/50 border border-red-800/60 rounded-xl text-red-200 text-xs font-sans leading-relaxed text-left" id="login-error-box">
+                  ⚠ {loginError}
+                </div>
+              )}
 
-            {loginError && (
-              <div className="p-3 bg-red-950/50 border border-red-800/60 rounded-xl text-red-200 text-xs font-sans leading-relaxed text-left" id="login-error-box">
-                ⚠ {loginError}
+              <div className="space-y-3">
+                <div>
+                  <label className="block text-[10px] font-bold text-neutral-400 uppercase tracking-widest mb-1 text-left">
+                    아이디 또는 이메일
+                  </label>
+                  <input
+                    type="text"
+                    value={loginId}
+                    onChange={(e) => setLoginId(e.target.value)}
+                    placeholder="ID (예: kindom) 또는 이메일 주소"
+                    className="w-full px-4 py-2.5 bg-neutral-950 border border-neutral-800 hover:border-kpcia-gold/40 focus:border-kpcia-gold focus:ring-1 focus:ring-kpcia-gold text-neutral-100 rounded-xl text-xs font-sans outline-none transition-all placeholder:text-neutral-600 font-medium animate-in fade-in"
+                    id="login-id-input"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-[10px] font-bold text-neutral-400 uppercase tracking-widest mb-1 text-left">
+                    비밀번호 (PASSWORD)
+                  </label>
+                  <input
+                    type="password"
+                    value={loginPassword}
+                    onChange={(e) => setLoginPassword(e.target.value)}
+                    placeholder="비밀번호를 입력하세요"
+                    className="w-full px-4 py-2.5 bg-neutral-950 border border-neutral-800 hover:border-kpcia-gold/40 focus:border-kpcia-gold focus:ring-1 focus:ring-kpcia-gold text-neutral-100 rounded-xl text-xs font-sans outline-none transition-all placeholder:text-neutral-600 font-medium animate-in fade-in"
+                    id="login-pw-input"
+                  />
+                </div>
               </div>
-            )}
 
-            <div className="space-y-3">
-              <div>
-                <label className="block text-[10px] font-bold text-neutral-400 uppercase tracking-widest mb-1 text-left">
-                  아이디 또는 이메일
-                </label>
-                <input
-                  type="text"
-                  value={loginId}
-                  onChange={(e) => setLoginId(e.target.value)}
-                  placeholder="ID (예: insight9lab) 또는 이메일 주소"
-                  className="w-full px-4 py-2.5 bg-neutral-950 border border-neutral-800 hover:border-kpcia-gold/40 focus:border-kpcia-gold focus:ring-1 focus:ring-kpcia-gold text-neutral-100 rounded-xl text-xs font-sans outline-none transition-all placeholder:text-neutral-600 font-medium"
-                  id="login-id-input"
-                />
-              </div>
-
-              <div>
-                <label className="block text-[10px] font-bold text-neutral-400 uppercase tracking-widest mb-1 text-left">
-                  비밀번호 (PASSWORD)
-                </label>
-                <input
-                  type="password"
-                  value={loginPassword}
-                  onChange={(e) => setLoginPassword(e.target.value)}
-                  placeholder="비밀번호를 입력하세요"
-                  className="w-full px-4 py-2.5 bg-neutral-950 border border-neutral-800 hover:border-kpcia-gold/40 focus:border-kpcia-gold focus:ring-1 focus:ring-kpcia-gold text-neutral-100 rounded-xl text-xs font-sans outline-none transition-all placeholder:text-neutral-600 font-medium"
-                  id="login-pw-input"
-                />
-              </div>
-            </div>
-
-            <button
-              type="submit"
-              className="w-full py-3 bg-kpcia-gold hover:bg-kpcia-gold-hover text-kpcia-dark hover:scale-[1.015] active:scale-[0.99] font-black text-xs rounded-xl transition-all duration-300 shadow-xl shadow-kpcia-gold/15 flex items-center justify-center gap-1.5 cursor-pointer mt-5 uppercase"
-              id="login-submit-btn"
-            >
-              <LogIn className="w-4 h-4 text-kpcia-dark" />
-              <span>KPCIA 전용 포털 안전 로그인</span>
-            </button>
-          </form>
-
-          {/* Quick Demo Helper / Fast Select Panel */}
-          <div className="border-t border-neutral-800/80 pt-4 space-y-4">
-            <div className="flex items-center justify-between text-[10px] font-bold text-neutral-400 uppercase tracking-wider">
-              <span>또는 데모 계정 간편 선택 로그인</span>
-              <span className="text-[8px] bg-neutral-800 border border-neutral-700 text-neutral-400 px-1.5 py-0.5 rounded">QUICK ACCESS</span>
-            </div>
-
-            <div className="grid grid-cols-2 gap-2 max-h-[160px] overflow-y-auto pr-1" id="gateway-accounts">
-              {users.map((user) => (
-                <button
-                  key={user.uid}
-                  type="button"
-                  onClick={() => {
-                    setCurrentUser(user);
-                    localStorage.setItem('kpcia_logged_in_uid', user.uid);
-                    triggerToast(`환영합니다, ${user.name} 강사님! (데모 로그인)`);
-                  }}
-                  className="p-2.5 rounded-xl bg-neutral-950/80 border border-neutral-850 hover:border-kpcia-gold/60 text-left transition-all duration-300 hover:scale-[1.015] hover:bg-neutral-950 group flex items-center justify-between cursor-pointer shadow-sm hover:shadow-kpcia-gold/5"
-                >
-                  <div className="space-y-0.5">
-                    <div className="text-[10px] font-extrabold text-neutral-200 group-hover:text-kpcia-gold transition-colors flex items-center gap-1">
-                      {user.name}
-                      {user.isAdmin && <span className="text-[7.5px] bg-kpcia-gold/15 text-kpcia-gold border border-kpcia-gold/35 px-1 rounded">MGR</span>}
-                    </div>
-                    <div className="text-[8.5px] text-neutral-400 truncate max-w-[120px]">{user.tier}</div>
-                  </div>
-                  <div className="text-right">
-                    <span className="text-[8.5px] font-mono font-bold text-kpcia-gold">{new Intl.NumberFormat().format(user.mileage)} M</span>
-                  </div>
-                </button>
-              ))}
-            </div>
-
-            {/* Quick credentials instructions */}
-            <div className="p-3 rounded-xl bg-neutral-950/40 border border-neutral-800/60 text-[10px] text-neutral-400 space-y-1 text-left font-sans">
-              <p className="font-bold text-neutral-300">💡 로그인 계정 안내</p>
-              <ul className="list-disc list-inside space-y-0.5 font-sans leading-relaxed text-neutral-400">
-                <li><strong className="text-neutral-200">운영사무국 ID:</strong> <code className="text-kpcia-gold bg-neutral-950 px-1 py-0.5 rounded">insight9lab</code> / 비밀번호: <code className="text-kpcia-gold bg-neutral-950 px-1 py-0.5 rounded">400828</code></li>
-                <li><strong className="text-neutral-200">강사 아이디:</strong> 위에 나열된 강사의 이메일 주소를 입력하고 아무 비밀번호나 입력하여 로그인하실 수 있습니다.</li>
-              </ul>
-            </div>
-
-            {/* Quick Master Reset Button */}
-            <button
-              type="button"
-              onClick={handleResetData}
-              className="w-full py-2.5 bg-red-950/15 hover:bg-red-950/30 text-red-400 hover:text-red-300 border border-red-900/30 hover:border-red-800/50 text-[10px] font-bold rounded-xl transition-all duration-300 flex items-center justify-center gap-1.5 cursor-pointer hover:scale-[1.01]"
-              id="gateway-reset-db-btn"
-            >
-              ♻ KPCIA 출강/프로그램/강사 전체 데이터 초기화
-            </button>
+              <button
+                type="submit"
+                className="w-full py-3 bg-kpcia-gold hover:bg-kpcia-gold-hover text-kpcia-dark hover:scale-[1.015] active:scale-[0.99] font-black text-xs rounded-xl transition-all duration-300 shadow-xl shadow-kpcia-gold/15 flex items-center justify-center gap-1.5 cursor-pointer mt-5 uppercase"
+                id="login-submit-btn"
+              >
+                <LogIn className="w-4 h-4 text-kpcia-dark" />
+                <span>KPCIA 전용 포털 안전 로그인</span>
+              </button>
+            </form>
           </div>
 
-          {/* Registration & Guest CTA */}
-          <div className="border-t border-neutral-800/80 pt-4 flex flex-col sm:flex-row gap-2 justify-between items-center text-xs">
-            <button
-              type="button"
-              onClick={() => setShowGatewayRegister(true)}
-              className="w-full sm:w-auto px-4 py-2 bg-neutral-900 border border-neutral-800 hover:border-kpcia-gold/40 hover:text-kpcia-gold text-[10px] font-extrabold rounded-lg transition-all duration-300 hover:scale-[1.01]"
-              id="gateway-signup-trigger"
-            >
-              신규 강사 회원가입
-            </button>
-
+          {/* Guest CTA (Visible at bottom for both) */}
+          <div className="border-t border-neutral-800/80 pt-4 flex justify-center text-xs">
             <button
               type="button"
               onClick={() => {
@@ -1126,16 +1061,13 @@ export default function App() {
                 setActiveTab('proposal');
                 triggerToast('비회원 게스트 상태로 접속했습니다. 제휴 제안이 가능합니다.', 'info');
               }}
-              className="w-full sm:w-auto px-4 py-2 bg-neutral-900 border border-neutral-800 hover:border-kpcia-gold/40 hover:text-kpcia-gold text-[10px] font-extrabold rounded-lg transition-all duration-300 hover:scale-[1.01]"
+              className="w-full px-4 py-2 bg-neutral-900 border border-neutral-800 hover:border-kpcia-gold/40 hover:text-kpcia-gold text-[10px] font-extrabold rounded-lg transition-all duration-300 hover:scale-[1.01] cursor-pointer"
               id="gateway-guest-btn"
             >
-              ★ 비회원 게 제휴 제안 바로가기
+              ★ 비회원 게스트 제휴 제안 바로가기
             </button>
           </div>
         </div>
-
-        {/* INLINE REGISTRATION PANEL */}
-        {renderRegisterModal()}
       </div>
     );
   }
@@ -1397,6 +1329,7 @@ export default function App() {
                 onUpdateUserPerformance={handleUpdateUserPerformance}
                 onDeleteUser={handleDeleteUser}
                 onDeleteProgram={handleDeleteProgram}
+                onResetDatabase={handleResetData}
               />
             )}
           </div>

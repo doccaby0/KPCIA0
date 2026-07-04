@@ -111,6 +111,7 @@ interface AdminPanelProps {
   onUpdateUserPerformance?: (userId: string, lectureCount: number, ratings: number[]) => void;
   onDeleteUser?: (userId: string) => void;
   onDeleteProgram?: (programId: string) => void;
+  onResetDatabase?: () => void;
 }
 
 export default function AdminPanel({
@@ -130,7 +131,8 @@ export default function AdminPanel({
   onApproveProgram,
   onUpdateUserPerformance,
   onDeleteUser,
-  onDeleteProgram
+  onDeleteProgram,
+  onResetDatabase
 }: AdminPanelProps) {
   // Navigation State
   const [activeTab, setActiveTab] = useState<'dashboard' | 'approvals' | 'lectures' | 'members' | 'proposals'>('dashboard');
@@ -755,6 +757,33 @@ export default function AdminPanel({
                 </div>
               )}
             </div>
+
+            {/* System Control & Master Reset (Admin Only) */}
+            {onResetDatabase && (
+              <div className="bg-red-950/10 border border-red-900/30 rounded-xl p-5 flex flex-col sm:flex-row items-center justify-between gap-4 text-left" id="admin-master-reset-panel">
+                <div className="space-y-1">
+                  <h4 className="text-xs font-bold text-red-400 flex items-center gap-1.5">
+                    <Trash2 className="w-4.5 h-4.5 text-red-500" />
+                    KPCIA 플랫폼 전체 마스터 데이터 초기화
+                  </h4>
+                  <p className="text-[10px] text-neutral-400 font-sans leading-relaxed">
+                    KPCIA에 등록된 모든 강사 가입 이력, 출강 실적, 교육 프로그램 저작권, 마일리지 원장 거래 내역 및 제휴 제안 전체 데이터를 공고 초기 상태로 완전히 포맷합니다.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (window.confirm("정말로 모든 출강/프로그램/강사 전체 데이터를 공고 당시의 초기 상태로 복구하시겠습니까? 로그인 정보 및 변경된 전체 레코드가 전면 유실됩니다.")) {
+                      onResetDatabase();
+                    }
+                  }}
+                  className="px-4 py-2 bg-red-950/30 hover:bg-red-950/55 text-red-400 hover:text-red-300 border border-red-900/40 hover:border-red-800/50 text-[10px] font-bold rounded-xl transition-all flex items-center justify-center gap-1.5 cursor-pointer hover:scale-[1.015] duration-300 shrink-0 self-start sm:self-center"
+                  id="admin-reset-db-btn"
+                >
+                  <span>♻ KPCIA 전체 데이터 공고 초기화</span>
+                </button>
+              </div>
+            )}
           </div>
         )}
 

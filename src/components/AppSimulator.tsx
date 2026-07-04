@@ -402,26 +402,7 @@ export default function AppSimulator({
                 </button>
               </form>
 
-              {/* Quick Switch Test Accounts (Inside mobile phone) */}
-              <div className="space-y-2 border-t border-neutral-900/80 pt-4">
-                <span className="text-[8.5px] font-mono tracking-wider font-bold text-kpcia-gold/80 block uppercase text-center">
-                  ⚡ 테스트 계정 간편 터치 로그인
-                </span>
-                
-                <div className="grid grid-cols-2 gap-1.5">
-                  {allUsers.filter(u => u.uid !== 'guest').slice(0, 4).map((u) => (
-                    <button
-                      key={u.uid}
-                      type="button"
-                      onClick={() => handleQuickLogin(u)}
-                      className="p-1.5 rounded-lg bg-neutral-900 hover:bg-neutral-800 border border-neutral-800/60 hover:border-kpcia-gold/25 text-left transition-all duration-200 cursor-pointer"
-                    >
-                      <div className="text-[9px] font-bold text-neutral-200 truncate">{u.name}</div>
-                      <div className="text-[7.5px] text-kpcia-gold/80 font-mono scale-90 origin-left truncate">{u.tier.replace('Prestige ', '')}</div>
-                    </button>
-                  ))}
-                </div>
-              </div>
+
             </div>
 
             {/* Guest Action */}
@@ -505,37 +486,7 @@ export default function AppSimulator({
                 </div>
               </div>
 
-              {/* Quick Persona Switch List (Mobilized user switcher dropdown) */}
-              <div className="space-y-1.5">
-                <span className="text-[8.5px] font-mono tracking-wider font-bold text-neutral-500 uppercase block">
-                  👤 다른 강사 계정으로 즉시 전환
-                </span>
-                <div className="space-y-1 max-h-[140px] overflow-y-auto pr-1 custom-scrollbar">
-                  {allUsers.map((u) => {
-                    const isCurrent = u.uid === currentUser.uid;
-                    return (
-                      <button
-                        key={u.uid}
-                        onClick={() => {
-                          if (onUserChange) onUserChange(u.uid);
-                          setShowUserModal(false);
-                        }}
-                        className={`w-full p-2 rounded-lg text-left transition-all flex items-center justify-between ${
-                          isCurrent 
-                            ? 'bg-kpcia-gold/10 border border-kpcia-gold/30 text-kpcia-gold' 
-                            : 'bg-neutral-950/40 hover:bg-neutral-800 border border-neutral-900 text-neutral-400 hover:text-neutral-200'
-                        }`}
-                      >
-                        <div className="flex flex-col">
-                          <span className="text-[9px] font-bold">{u.name}</span>
-                          <span className="text-[7.5px] opacity-75">{u.tier}</span>
-                        </div>
-                        {isCurrent && <Check className="w-3.5 h-3.5 text-kpcia-gold" />}
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
+
 
               {/* Actions Footer */}
               <div className="pt-2 flex gap-2">
