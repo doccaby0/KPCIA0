@@ -79,6 +79,23 @@
         "createdAt": { "type": "string", "format": "date-time" }
       },
       "required": ["id", "userId", "type", "amount", "createdAt"]
+    },
+    "Proposal": {
+      "title": "Partnership Proposal",
+      "description": "Corporate partnership proposals submitted by companies or external clients.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "companyName": { "type": "string" },
+        "proposerName": { "type": "string" },
+        "email": { "type": "string" },
+        "phone": { "type": "string" },
+        "title": { "type": "string" },
+        "content": { "type": "string" },
+        "status": { "type": "string", "enum": ["pending", "reviewed", "accepted", "declined"] },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "companyName", "proposerName", "email", "phone", "title", "content", "status", "createdAt"]
     }
   },
   "firestore": {
@@ -97,6 +114,10 @@
     "transactions/{transactionId}": {
       "schema": "Transaction",
       "description": "Mileage transactions"
+    },
+    "proposals/{proposalId}": {
+      "schema": "Proposal",
+      "description": "Corporate partnership proposals"
     }
   }
 }

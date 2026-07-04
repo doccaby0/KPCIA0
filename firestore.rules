@@ -1,8 +1,169 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
+
+    // Default deny catch-all safety net
     match /{document=**} {
-      allow read, write: if true;
+      allow read, write: if false;
+    }
+
+    // Helper: Validate IDs to prevent resource poisoning attacks
+    function isValidId(id) {
+      return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    // Helper: Get data maps
+    function incoming(req) {
+      return req.resource.data;
+    }
+    
+    function existing(res) {
+      return res.data;
+    }
+
+    // ==========================================
+    // 1. Users Collection rules
+    // ==========================================
+    match /users/{userId} {
+      allow read: if true;
+      
+      allow create: if isValidId(userId) 
+        && userId == request.resource.data.uid
+        && isValidUser(request.resource.data);
+        
+      allow update: if isValidId(userId)
+        && userId == request.resource.data.uid
+        && isValidUser(request.resource.data);
+        
+      allow delete: if true; // Allowed for reset and user deletion
+    }
+
+    function isValidUser(data) {
+      return data.uid is string && data.uid.size() <= 100
+        && data.email is string && data.email.size() <= 150
+        && data.name is string && data.name.size() <= 100
+        && data.tier is string && data.tier.size() <= 50
+        && data.mileage is int
+        && (data.loginId == null || (data.loginId is string && data.loginId.size() <= 100))
+        && (data.password == null || (data.password is string && data.password.size() <= 100))
+        && (data.isApproved == null || data.isApproved is bool)
+        && (data.emailVerified == null || data.emailVerified is bool)
+        && (data.isAdmin == null || data.isAdmin is bool)
+        && (data.lectureCount == null || data.lectureCount is int)
+        && (data.averageRating == null || data.averageRating is int || data.averageRating is float)
+        && data.profileCard is map
+        && data.badges is list;
+    }
+
+    // ==========================================
+    // 2. Lectures Collection rules
+    // ==========================================
+    match /lectures/{lectureId} {
+      allow read: if true;
+      
+      allow create: if isValidId(lectureId)
+        && lectureId == request.resource.data.id
+        && isValidLecture(request.resource.data);
+        
+      allow update: if isValidId(lectureId)
+        && lectureId == request.resource.data.id
+        && isValidLecture(request.resource.data);
+        
+      allow delete: if true; // Allowed for resets
+    }
+
+    function isValidLecture(data) {
+      return data.id is string && data.id.size() <= 100
+        && data.title is string && data.title.size() <= 200
+        && data.description is string && data.description.size() <= 5000
+        && data.targetTier is string && data.targetTier.size() <= 50
+        && data.budget is int
+        && data.mileageRoyalty is int
+        && data.status is string && (data.status == 'open' || data.status == 'assigned' || data.status == 'completed')
+        && (data.location == null || (data.location is string && data.location.size() <= 300))
+        && data.applicants is list;
+    }
+
+    // ==========================================
+    // 3. Programs Collection rules
+    // ==========================================
+    match /programs/{programId} {
+      allow read: if true;
+      
+      allow create: if isValidId(programId)
+        && programId == request.resource.data.id
+        && isValidProgram(request.resource.data);
+        
+      allow update: if isValidId(programId)
+        && programId == request.resource.data.id
+        && isValidProgram(request.resource.data);
+        
+      allow delete: if true;
+    }
+
+    function isValidProgram(data) {
+      return data.id is string && data.id.size() <= 100
+        && data.title is string && data.title.size() <= 200
+        && data.description is string && data.description.size() <= 5000
+        && data.authorId is string && data.authorId.size() <= 100
+        && data.authorName is string && data.authorName.size() <= 100
+        && data.royaltyRate is int
+        && (data.isApproved == null || data.isApproved is bool)
+        && data.curriculum is list;
+    }
+
+    // ==========================================
+    // 4. Transactions Collection rules
+    // ==========================================
+    match /transactions/{transactionId} {
+      allow read: if true;
+      
+      allow create: if isValidId(transactionId)
+        && transactionId == request.resource.data.id
+        && isValidTransaction(request.resource.data);
+        
+      allow update: if isValidId(transactionId)
+        && transactionId == request.resource.data.id
+        && isValidTransaction(request.resource.data);
+        
+      allow delete: if true;
+    }
+
+    function isValidTransaction(data) {
+      return data.id is string && data.id.size() <= 100
+        && data.userId is string && data.userId.size() <= 100
+        && data.userName is string && data.userName.size() <= 100
+        && data.amount is int
+        && data.type is string && data.type.size() <= 50
+        && data.description is string && data.description.size() <= 1000;
+    }
+
+    // ==========================================
+    // 5. Proposals Collection rules
+    // ==========================================
+    match /proposals/{proposalId} {
+      allow read: if true;
+      
+      allow create: if isValidId(proposalId)
+        && proposalId == request.resource.data.id
+        && isValidProposal(request.resource.data);
+        
+      allow update: if isValidId(proposalId)
+        && proposalId == request.resource.data.id
+        && isValidProposal(request.resource.data);
+        
+      allow delete: if true;
+    }
+
+    function isValidProposal(data) {
+      return data.id is string && data.id.size() <= 100
+        && data.companyName is string && data.companyName.size() <= 200
+        && data.proposerName is string && data.proposerName.size() <= 100
+        && data.email is string && data.email.size() <= 150
+        && data.phone is string && data.phone.size() <= 50
+        && data.title is string && data.title.size() <= 300
+        && data.content is string && data.content.size() <= 10000
+        && data.status is string && (data.status == 'pending' || data.status == 'reviewed' || data.status == 'accepted' || data.status == 'declined');
     }
   }
 }

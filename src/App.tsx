@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { UserProfile, LectureRequest, EducationalProgram, MileageTransaction, InstructorTier, DigitalBadge, PartnershipProposal } from './types';
 import { StorageService, generateBadgeForTier } from './lib/firebase';
+import { sanitizeString, sanitizePhone, checkRateLimit } from './utils/security';
 import Header from './components/Header';
 import InstructorCard from './components/InstructorCard';
 import LectureBoard from './components/LectureBoard';
@@ -158,9 +159,18 @@ export default function App() {
 
   // 3. Post a new lecture request (Admin Only)
   const handleAddLecture = async (lectureData: any) => {
+    const sanitizedData = {
+      ...lectureData,
+      title: sanitizeString(lectureData.title),
+      description: sanitizeString(lectureData.description),
+      location: sanitizeString(lectureData.location),
+      duration: sanitizeString(lectureData.duration),
+      time: sanitizeString(lectureData.time),
+      date: sanitizeString(lectureData.date)
+    };
     const newId = `lect_00${lectures.length + 1}_${Date.now().toString().slice(-4)}`;
     const newLecture: LectureRequest = {
-      ...lectureData,
+      ...sanitizedData,
       id: newId,
       status: 'open',
       applicants: [],
@@ -178,9 +188,19 @@ export default function App() {
   const handleRegisterProgram = async (programData: any) => {
     if (!currentUser) return;
 
+    const sanitizedData = {
+      ...programData,
+      title: sanitizeString(programData.title),
+      description: sanitizeString(programData.description),
+      targetAudience: sanitizeString(programData.targetAudience),
+      curriculum: Array.isArray(programData.curriculum) 
+        ? programData.curriculum.map((item: string) => sanitizeString(item)) 
+        : []
+    };
+
     const newId = `prog_00${programs.length + 1}_${Date.now().toString().slice(-4)}`;
     const newProgram: EducationalProgram = {
-      ...programData,
+      ...sanitizedData,
       id: newId,
       authorId: currentUser.uid,
       authorName: currentUser.name,
@@ -402,9 +422,23 @@ export default function App() {
 
   // 8.1. Register Partnership Proposal
   const handleRegisterProposal = async (proposalData: any) => {
+    if (!checkRateLimit('proposal_submit', 3000)) {
+      triggerToast('제휴 제안이 너무 빈번하게 시도되었습니다. 잠시 후 다시 전송해 주세요.', 'info');
+      return;
+    }
+
+    const sanitizedData = {
+      companyName: sanitizeString(proposalData.companyName),
+      proposerName: sanitizeString(proposalData.proposerName),
+      email: sanitizeString(proposalData.email),
+      phone: sanitizePhone(proposalData.phone),
+      title: sanitizeString(proposalData.title),
+      content: sanitizeString(proposalData.content)
+    };
+
     const newId = `prop_${Date.now()}`;
     const newProposal: PartnershipProposal = {
-      ...proposalData,
+      ...sanitizedData,
       id: newId,
       status: 'pending',
       createdAt: new Date().toISOString()
@@ -512,9 +546,29 @@ export default function App() {
   // 9. Instructor card save handler
   const handleSaveProfileCard = async (cardInfo: any) => {
     if (!currentUser) return;
+
+    const sanitizedCard = {
+      ...cardInfo,
+      title: sanitizeString(cardInfo.title),
+      bio: sanitizeString(cardInfo.bio),
+      contactEmail: sanitizeString(cardInfo.contactEmail),
+      contactPhone: sanitizePhone(cardInfo.contactPhone),
+      imageUrl: cardInfo.imageUrl ? sanitizeString(cardInfo.imageUrl) : undefined,
+      pdfUrl: cardInfo.pdfUrl ? sanitizeString(cardInfo.pdfUrl) : undefined,
+      specialties: Array.isArray(cardInfo.specialties) 
+        ? cardInfo.specialties.map((s: string) => sanitizeString(s)) 
+        : [],
+      career: Array.isArray(cardInfo.career) 
+        ? cardInfo.career.map((c: string) => sanitizeString(c)) 
+        : [],
+      education: Array.isArray(cardInfo.education) 
+        ? cardInfo.education.map((e: string) => sanitizeString(e)) 
+        : []
+    };
+
     const updatedUser: UserProfile = {
       ...currentUser,
-      profileCard: cardInfo,
+      profileCard: sanitizedCard,
       updatedAt: new Date().toISOString()
     };
     await handleUpdateCurrentUser(updatedUser);
@@ -523,27 +577,39 @@ export default function App() {
 
   // 10. Register / Sign Up New Instructor Profile
   const handleRegisterUser = async (name: string, email: string, tier: InstructorTier, title: string, phone: string, loginId?: string, password?: string) => {
+    if (!checkRateLimit('user_register', 3000)) {
+      triggerToast('가입 요청이 너무 빈번합니다. 잠시 후 다시 시도해 주세요.', 'info');
+      return;
+    }
+
+    const sName = sanitizeString(name);
+    const sEmail = sanitizeString(email);
+    const sTitle = sanitizeString(title);
+    const sPhone = sanitizePhone(phone);
+    const sLoginId = loginId ? sanitizeString(loginId) : undefined;
+    const sPassword = password ? sanitizeString(password) : undefined;
+
     const newUid = `user_${Date.now()}`;
     const initialBadge = generateBadgeForTier(tier);
     
     const newUser: UserProfile = {
       uid: newUid,
-      email: email,
-      name: name,
+      email: sEmail,
+      name: sName,
       tier: tier,
       mileage: 0, // Welcome signup bonus removed as requested
       isApproved: false, // Default to false; must be approved by Administration (운영사무국)
       emailVerified: true, // Verification completed before registering
-      loginId: loginId,
-      password: password,
+      loginId: sLoginId,
+      password: sPassword,
       profileCard: {
-        title: title || 'KPCIA 공인 전문 강사',
-        bio: `안녕하세요, KPCIA 정식 인증 강사 ${name}입니다. 신규 교육 기획 및 맞춤형 대기업 특강을 진행합니다.`,
-        specialties: [title || '전문 강의 기획', '직무 역량 교육'],
+        title: sTitle || 'KPCIA 공인 전문 강사',
+        bio: `안녕하세요, KPCIA 정식 인증 강사 ${sName}입니다. 신규 교육 기획 및 맞춤형 대기업 특강을 진행합니다.`,
+        specialties: [sTitle || '전문 강의 기획', '직무 역량 교육'],
         career: [`KPCIA 정식 강사 등록 (2026년 7월)`],
         education: [`대학 졸업 및 실무 교육 이수 완료`],
-        contactEmail: email,
-        contactPhone: phone || '010-0000-0000',
+        contactEmail: sEmail,
+        contactPhone: sPhone || '010-0000-0000',
         cardTheme: 'classic'
       },
       badges: [initialBadge],
