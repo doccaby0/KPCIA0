@@ -49,7 +49,7 @@ KPCIA 한국프레스티지강사협회 - 출강 공고 상세 정보
 ■ 출강 시간       : ${lecture.time} (${lecture.duration})
 ■ 수강 대상       : ${lecture.attendees ? `${lecture.attendees}명` : '상세 정보 참조'}
 ■ 출강 장소       : ${lecture.location}
-■ 출강 강사료     : ${isPriceVisible ? `${lecture.budget.toLocaleString()} KRW` : '[로그인 및 자격 획득 후 공개]'}
+■ 출강 강사료     : ${isPriceVisible ? `${lecture.budget.toLocaleString()} KRW` : '[등급 달성시 공개]'}
 ■ 마일리지 로열티 : ${lecture.mileageRoyalty.toLocaleString()} M
 ■ 연계 교육 프로그램 : ${lecture.programTitle || '없음'}
 ■ 공고 상태       : ${lecture.status === 'open' ? '모집중 (지원 가능)' : lecture.status === 'assigned' ? '배정 완료' : '종료'}
@@ -226,7 +226,7 @@ ${lecture.description}
                 <div>
                   <div className="text-[10px] text-neutral-500 uppercase font-mono">출강 강사료</div>
                   {!currentUser || currentUser.uid === 'guest' ? (
-                    <div className="relative group/price mt-1" title="로그인 후 확인 가능합니다.">
+                    <div className="relative group/price mt-1" title="등급 달성시 확인 가능합니다.">
                       <div className="text-sm font-bold text-neutral-450/40 flex items-center gap-1 font-mono select-none pointer-events-none filter blur-[4.5px]">
                         <Banknote className="w-4 h-4 text-neutral-600 shrink-0" />
                         {lecture.budget.toLocaleString()} KRW

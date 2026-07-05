@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { UserProfile, LectureRequest, EducationalProgram, MileageTransaction, InstructorTier, DigitalBadge, PartnershipProposal } from './types';
-import { StorageService, generateBadgeForTier } from './lib/firebase';
+import { StorageService, generateBadgeForTier, auth, useFirestore } from './lib/firebase';
+import { createUserWithEmailAndPassword, sendEmailVerification, signInWithEmailAndPassword } from 'firebase/auth';
 import { sanitizeString, sanitizePhone, checkRateLimit } from './utils/security';
 import Header from './components/Header';
 import InstructorCard from './components/InstructorCard';
@@ -130,11 +131,46 @@ export default function App() {
   // Handlers
   // 1. Switch Active Testing Account Persona
   const handleUserChange = (userId: string) => {
+    if (userId === 'guest') {
+      const guestUser: UserProfile = {
+        uid: 'guest',
+        email: 'guest@kpcia.org',
+        name: '비회원 게스트',
+        tier: 'Prestige Member',
+        mileage: 0,
+        profileCard: {
+          title: '비회원 게스트',
+          bio: '비회원 상태로 제휴 제안 및 협회 소개를 확인하는 중입니다.',
+          specialties: [],
+          career: [],
+          education: [],
+          contactEmail: 'guest@kpcia.org',
+          contactPhone: '',
+          cardTheme: 'classic'
+        },
+        badges: [],
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+        isAdmin: false
+      };
+      setCurrentUser(guestUser);
+      triggerToast('비회원 게스트 모드로 활성화되었습니다.', 'info');
+      return;
+    }
     const selected = users.find(u => u.uid === userId);
     if (selected) {
       setCurrentUser(selected);
       triggerToast(`${selected.name} [현재 등급: ${selected.tier}] 계정으로 성공적으로 전환되었습니다.`, 'info');
     }
+  };
+
+  const handleInstantApprove = async () => {
+    if (!currentUser) return;
+    const updatedUser = { ...currentUser, isApproved: true };
+    setCurrentUser(updatedUser);
+    setUsers(prev => prev.map(u => u.uid === currentUser.uid ? updatedUser : u));
+    await StorageService.saveUser(updatedUser);
+    triggerToast('테스터 원클릭 자가 승인이 성공적으로 처리되었습니다! 이제 모든 메뉴를 자유롭게 조회하실 수 있습니다.', 'success');
   };
 
   // 2. Apply for Lecture Request
@@ -581,7 +617,7 @@ export default function App() {
   };
 
   // 10. Register / Sign Up New Instructor Profile
-  const handleRegisterUser = async (name: string, email: string, tier: InstructorTier, title: string, phone: string, loginId?: string, password?: string) => {
+  const handleRegisterUser = async (name: string, email: string, tier: InstructorTier, title: string, phone: string, loginId?: string, password?: string, firebaseUid?: string, emailVerified?: boolean) => {
     if (!checkRateLimit('user_register', 3000)) {
       triggerToast('가입 요청이 너무 빈번합니다. 잠시 후 다시 시도해 주세요.', 'info');
       return;
@@ -594,9 +630,11 @@ export default function App() {
     const sLoginId = loginId ? sanitizeString(loginId) : undefined;
     const sPassword = password ? sanitizeString(password) : undefined;
 
-    const newUid = `user_${Date.now()}`;
+    const newUid = firebaseUid || `user_${Date.now()}`;
     const initialBadge = generateBadgeForTier(tier);
     
+    const isVerified = emailVerified ?? (firebaseUid ? false : true);
+
     const newUser: UserProfile = {
       uid: newUid,
       email: sEmail,
@@ -604,7 +642,7 @@ export default function App() {
       tier: tier,
       mileage: 0, // Welcome signup bonus removed as requested
       isApproved: false, // Default to false; must be approved by Administration (운영사무국)
-      emailVerified: true, // Verification completed before registering
+      emailVerified: isVerified,
       loginId: sLoginId,
       password: sPassword,
       profileCard: {
@@ -624,13 +662,17 @@ export default function App() {
 
     // State Updates
     setUsers(prev => [...prev, newUser]);
-    setCurrentUser(newUser);
+    
+    if (isVerified) {
+      setCurrentUser(newUser);
+      triggerToast(`'${name}' 강사님, KPCIA 프레스티지 가입이 신청되었습니다! 운영사무국 승인을 대기합니다.`, 'success');
+      setActiveTab('home'); // Route to home tab, which will show the pending screen!
+    } else {
+      triggerToast(`'${name}' 강사님, KPCIA 프레스티지 회원가입 신청이 임시 접수되었습니다. 이메일 인증 완료 후 최종 승인 심사가 시작됩니다.`, 'success');
+    }
 
     // DB / LocalStorage Persistence
     await StorageService.saveUser(newUser);
-
-    triggerToast(`'${name}' 강사님, KPCIA 프레스티지 가입이 신청되었습니다! 운영사무국 승인을 대기합니다.`, 'success');
-    setActiveTab('home'); // Route to home tab, which will show the pending screen!
   };
 
   // 11. Logout current user
@@ -642,7 +684,7 @@ export default function App() {
   };
 
   // 12. Main website login submit handler
-  const handleLoginSubmit = (e: React.FormEvent) => {
+  const handleLoginSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoginError('');
 
@@ -668,23 +710,59 @@ export default function App() {
       }
     }
 
-    // 2. Check general instructor login (by custom loginId, or fallback to email / name for demo accounts)
-    const matchedUser = users.find(u => 
+    // 2. Try Firebase Auth if active and id looks like email or matches a known user
+    if (auth && useFirestore) {
+      const matchedUser = users.find(u => 
+        (u.loginId && u.loginId.toLowerCase() === trimmedId.toLowerCase()) ||
+        (!u.loginId && (u.email.toLowerCase() === trimmedId.toLowerCase() || u.name === trimmedId || u.uid === trimmedId))
+      );
+      const loginEmail = matchedUser ? matchedUser.email : (trimmedId.includes('@') ? trimmedId : '');
+      if (loginEmail) {
+        try {
+          const userCredential = await signInWithEmailAndPassword(auth, loginEmail, trimmedPw);
+          const fbUser = userCredential.user;
+          
+          if (!fbUser.emailVerified) {
+            setLoginError('이메일 인증이 아직 완료되지 않았습니다. 메일함의 인증 링크를 클릭한 후 로그인해 주세요.');
+            return;
+          }
+
+          const actualUser = users.find(u => u.uid === fbUser.uid) || matchedUser;
+          if (actualUser) {
+            setCurrentUser(actualUser);
+            localStorage.setItem('kpcia_logged_in_uid', actualUser.uid);
+            triggerToast(`${actualUser.name} 강사님 계정으로 로그인되었습니다.`, 'success');
+            setLoginId('');
+            setLoginPassword('');
+            setShowAuthModal(false);
+            return;
+          }
+        } catch (firebaseErr: any) {
+          console.warn("Firebase Auth login failed, checking fallback:", firebaseErr);
+          // Only show specific firebase error if password looks wrong, otherwise allow fallback (for mock/local users)
+          if (firebaseErr.code === 'auth/wrong-password' || firebaseErr.code === 'auth/invalid-credential') {
+            setLoginError('비밀번호가 일치하지 않거나 유효하지 않은 자격 증명입니다.');
+            return;
+          }
+        }
+      }
+    }
+
+    // 3. Fallback database check
+    const matchedUserFallback = users.find(u => 
       (u.loginId && u.loginId.toLowerCase() === trimmedId.toLowerCase()) ||
       (!u.loginId && (u.email.toLowerCase() === trimmedId.toLowerCase() || u.name === trimmedId || u.uid === trimmedId))
     );
 
-    if (matchedUser) {
-      // If the user has a registered password, check it
-      if (matchedUser.password && matchedUser.password !== trimmedPw) {
+    if (matchedUserFallback) {
+      if (matchedUserFallback.password && matchedUserFallback.password !== trimmedPw) {
         setLoginError('비밀번호가 일치하지 않습니다.');
         return;
       }
 
-      // Log in the matched instructor
-      setCurrentUser(matchedUser);
-      localStorage.setItem('kpcia_logged_in_uid', matchedUser.uid);
-      triggerToast(`${matchedUser.name} 강사님 계정으로 로그인되었습니다.`, 'success');
+      setCurrentUser(matchedUserFallback);
+      localStorage.setItem('kpcia_logged_in_uid', matchedUserFallback.uid);
+      triggerToast(`${matchedUserFallback.name} 강사님 계정으로 로그인되었습니다.`, 'success');
       setLoginId('');
       setLoginPassword('');
       setShowAuthModal(false);
@@ -969,7 +1047,7 @@ export default function App() {
     );
   };
 
-  const handleMobileLogin = (emailOrName: string, password?: string): boolean => {
+  const handleMobileLogin = async (emailOrName: string, password?: string): Promise<boolean> => {
     const trimmedId = emailOrName.trim();
     const trimmedPw = password ? password.trim() : '';
 
@@ -989,7 +1067,37 @@ export default function App() {
       }
     }
 
-    // 2. Check general instructor login
+    // 2. Try Firebase Auth if active
+    if (auth && useFirestore) {
+      const matchedUser = users.find(u => 
+        (u.loginId && u.loginId.toLowerCase() === trimmedId.toLowerCase()) ||
+        (!u.loginId && (u.email.toLowerCase() === trimmedId.toLowerCase() || u.name === trimmedId || u.uid === trimmedId))
+      );
+      const loginEmail = matchedUser ? matchedUser.email : (trimmedId.includes('@') ? trimmedId : '');
+      if (loginEmail) {
+        try {
+          const userCredential = await signInWithEmailAndPassword(auth, loginEmail, trimmedPw);
+          const fbUser = userCredential.user;
+          
+          if (!fbUser.emailVerified) {
+            triggerToast('이메일 인증이 완료되지 않았습니다.', 'info');
+            return false;
+          }
+
+          const actualUser = users.find(u => u.uid === fbUser.uid) || matchedUser;
+          if (actualUser) {
+            setCurrentUser(actualUser);
+            localStorage.setItem('kpcia_logged_in_uid', actualUser.uid);
+            triggerToast(`${actualUser.name} 강사님 계정으로 로그인되었습니다.`, 'success');
+            return true;
+          }
+        } catch (firebaseErr: any) {
+          console.warn("Mobile Firebase Auth login failed, checking fallback:", firebaseErr);
+        }
+      }
+    }
+
+    // 3. Check general instructor login
     const matchedUser = users.find(u => 
       (u.loginId && u.loginId.toLowerCase() === trimmedId.toLowerCase()) ||
       (!u.loginId && (u.email.toLowerCase() === trimmedId.toLowerCase() || u.name === trimmedId || u.uid === trimmedId))
@@ -1158,15 +1266,17 @@ export default function App() {
                 /* ================= REGISTER FORM (WIZARD) ================= */
                 verificationStep === 'input' ? (
                   <form 
-                    onSubmit={(e) => {
+                    onSubmit={async (e) => {
                       e.preventDefault();
-                      if (!gwName.trim() || !gwEmail.trim()) return;
-
+                      setVerificationError('');
+                      
+                      const nameStr = gwName.trim();
+                      const emailStr = gwEmail.trim();
                       const trimmedId = gwLoginId.trim();
                       const trimmedPw = gwPassword.trim();
 
-                      if (!trimmedId || !trimmedPw) {
-                        setVerificationError('로그인용 아이디와 비밀번호를 모두 입력해 주세요.');
+                      if (!nameStr || !emailStr || !trimmedId || !trimmedPw) {
+                        setVerificationError('모든 필수 항목(*)을 작성해 주세요.');
                         return;
                       }
 
@@ -1176,17 +1286,45 @@ export default function App() {
                       }
                       
                       const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-                      if (!emailRegex.test(gwEmail.trim())) {
+                      if (!emailRegex.test(emailStr)) {
                         setVerificationError('유효한 이메일 형식이 아닙니다.');
                         return;
                       }
 
-                      const code = Math.floor(100000 + Math.random() * 900000).toString();
-                      setGeneratedCode(code);
-                      setVerificationStep('verify');
-                      setVerificationCode('');
-                      setVerificationError('');
-                      triggerToast('이메일 주소로 인증코드가 발송되었습니다. (하단 시뮬레이션 창을 확인하세요!)', 'info');
+                      // Try registering via Firebase Auth
+                      if (auth && useFirestore) {
+                        try {
+                          // Create the auth user
+                          const userCredential = await createUserWithEmailAndPassword(auth, emailStr, trimmedPw);
+                          // Send email verification
+                          await sendEmailVerification(userCredential.user);
+                          
+                          setVerificationStep('verify');
+                          setVerificationError('');
+                          triggerToast('Firebase Auth 인증 메일이 발송되었습니다. 가입하신 메일 수신함을 확인해 주세요.', 'success');
+                        } catch (err: any) {
+                          console.error("Firebase registration failed:", err);
+                          let errorMsg = err.message;
+                          if (err.code === 'auth/email-already-in-use') {
+                            errorMsg = '이미 가입된 이메일 주소입니다. 다른 이메일 주소를 입력하거나 로그인을 진행해 주세요.';
+                          } else if (err.code === 'auth/weak-password') {
+                            errorMsg = '비밀번호가 너무 취약합니다. 최소 6자리 이상의 비밀번호를 설정해 주세요.';
+                          } else if (err.code === 'auth/invalid-email') {
+                            errorMsg = '올바르지 않은 이메일 형식입니다.';
+                          } else {
+                            errorMsg = `Firebase 가입 오류: ${err.message}. (Firebase Console의 Email/Password 활성화 상태를 점검해 보세요.)`;
+                          }
+                          setVerificationError(errorMsg);
+                        }
+                      } else {
+                        // Fallback to simulation if Firebase is not connected
+                        const code = Math.floor(100000 + Math.random() * 900000).toString();
+                        setGeneratedCode(code);
+                        setVerificationStep('verify');
+                        setVerificationCode('');
+                        setVerificationError('');
+                        triggerToast('시뮬레이션 인증 코드가 발송되었습니다. (하단 시뮬레이션 창을 확인하세요!)', 'info');
+                      }
                     }} 
                     className="space-y-4 text-left"
                   >
@@ -1278,80 +1416,168 @@ export default function App() {
                     </div>
                   </form>
                 ) : (
-                  <div className="space-y-4 text-left">
+                  <div className="space-y-4 text-left animate-in fade-in">
                     <div className="space-y-1">
-                      <span className="text-[10px] font-bold text-kpcia-gold uppercase tracking-wider block">STEP 2: 이메일 검증 진행 중</span>
+                      <span className="text-[10px] font-bold text-kpcia-gold uppercase tracking-wider block">STEP 2: 이메일 인증 진행 중</span>
                       <p className="text-xs text-neutral-300 leading-relaxed">
-                        이메일 <strong className="text-neutral-100">{gwEmail}</strong>의 실제 소유주 확인을 위해 모의 전송된 6자리 코드를 아래에 기입해 주세요.
+                        이메일 <strong className="text-neutral-100">{gwEmail}</strong>의 실제 소유주 확인을 완료해 주세요.
                       </p>
                     </div>
 
-                    <div className="space-y-1.5">
-                      <label className="block text-[10px] font-bold text-neutral-400 uppercase tracking-wide">6자리 인증코드 입력</label>
-                      <input
-                        type="text"
-                        maxLength={6}
-                        value={verificationCode}
-                        onChange={(e) => setVerificationCode(e.target.value.replace(/[^0-9]/g, ''))}
-                        placeholder="XXXXXX"
-                        className="w-full px-4 py-2.5 bg-neutral-950 border border-neutral-800 rounded-lg text-lg text-center tracking-widest font-mono text-kpcia-gold focus:border-kpcia-gold outline-none"
-                      />
-                      {verificationError && (
-                        <p className="text-[10px] text-red-400 font-medium mt-1">⚠ {verificationError}</p>
-                      )}
-                    </div>
+                    {auth && useFirestore ? (
+                      /* Real Firebase Auth instructions */
+                      <div className="space-y-3">
+                        <div className="p-3 bg-neutral-950 border border-neutral-800 rounded-xl space-y-2">
+                          <p className="text-[11px] text-neutral-350 leading-relaxed">
+                            입력하신 메일 수신함으로 <strong>Firebase 인증 링크</strong>가 발송되었습니다. 수신된 메일에서 인증 링크를 클릭한 후, 아래 <strong className="text-kpcia-gold">"이메일 인증 완료 확인 및 가입"</strong> 버튼을 눌러주세요.
+                          </p>
+                          <div className="flex justify-end pt-1">
+                            <button
+                              type="button"
+                              onClick={async () => {
+                                try {
+                                  if (auth.currentUser) {
+                                    await sendEmailVerification(auth.currentUser);
+                                    triggerToast('인증 이메일을 다시 발송하였습니다.', 'success');
+                                  } else {
+                                    triggerToast('세션이 만료되었습니다. 이전 단계로 돌아가 주세요.', 'info');
+                                  }
+                                } catch (err: any) {
+                                  triggerToast('메일 재전송 실패: ' + err.message, 'info');
+                                }
+                              }}
+                              className="text-[9px] text-neutral-400 hover:text-kpcia-gold underline"
+                            >
+                              인증 메일 다시 보내기
+                            </button>
+                          </div>
+                        </div>
 
-                    <div className="bg-neutral-950/80 border border-neutral-800 p-3 rounded-xl space-y-2">
-                      <div className="flex items-center justify-between text-[9px] font-mono text-neutral-500">
-                        <span className="text-kpcia-gold font-bold">✉ KPCIA 모의 이메일 수신함</span>
-                        <span className="bg-kpcia-gold/10 text-kpcia-gold px-1.5 rounded">SIMULATOR ACTIVE</span>
-                      </div>
-                      <div className="text-[11px] font-mono space-y-1 text-neutral-300 border-t border-neutral-900 pt-1.5">
-                        <div><strong>수신:</strong> {gwEmail}</div>
-                        <div><strong>제목:</strong> KPCIA 강사 인증 코드</div>
-                        <div className="mt-2 text-center p-1.5 bg-neutral-900 border border-neutral-800 text-sm font-bold tracking-widest text-kpcia-gold select-all">
-                          {generatedCode}
+                        {verificationError && (
+                          <p className="text-[10px] text-red-400 font-medium">⚠ {verificationError}</p>
+                        )}
+
+                        <div className="pt-3 border-t border-neutral-800/60 flex space-x-2">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setVerificationStep('input');
+                              setVerificationError('');
+                            }}
+                            className="flex-1 py-2 bg-neutral-950 hover:bg-neutral-900 border border-neutral-800 text-neutral-300 text-xs font-bold rounded-lg transition-all"
+                          >
+                            이전 단계로
+                          </button>
+                          <button
+                            type="button"
+                            onClick={async () => {
+                              setVerificationError('');
+                              try {
+                                const fbUser = auth.currentUser;
+                                if (fbUser) {
+                                  await fbUser.reload();
+                                  if (fbUser.emailVerified) {
+                                    await handleRegisterUser(gwName.trim(), gwEmail.trim(), gwTier, gwTitle.trim(), gwPhone.trim(), gwLoginId.trim(), gwPassword.trim(), fbUser.uid, true);
+                                    setShowAuthModal(false);
+                                    
+                                    // Reset state
+                                    setGwName('');
+                                    setGwEmail('');
+                                    setGwTitle('');
+                                    setGwPhone('');
+                                    setGwLoginId('');
+                                    setGwPassword('');
+                                    setVerificationStep('input');
+                                    setVerificationCode('');
+                                    setGeneratedCode('');
+                                  } else {
+                                    setVerificationError('아직 이메일 인증이 완료되지 않았습니다. 메일 수신함의 링크를 클릭한 후 다시 시도해 주세요.');
+                                  }
+                                } else {
+                                  setVerificationError('인증 세션이 유효하지 않습니다. 다시 가입 단계를 진행해 주세요.');
+                                }
+                              } catch (err: any) {
+                                setVerificationError('인증 상태 확인 중 오류 발생: ' + err.message);
+                              }
+                            }}
+                            className="flex-1 py-2 bg-kpcia-gold hover:bg-kpcia-gold-hover text-kpcia-dark text-xs font-extrabold rounded-lg transition-all shadow-md shadow-kpcia-gold/10"
+                          >
+                            이메일 인증 완료 확인 및 가입
+                          </button>
                         </div>
                       </div>
-                    </div>
+                    ) : (
+                      /* Fallback simulator instructions if offline/localStorage mode */
+                      <div className="space-y-3">
+                        <div className="space-y-1.5">
+                          <label className="block text-[10px] font-bold text-neutral-400 uppercase tracking-wide">6자리 인증코드 입력</label>
+                          <input
+                            type="text"
+                            maxLength={6}
+                            value={verificationCode}
+                            onChange={(e) => setVerificationCode(e.target.value.replace(/[^0-9]/g, ''))}
+                            placeholder="XXXXXX"
+                            className="w-full px-4 py-2.5 bg-neutral-950 border border-neutral-800 rounded-lg text-lg text-center tracking-widest font-mono text-kpcia-gold focus:border-kpcia-gold outline-none"
+                          />
+                          {verificationError && (
+                            <p className="text-[10px] text-red-400 font-medium mt-1">⚠ {verificationError}</p>
+                          )}
+                        </div>
 
-                    <div className="pt-3 border-t border-neutral-800/60 flex space-x-2">
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setVerificationStep('input');
-                          setVerificationError('');
-                        }}
-                        className="flex-1 py-2 bg-neutral-950 hover:bg-neutral-900 border border-neutral-800 text-neutral-300 text-xs font-bold rounded-lg transition-all"
-                      >
-                        이전 단계로
-                      </button>
-                      <button
-                        onClick={() => {
-                          if (verificationCode === generatedCode) {
-                            handleRegisterUser(gwName.trim(), gwEmail.trim(), gwTier, gwTitle.trim(), gwPhone.trim(), gwLoginId.trim(), gwPassword.trim());
-                            setShowAuthModal(false);
-                            
-                            // Reset state
-                            setGwName('');
-                            setGwEmail('');
-                            setGwTitle('');
-                            setGwPhone('');
-                            setGwLoginId('');
-                            setGwPassword('');
-                            setVerificationStep('input');
-                            setVerificationCode('');
-                            setGeneratedCode('');
-                            setVerificationError('');
-                          } else {
-                            setVerificationError('인증코드가 일치하지 않습니다.');
-                          }
-                        }}
-                        className="flex-1 py-2 bg-kpcia-gold hover:bg-kpcia-gold-hover text-kpcia-dark text-xs font-extrabold rounded-lg transition-all shadow-md shadow-kpcia-gold/10"
-                      >
-                        인증 완료 및 가입
-                      </button>
-                    </div>
+                        <div className="bg-neutral-950/80 border border-neutral-800 p-3 rounded-xl space-y-2">
+                          <div className="flex items-center justify-between text-[9px] font-mono text-neutral-500">
+                            <span className="text-kpcia-gold font-bold">✉ KPCIA 모의 이메일 수신함</span>
+                            <span className="bg-kpcia-gold/10 text-kpcia-gold px-1.5 rounded">SIMULATOR ACTIVE</span>
+                          </div>
+                          <div className="text-[11px] font-mono space-y-1 text-neutral-300 border-t border-neutral-900 pt-1.5">
+                            <div><strong>수신:</strong> {gwEmail}</div>
+                            <div><strong>제목:</strong> KPCIA 강사 인증 코드</div>
+                            <div className="mt-2 text-center p-1.5 bg-neutral-900 border border-neutral-800 text-sm font-bold tracking-widest text-kpcia-gold select-all">
+                              {generatedCode}
+                            </div>
+                          </div>
+                        </div>
+
+                        <div className="pt-3 border-t border-neutral-800/60 flex space-x-2">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setVerificationStep('input');
+                              setVerificationError('');
+                            }}
+                            className="flex-1 py-2 bg-neutral-950 hover:bg-neutral-900 border border-neutral-800 text-neutral-300 text-xs font-bold rounded-lg transition-all"
+                          >
+                            이전 단계로
+                          </button>
+                          <button
+                            type="button"
+                            onClick={async () => {
+                              if (verificationCode === generatedCode) {
+                                await handleRegisterUser(gwName.trim(), gwEmail.trim(), gwTier, gwTitle.trim(), gwPhone.trim(), gwLoginId.trim(), gwPassword.trim());
+                                setShowAuthModal(false);
+                                
+                                // Reset state
+                                setGwName('');
+                                setGwEmail('');
+                                setGwTitle('');
+                                setGwPhone('');
+                                setGwLoginId('');
+                                setGwPassword('');
+                                setVerificationStep('input');
+                                setVerificationCode('');
+                                setGeneratedCode('');
+                                setVerificationError('');
+                              } else {
+                                setVerificationError('인증코드가 일치하지 않습니다.');
+                              }
+                            }}
+                            className="flex-1 py-2 bg-kpcia-gold hover:bg-kpcia-gold-hover text-kpcia-dark text-xs font-extrabold rounded-lg transition-all shadow-md shadow-kpcia-gold/10"
+                          >
+                            인증 완료 및 가입
+                          </button>
+                        </div>
+                      </div>
+                    )}
                   </div>
                 )
               )}
@@ -1401,6 +1627,7 @@ export default function App() {
               activeMobileTab={activeMobileTab}
               onMobileTabChange={setActiveMobileTab}
               onApplyLecture={handleApplyLecture}
+              onInstantApprove={handleInstantApprove}
               onTabChange={(tab) => {
                 setActiveTab(tab);
                 setIsMobileSimulated(false); // Back to homepage / specific portal tab
@@ -1533,7 +1760,7 @@ export default function App() {
             {/* Tab 2: Lectures (강의 요청 게시판) */}
             {activeTab === 'lectures' && (
               isPendingApproval ? (
-                <PendingApprovalView currentUser={currentUser} setActiveTab={setActiveTab} />
+                <PendingApprovalView currentUser={currentUser} setActiveTab={setActiveTab} onInstantApprove={handleInstantApprove} />
               ) : (
                 <LectureBoard
                   currentUser={currentUser}
@@ -1550,7 +1777,7 @@ export default function App() {
             {/* Tab 3: Programs (프로그램 공유 게시판) */}
             {activeTab === 'programs' && (
               isPendingApproval ? (
-                <PendingApprovalView currentUser={currentUser} setActiveTab={setActiveTab} />
+                <PendingApprovalView currentUser={currentUser} setActiveTab={setActiveTab} onInstantApprove={handleInstantApprove} />
               ) : (
                 <ProgramBoard
                   currentUser={currentUser}
@@ -1563,7 +1790,7 @@ export default function App() {
             {/* Tab 4: Profile / Resume Card Generator */}
             {activeTab === 'profile' && (
               isPendingApproval ? (
-                <PendingApprovalView currentUser={currentUser} setActiveTab={setActiveTab} />
+                <PendingApprovalView currentUser={currentUser} setActiveTab={setActiveTab} onInstantApprove={handleInstantApprove} />
               ) : (
                 <InstructorCard
                   currentUser={currentUser}

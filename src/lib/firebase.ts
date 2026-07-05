@@ -12,24 +12,29 @@ import {
   onSnapshot,
   deleteDoc
 } from 'firebase/firestore';
+import { getAuth } from 'firebase/auth';
 import { UserProfile, LectureRequest, EducationalProgram, MileageTransaction, InstructorTier, DigitalBadge, PartnershipProposal } from '../types';
 import firebaseConfig from '../../firebase-applet-config.json';
 
 // Initialize Firebase with exact applet database ID configuration
 let app;
 let db: any = null;
+let auth: any = null;
 let useFirestore = false;
 
 try {
   app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApp();
   // Pass firestoreDatabaseId explicitly so it connects to the assigned database
   db = getFirestore(app, firebaseConfig.firestoreDatabaseId);
+  auth = getAuth(app);
   useFirestore = true;
   console.log("Firebase initialized successfully with database ID:", firebaseConfig.firestoreDatabaseId);
 } catch (error) {
   console.warn("Firebase failed to initialize. Falling back to robust LocalStorage storage.", error);
   useFirestore = false;
 }
+
+export { db, auth, useFirestore };
 
 // Default Seed Data for local storage fallback and initial database seeding
 export const INITIAL_USERS: UserProfile[] = [
@@ -69,9 +74,97 @@ export const INITIAL_USERS: UserProfile[] = [
   }
 ];
 
-export const INITIAL_PROGRAMS: EducationalProgram[] = [];
+export const INITIAL_PROGRAMS: EducationalProgram[] = [
+  {
+    id: "prog_ai_innovation",
+    title: "대기업 생성형 AI 워크플로우 생산성 혁신 솔루션",
+    description: "ChatGPT, Claude, Midjourney 등 주요 Generative AI 도구를 실무 워크플로우에 결합하여 200% 생산성을 도출하는 올인원 마스터 커리큘럼입니다.",
+    authorId: "user_admin",
+    authorName: "KPCIA 운영사무국",
+    royaltyRate: 150,
+    curriculum: [
+      "세션 1: 생성형 AI 기본 원리 및 프롬프트 고도화 엔지니어링",
+      "세션 2: 주요 비즈니스 보고서 및 PPT 슬라이드 초안 실시간 생성 실습",
+      "세션 3: 노코드 AI 에이전트 설계 및 사내 업무 자동화 파이프라인 구축"
+    ],
+    targetAudience: "대기업 임직원, 마케팅 및 기획 부서 실무자",
+    createdAt: "2026-07-01T10:00:00Z",
+    isApproved: true
+  },
+  {
+    id: "prog_mz_leadership",
+    title: "MZ 세대 소통 및 피드백 기반 성과 극대화 리더십",
+    description: "신세대 직원들의 동기부여 요소 및 심리적 안전감을 분석하고, 실전 롤플레잉을 통해 갈등을 성과로 승화시키는 코칭 프로그램입니다.",
+    authorId: "user_admin",
+    authorName: "KPCIA 운영사무국",
+    royaltyRate: 100,
+    curriculum: [
+      "세션 1: 최신 직업 가치관 분석 및 심리적 안전감(Psychological Safety)의 이해",
+      "세션 2: 성과 촉진을 위한 건설적인 피드백(Constructive Feedback) 5단계 모델",
+      "세션 3: 실전 갈등 해결 워크숍 및 상황별 커뮤니케이션 모의 시뮬레이션"
+    ],
+    targetAudience: "기업체 중간 관리자, 팀장급 임직원",
+    createdAt: "2026-07-02T11:00:00Z",
+    isApproved: true
+  }
+];
 
-export const INITIAL_LECTURES: LectureRequest[] = [];
+export const INITIAL_LECTURES: LectureRequest[] = [
+  {
+    id: "lect_samsung_ai",
+    title: "삼성전자 DS부문 초격차 AI 반도체 트렌드 특강",
+    description: "반도체 연구소 임직원을 대상으로 하는 초격차 생성형 AI 및 첨단 패키징 트렌드 명품 특강 출강입니다.",
+    targetTier: "Prestige Elite",
+    budget: 2500000,
+    mileageRoyalty: 250,
+    programId: "prog_ai_innovation",
+    programTitle: "대기업 생성형 AI 워크플로우 생산성 혁신 솔루션",
+    date: "2026-07-20",
+    time: "13:00 - 16:00",
+    duration: "3시간",
+    location: "경기도 용인시 삼성인력개발원",
+    attendees: 120,
+    status: "open",
+    applicants: [],
+    createdAt: "2026-07-01T12:00:00Z"
+  },
+  {
+    id: "lect_naver_prompt",
+    title: "네이버 클라우드 부트캠프 생성형 AI 프롬프트 엔지니어링",
+    description: "네이버 제휴 파트너사 임직원 대상의 AI 기술 활용 업무 생산성 극대화 및 노코드 툴 실습 교육 매칭 공고입니다.",
+    targetTier: "Prestige Professional",
+    budget: 1200000,
+    mileageRoyalty: 120,
+    programId: "prog_ai_innovation",
+    programTitle: "대기업 생성형 AI 워크플로우 생산성 혁신 솔루션",
+    date: "2026-07-25",
+    time: "14:00 - 17:00",
+    duration: "3시간",
+    location: "경기도 성남시 네이버 1784 사옥",
+    attendees: 45,
+    status: "open",
+    applicants: [],
+    createdAt: "2026-07-02T13:00:00Z"
+  },
+  {
+    id: "lect_skt_leadership",
+    title: "SK텔레콤 팀장급 글로벌 리더십 역량 강화 워크숍",
+    description: "글로벌 비즈니스 매너, 다문화 팀 빌딩 및 AI 기반 협업 의사결정 시뮬레이션 기획 특강 출강입니다.",
+    targetTier: "Prestige Associate",
+    budget: 800000,
+    mileageRoyalty: 80,
+    programId: "prog_mz_leadership",
+    programTitle: "MZ 세대 소통 및 피드백 기반 성과 극대화 리더십",
+    date: "2026-07-18",
+    time: "10:00 - 12:00",
+    duration: "2시간",
+    location: "서울특별시 중구 SKT T-타워",
+    attendees: 30,
+    status: "open",
+    applicants: [],
+    createdAt: "2026-07-03T14:00:00Z"
+  }
+];
 
 export const INITIAL_TRANSACTIONS: MileageTransaction[] = [];
 

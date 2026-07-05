@@ -181,13 +181,13 @@ export default function Header({
     </header>
     
     {/* Mobile Navigation (Bottom Nav) for actual mobile screens */}
-    <nav className="md:hidden fixed bottom-0 left-0 right-0 z-50 bg-neutral-950/90 backdrop-blur-md border-t border-neutral-850 px-2 py-1.5 flex justify-around items-center" id="mobile-bottom-nav">
+    <nav className="md:hidden fixed bottom-0 left-0 right-0 z-50 bg-neutral-950/90 backdrop-blur-md border-t border-neutral-850 px-2 py-3.5 flex justify-around items-center" id="mobile-bottom-nav">
       {[
-        { id: 'home', label: '협회소개', icon: <Home className="w-4 h-4" /> },
-        { id: 'lectures', label: '출강공고', icon: <Briefcase className="w-4 h-4" /> },
-        { id: 'programs', label: '교육기획', icon: <BookOpen className="w-4 h-4" />, instructorOnly: true },
-        { id: 'proposal', label: '제휴제안', icon: <Handshake className="w-4 h-4" /> },
-        { id: 'admin', label: '관리자', icon: <Shield className="w-4 h-4" />, adminOnly: true }
+        { id: 'home', label: '협회소개', icon: <Home className="w-5 h-5" /> },
+        { id: 'lectures', label: '출강공고', icon: <Briefcase className="w-5 h-5" /> },
+        { id: 'programs', label: '교육기획', icon: <BookOpen className="w-5 h-5" />, instructorOnly: true },
+        { id: 'proposal', label: '제휴제안', icon: <Handshake className="w-5 h-5" /> },
+        { id: 'admin', label: '관리자', icon: <Shield className="w-5 h-5" />, adminOnly: true }
       ].map((tab) => {
         if (tab.adminOnly && !isUserAdmin) return null;
         if (tab.instructorOnly && isUserGuestOrNull) return null;
@@ -196,15 +196,15 @@ export default function Header({
           <button
             key={tab.id}
             onClick={() => onTabChange(tab.id)}
-            className={`flex flex-col items-center justify-center py-1 px-2 rounded-lg transition-all cursor-pointer ${
+            className={`flex flex-col items-center justify-center p-2 rounded-xl transition-all cursor-pointer ${
               isActive
-                ? 'text-kpcia-gold scale-105'
-                : 'text-neutral-400 hover:text-neutral-200'
+                ? 'text-kpcia-gold scale-110 bg-kpcia-gold/10'
+                : 'text-neutral-400 hover:text-neutral-200 hover:bg-neutral-900/40'
             }`}
             id={`mobile-tab-${tab.id}`}
+            title={tab.label}
           >
             {tab.icon}
-            <span className="text-[8px] mt-1 font-semibold tracking-tight">{tab.label}</span>
           </button>
         );
       })}

@@ -5,9 +5,10 @@ import { UserProfile } from '../types';
 interface PendingApprovalViewProps {
   currentUser: UserProfile | null;
   setActiveTab: (tab: string) => void;
+  onInstantApprove?: () => void;
 }
 
-export default function PendingApprovalView({ currentUser, setActiveTab }: PendingApprovalViewProps) {
+export default function PendingApprovalView({ currentUser, setActiveTab, onInstantApprove }: PendingApprovalViewProps) {
   return (
     <div className="max-w-2xl mx-auto my-12 p-8 bg-neutral-900 border border-kpcia-gold/30 rounded-2xl text-center space-y-6 relative overflow-hidden shadow-2xl animate-in fade-in" id="pending-approval-view">
       <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-amber-500 via-kpcia-gold to-amber-500 animate-pulse" />
@@ -44,7 +45,16 @@ export default function PendingApprovalView({ currentUser, setActiveTab }: Pendi
         </ol>
       </div>
 
-      <div className="flex justify-center pt-2">
+      <div className="flex flex-col sm:flex-row justify-center items-center gap-3 pt-2">
+        {onInstantApprove && (
+          <button
+            onClick={onInstantApprove}
+            className="px-5 py-2.5 bg-kpcia-gold hover:bg-kpcia-gold-hover text-kpcia-dark text-xs font-black rounded-xl transition-all cursor-pointer flex items-center gap-1.5 shadow-lg shadow-kpcia-gold/15"
+          >
+            <UserCheck className="w-4 h-4" />
+            <span>테스터 원클릭 자가 임시 승인</span>
+          </button>
+        )}
         <button
           onClick={() => setActiveTab('home')}
           className="px-5 py-2.5 bg-neutral-950 hover:bg-neutral-850 border border-neutral-800 text-neutral-300 hover:text-neutral-100 text-xs font-bold rounded-xl transition-all cursor-pointer hover:border-kpcia-gold/30"

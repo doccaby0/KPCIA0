@@ -29,7 +29,7 @@ export default function KPCIALogo({ variant = 'hero', theme = 'dark' }: KPCIALog
             KPCIA
           </span>
         </div>
-        <div className="flex flex-col justify-center border-l border-neutral-800/80 pl-3 leading-tight">
+        <div className="hidden sm:flex flex-col justify-center border-l border-neutral-800/80 pl-3 leading-tight">
           <span className="text-[11px] font-black tracking-wider text-neutral-100 font-sans transition-all duration-300 group-hover:text-kpcia-gold">
             한국프레스티지기업강사협회
           </span>

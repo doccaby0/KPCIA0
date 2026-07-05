@@ -15,7 +15,8 @@ import {
   Check, 
   Globe,
   Users,
-  FileDown
+  FileDown,
+  UserCheck
 } from 'lucide-react';
 
 interface AppSimulatorProps {
@@ -30,6 +31,7 @@ interface AppSimulatorProps {
   onMobileTabChange: (tab: string) => void;
   onApplyLecture: (lectureId: string) => void;
   onTabChange: (tab: string) => void;
+  onInstantApprove?: () => void;
 }
 
 export default function AppSimulator({
@@ -43,7 +45,8 @@ export default function AppSimulator({
   activeMobileTab,
   onMobileTabChange,
   onApplyLecture,
-  onTabChange
+  onTabChange,
+  onInstantApprove
 }: AppSimulatorProps) {
   const [showUserModal, setShowUserModal] = useState(false);
   const [loginId, setLoginId] = useState('');
@@ -75,7 +78,7 @@ KPCIA 한국프레스티지강사협회 - 출강 공고 상세 정보 (모바일
 ■ 출강 시간       : ${lecture.time} (${lecture.duration})
 ■ 수강 대상       : ${lecture.attendees ? `${lecture.attendees}명` : '상세 정보 참조'}
 ■ 출강 장소       : ${lecture.location}
-■ 출강 강사료     : ${isPriceVisible ? `${lecture.budget.toLocaleString()} KRW` : '[로그인 및 자격 획득 후 공개]'}
+■ 출강 강사료     : ${isPriceVisible ? `${lecture.budget.toLocaleString()} KRW` : '[등급 달성시 공개]'}
 ■ 마일리지 로열티 : ${lecture.mileageRoyalty.toLocaleString()} M
 ■ 연계 교육 프로그램 : ${lecture.programTitle || '없음'}
 ■ 공고 상태       : ${lecture.status === 'open' ? '모집중 (지원 가능)' : lecture.status === 'assigned' ? '배정 완료' : '종료'}
@@ -206,6 +209,15 @@ ${lecture.description}
                     <strong className="text-kpcia-gold block">💡 빠른 가입 승인 방법:</strong>
                     <span>PC 웹 포털로 복귀 후, 우측 상단 프로필에서 <strong>"KPCIA 운영사무국" (관리자 계정)</strong>으로 전환하여, <strong>"협회 관리자실" (Admin)</strong> 메뉴에서 승인을 완료해 주세요.</span>
                   </div>
+                  {onInstantApprove && (
+                    <button
+                      onClick={onInstantApprove}
+                      className="w-full max-w-[280px] mx-auto py-2.5 bg-kpcia-gold hover:bg-kpcia-gold-hover text-kpcia-dark text-[10px] font-black rounded-lg transition-all flex items-center justify-center gap-1.5 cursor-pointer shadow-lg shadow-kpcia-gold/10 mt-3"
+                    >
+                      <UserCheck className="w-3.5 h-3.5" />
+                      <span>원클릭 자가 임시 승인</span>
+                    </button>
+                  )}
                 </div>
               ) : (
                 <>
@@ -392,7 +404,7 @@ ${lecture.description}
             </div>
 
             {/* Mobile Bottom Tab Navigation */}
-            <div className="border-t border-neutral-900/60 bg-neutral-950 pt-2.5 pb-1 flex justify-around items-center shrink-0 z-30" id="phone-nav-bar">
+            <div className="border-t border-neutral-900/60 bg-neutral-950 py-3.5 flex justify-around items-center shrink-0 z-30" id="phone-nav-bar">
               {[
                 { id: 'lectures', label: '강의요청', icon: Award },
                 { id: 'programs', label: '저작권', icon: BookOpen },
@@ -404,13 +416,13 @@ ${lecture.description}
                   <button
                     key={item.id}
                     onClick={() => onMobileTabChange(item.id)}
-                    className={`flex flex-col items-center space-y-1 transition-all cursor-pointer ${
-                      isSel ? 'text-kpcia-gold scale-105' : 'text-neutral-500 hover:text-neutral-400'
+                    className={`p-2 rounded-xl transition-all cursor-pointer flex flex-col items-center justify-center ${
+                      isSel ? 'text-kpcia-gold scale-110 bg-kpcia-gold/10' : 'text-neutral-500 hover:text-neutral-400'
                     }`}
                     id={`phone-nav-item-${item.id}`}
+                    title={item.label}
                   >
-                    <IconComp className="w-4 h-4" />
-                    <span className="text-[8px] font-medium">{item.label}</span>
+                    <IconComp className="w-5 h-5" />
                   </button>
                 );
               })}
