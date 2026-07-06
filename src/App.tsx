@@ -42,6 +42,8 @@ export default function App() {
   const [verificationCode, setVerificationCode] = useState<string>('');
   const [generatedCode, setGeneratedCode] = useState<string>('');
   const [verificationError, setVerificationError] = useState<string>('');
+  const [forceSimulationAuth, setForceSimulationAuth] = useState<boolean>(false);
+  const [isOperationNotAllowedError, setIsOperationNotAllowedError] = useState<boolean>(false);
 
   // Login Form States
   const [loginId, setLoginId] = useState<string>('');
@@ -1292,7 +1294,7 @@ export default function App() {
                       }
 
                       // Try registering via Firebase Auth
-                      if (auth && useFirestore) {
+                      if (auth && useFirestore && !forceSimulationAuth) {
                         try {
                           // Create the auth user
                           const userCredential = await createUserWithEmailAndPassword(auth, emailStr, trimmedPw);
@@ -1301,6 +1303,7 @@ export default function App() {
                           
                           setVerificationStep('verify');
                           setVerificationError('');
+                          setIsOperationNotAllowedError(false);
                           triggerToast('Firebase Auth 인증 메일이 발송되었습니다. 가입하신 메일 수신함을 확인해 주세요.', 'success');
                         } catch (err: any) {
                           console.error("Firebase registration failed:", err);
@@ -1311,18 +1314,22 @@ export default function App() {
                             errorMsg = '비밀번호가 너무 취약합니다. 최소 6자리 이상의 비밀번호를 설정해 주세요.';
                           } else if (err.code === 'auth/invalid-email') {
                             errorMsg = '올바르지 않은 이메일 형식입니다.';
+                          } else if (err.code === 'auth/operation-not-allowed' || err.message?.includes('Operation-not-allowed')) {
+                            errorMsg = 'Firebase 가입 오류: Firebase 콘솔의 Authentication -> Sign-in method에서 이메일/비밀번호(Email/Password) 로그인이 활성화되어 있지 않습니다.';
+                            setIsOperationNotAllowedError(true);
                           } else {
                             errorMsg = `Firebase 가입 오류: ${err.message}. (Firebase Console의 Email/Password 활성화 상태를 점검해 보세요.)`;
                           }
                           setVerificationError(errorMsg);
                         }
                       } else {
-                        // Fallback to simulation if Firebase is not connected
+                        // Fallback to simulation if Firebase is not connected or bypass is on
                         const code = Math.floor(100000 + Math.random() * 900000).toString();
                         setGeneratedCode(code);
                         setVerificationStep('verify');
                         setVerificationCode('');
                         setVerificationError('');
+                        setIsOperationNotAllowedError(false);
                         triggerToast('시뮬레이션 인증 코드가 발송되었습니다. (하단 시뮬레이션 창을 확인하세요!)', 'info');
                       }
                     }} 
@@ -1331,6 +1338,32 @@ export default function App() {
                     {verificationError && (
                       <div className="p-2.5 rounded-lg bg-red-950/50 border border-red-900/50 text-[11px] text-red-400 font-medium">
                         {verificationError}
+                      </div>
+                    )}
+
+                    {isOperationNotAllowedError && (
+                      <div className="p-3.5 rounded-xl bg-amber-950/40 border border-amber-900/40 text-xs text-amber-300 space-y-2.5">
+                        <p className="font-bold">💡 Firebase 이메일/비밀번호 기능이 비활성화 상태입니다.</p>
+                        <p className="text-[11px] text-neutral-300 leading-relaxed">
+                          원활한 배포 및 테스트를 위해 아래 버튼을 클릭하여 즉시 <strong>가상 이메일 시뮬레이션 모드</strong>로 가입을 시도해 보세요. (실제 Firebase 연결을 건너뛰고 가상 인증번호로 빠른 가입이 가능합니다!)
+                        </p>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setForceSimulationAuth(true);
+                            setIsOperationNotAllowedError(false);
+                            // Trigger simulation registration sequence immediately
+                            const code = Math.floor(100000 + Math.random() * 900000).toString();
+                            setGeneratedCode(code);
+                            setVerificationStep('verify');
+                            setVerificationCode('');
+                            setVerificationError('');
+                            triggerToast('가상 이메일 시뮬레이션 인증 코드가 발송되었습니다.', 'info');
+                          }}
+                          className="w-full py-2 bg-amber-500 hover:bg-amber-600 text-neutral-950 font-black text-[11px] rounded-lg transition-all cursor-pointer text-center"
+                        >
+                          시뮬레이션 가입 모드로 즉시 우회하기
+                        </button>
                       </div>
                     )}
 
@@ -1424,7 +1457,7 @@ export default function App() {
                       </p>
                     </div>
 
-                    {auth && useFirestore ? (
+                    {auth && useFirestore && !forceSimulationAuth ? (
                       /* Real Firebase Auth instructions */
                       <div className="space-y-3">
                         <div className="p-3 bg-neutral-950 border border-neutral-800 rounded-xl space-y-2">
