@@ -22,7 +22,9 @@ import {
   FileText, 
   ChevronRight, 
   Activity,
-  Trash2
+  Trash2,
+  CreditCard,
+  FileDown
 } from 'lucide-react';
 
 export function getLectureMilestoneBadge(lectureCount?: number) {
@@ -109,7 +111,7 @@ interface AdminPanelProps {
   onRejectUser?: (userId: string) => void;
   onApproveProgram?: (programId: string, updatedProgram: EducationalProgram) => void;
   onAddLecture?: (lecture: any) => void;
-  onUpdateUserPerformance?: (userId: string, lectureCount: number, ratings: number[]) => void;
+  onUpdateUserPerformance?: (userId: string, lectureCount: number, ratings: number[], bankAccount?: string) => void;
   onDeleteUser?: (userId: string) => void;
   onDeleteProgram?: (programId: string) => void;
   onResetDatabase?: () => void;
@@ -137,7 +139,7 @@ export default function AdminPanel({
   onResetDatabase
 }: AdminPanelProps) {
   // Navigation State
-  const [activeTab, setActiveTab] = useState<'dashboard' | 'approvals' | 'lectures' | 'members' | 'proposals'>('dashboard');
+  const [activeTab, setActiveTab] = useState<'dashboard' | 'approvals' | 'lectures' | 'settlements' | 'members' | 'proposals'>('dashboard');
   
   // Lecture Posting States
   const [showAddForm, setShowAddForm] = useState(false);
@@ -152,6 +154,8 @@ export default function AdminPanel({
   const [lectDuration, setLectDuration] = useState('2 hours');
   const [lectLocation, setLectLocation] = useState('');
   const [lectAttendees, setLectAttendees] = useState<string>('30');
+  const [lectManagerName, setLectManagerName] = useState('');
+  const [lectManagerPhone, setLectManagerPhone] = useState('');
   
   // Search States
   const [memberSearch, setMemberSearch] = useState('');
@@ -172,6 +176,7 @@ export default function AdminPanel({
   const [perfLectureCount, setPerfLectureCount] = useState<string>('0');
   const [perfRatings, setPerfRatings] = useState<number[]>([]);
   const [newRatingInput, setNewRatingInput] = useState<string>('');
+  const [perfBankAccount, setPerfBankAccount] = useState<string>('');
 
   const startEditingPerformance = (user: UserProfile) => {
     if (expandedUserId === user.uid) {
@@ -181,19 +186,20 @@ export default function AdminPanel({
       setPerfLectureCount((user.lectureCount || 0).toString());
       setPerfRatings(user.lectureRatings || []);
       setNewRatingInput('');
+      setPerfBankAccount(user.profileCard?.bankAccount || '');
     }
   };
 
   const handleSavePerformance = (userId: string) => {
     if (!onUpdateUserPerformance) return;
     const count = parseInt(perfLectureCount, 10);
-    onUpdateUserPerformance(userId, isNaN(count) ? 0 : count, perfRatings);
+    onUpdateUserPerformance(userId, isNaN(count) ? 0 : count, perfRatings, perfBankAccount);
     setExpandedUserId(null);
   };
 
   const handleAddRating = () => {
     const r = parseFloat(newRatingInput);
-    if (isNaN(r) || r < 0 || r > 100) return;
+    if (isNaN(r) || r < 0 || r > 5) return;
     const ratingValue = Number(r.toFixed(1));
     const updatedRatings = [...perfRatings, ratingValue];
     setPerfRatings(updatedRatings);
@@ -235,6 +241,8 @@ export default function AdminPanel({
       duration: lectDuration,
       location: lectLocation,
       attendees: lectAttendees ? Number(lectAttendees) : undefined,
+      managerName: lectManagerName || undefined,
+      managerPhone: lectManagerPhone || undefined,
     };
 
     onAddLecture(newLect);
@@ -249,6 +257,8 @@ export default function AdminPanel({
     setLectProgramId('');
     setLectLocation('');
     setLectAttendees('30');
+    setLectManagerName('');
+    setLectManagerPhone('');
   };
 
   // Editing and approval states for Educational Programs
@@ -355,6 +365,178 @@ export default function AdminPanel({
     onAdjustMileage(selectedUser, adjustAmount, adjustReason);
     setAdjustAmount(1000);
     setAdjustReason('특별 우수 교안 가산 마일리지 지급');
+  };
+
+  const downloadLectureAsExcel = (lecture: LectureRequest) => {
+    const totalCost = lecture.budget + 400000;
+
+    const htmlContent = `
+<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel" xmlns="http://www.w3.org/TR/REC-html40">
+<head>
+<!--[if gte mso 9]>
+<xml>
+<x:ExcelWorkbook>
+<x:ExcelWorksheets>
+<x:ExcelWorksheet>
+<x:Name>출강강의요청서</x:Name>
+<x:WorksheetOptions>
+<x:DisplayGridlines/>
+</x:WorksheetOptions>
+</x:ExcelWorksheet>
+</x:ExcelWorksheets>
+</x:ExcelWorkbook>
+</xml>
+<![endif]-->
+<meta http-equiv="content-type" content="application/vnd.ms-excel; charset=UTF-8"/>
+<style>
+  table { border-collapse: collapse; font-family: 'Malgun Gothic', 'Dotum', sans-serif; }
+  td { border: 1px solid #D1D5DB; padding: 10px; font-size: 11px; vertical-align: middle; }
+  .header-title { background-color: #1F4E79; color: #FFFFFF; font-size: 16px; font-weight: bold; text-align: center; padding: 15px; border: 1px solid #1F4E79; }
+  .section-title { background-color: #D9E1F2; color: #1F4E79; font-size: 12px; font-weight: bold; text-align: left; padding: 8px; border: 1px solid #B4C6E7; }
+  .label-cell { background-color: #F2F2F2; font-weight: bold; text-align: center; width: 120px; }
+  .value-cell { text-align: left; }
+  .tbl-header { background-color: #D9E1F2; font-weight: bold; text-align: center; }
+  .align-center { text-align: center; }
+  .align-right { text-align: right; }
+  .total-row { background-color: #FFF2CC; font-weight: bold; }
+  .notice-text { color: #C00000; font-weight: bold; font-size: 11px; line-height: 1.6; }
+</style>
+</head>
+<body>
+<table>
+  <tr>
+    <td colspan="6" class="header-title">[인사이트9교육연구소] 출강 강의 요청서</td>
+  </tr>
+  <tr style="height: 10px;"><td colspan="6" style="border: none;"></td></tr>
+  <tr>
+    <td colspan="6" class="section-title">1. 기본 강의 요청 정보</td>
+  </tr>
+  <tr>
+    <td class="label-cell">기관명</td>
+    <td colspan="5" class="value-cell">${lecture.location ? lecture.location.split(' ')[0] : '협력기관'}</td>
+  </tr>
+  <tr>
+    <td class="label-cell">교육 일정</td>
+    <td colspan="2" class="value-cell">${lecture.date || '추후협의'}</td>
+    <td class="label-cell">교육 시간</td>
+    <td colspan="2" class="value-cell">${lecture.time || '추후협의'} (총 ${lecture.duration || '추후협의'})</td>
+  </tr>
+  <tr>
+    <td class="label-cell">장소</td>
+    <td colspan="5" class="value-cell">${lecture.location || '추후협의'}</td>
+  </tr>
+  <tr>
+    <td class="label-cell">교육 주제</td>
+    <td colspan="5" class="value-cell">${lecture.title}</td>
+  </tr>
+  <tr>
+    <td class="label-cell">현장 담당자</td>
+    <td colspan="2" class="value-cell">${lecture.managerName || '김성진'}</td>
+    <td class="label-cell">연락처</td>
+    <td colspan="2" class="value-cell">${lecture.managerPhone || '010-5259-7458'}</td>
+  </tr>
+  <tr style="height: 10px;"><td colspan="6" style="border: none;"></td></tr>
+  <tr>
+    <td colspan="6" class="section-title">2. 비용 및 정산 안내</td>
+  </tr>
+  <tr class="tbl-header">
+    <td colspan="2">항목</td>
+    <td>금액 / 계산 기준</td>
+    <td colspan="2">내용</td>
+    <td>비고 (주의사항)</td>
+  </tr>
+  <tr>
+    <td colspan="2" class="align-center">강사료</td>
+    <td class="align-right">${lecture.budget.toLocaleString()}원</td>
+    <td colspan="2" class="align-center">${lecture.duration || '추후협의'}</td>
+    <td>실비 정산 가능</td>
+  </tr>
+  <tr>
+    <td colspan="2" class="align-center">재료비</td>
+    <td class="align-right">400,000원</td>
+    <td colspan="2" class="align-center">20000 * 20</td>
+    <td>(정원 미달 시에도 남은 재료 소진 필수)</td>
+  </tr>
+  <tr class="total-row">
+    <td colspan="2" class="align-center">총 비용</td>
+    <td class="align-right">${totalCost.toLocaleString()}원</td>
+    <td colspan="2" class="align-center"></td>
+    <td>합계 금액</td>
+  </tr>
+  <tr style="height: 10px;"><td colspan="6" style="border: none;"></td></tr>
+  <tr>
+    <td colspan="6" class="section-title">3. 프로그램 진행 플로우 (강사 행동 요령)</td>
+  </tr>
+  <tr class="tbl-header">
+    <td>단계</td>
+    <td colspan="2">시간 및 타이밍</td>
+    <td colspan="2">주요 행동 지침</td>
+    <td>완료 체크</td>
+  </tr>
+  <tr>
+    <td class="align-center">사전 준비</td>
+    <td colspan="2" class="align-center">강의 시작 30분 전</td>
+    <td colspan="2">현장 도착 완료 및 교육장 세팅 후 '세팅 완료 사진' 촬영 필수</td>
+    <td class="align-center">[ ]</td>
+  </tr>
+  <tr>
+    <td class="align-center">강의 진행</td>
+    <td colspan="2" class="align-center">강의 중</td>
+    <td colspan="2">수강생 교육 진행 및 활발한 스케치 사진(강의 중 사진) 촬영</td>
+    <td class="align-center">[ ]</td>
+  </tr>
+  <tr>
+    <td class="align-center">마무리</td>
+    <td colspan="2" class="align-center">강의 종료 10분 전</td>
+    <td colspan="2">프로그램 완료, 결과물 모아서 단체 사진 촬영 및 만족도 QR 조사 실시</td>
+    <td class="align-center">[ ]</td>
+  </tr>
+  <tr>
+    <td class="align-center">사후 보고</td>
+    <td colspan="2" class="align-center">강의 종료 후 즉시</td>
+    <td colspan="2">촬영한 모든 사진(세팅, 강의, 결과물 등)을 대표님 카카오톡으로 전송</td>
+    <td class="align-center">[ ]</td>
+  </tr>
+  <tr style="height: 10px;"><td colspan="6" style="border: none;"></td></tr>
+  <tr>
+    <td colspan="6" class="section-title">4. 강의 후 행정 및 결제 처리 안내</td>
+  </tr>
+  <tr>
+    <td colspan="2" class="label-cell">지출증빙 영수증 제출</td>
+    <td colspan="4" class="value-cell">총예산 지출증빙 영수증을 사진 촬영 또는 이메일로 발송 (insight9edu@naver.com)</td>
+  </tr>
+  <tr>
+    <td colspan="2" class="label-cell">현금영수증 발행 정보</td>
+    <td colspan="4" class="value-cell">사업자 지출증빙용: 702-41-00899 (인사이트9교육연구소)</td>
+  </tr>
+  <tr>
+    <td colspan="2" class="label-cell">현장 추가 문의 응대</td>
+    <td colspan="4" class="value-cell">현장 담당자의 프로그램/강의 예산 추가 문의 시 -> '인사이트9교육연구소(본사)에 연락하시면 안내해 드립니다'로 응대</td>
+  </tr>
+  <tr style="height: 10px;"><td colspan="6" style="border: none;"></td></tr>
+  <tr>
+    <td colspan="6" class="section-title">5. 주의 및 특이사항 (필수 준수)</td>
+  </tr>
+  <tr>
+    <td colspan="6" class="notice-text">
+      • 현장 담당자에게 소속 소개 시 '인사이트9교육연구소와 함께하는 협력 기관'이라고 소개해주세요.<br/>
+      • 출강 전 현장 담당자와 연락하여 강의장 컨디션, 시간, 장소, 특이사항을 사전 체크해주세요.<br/>
+      • 현장에서 인원 추가는 절대 불가합니다. 요청 시 '본사에서 정해진 인원으로만 진행된다'고 안내해주세요.<br/>
+      • 개인/협회/공방 SNS나 블로그에 후기 PR 게시 시 '인사이트9교육연구소와 협업했다'는 내용을 꼭 기재해주세요.
+    </td>
+  </tr>
+</table>
+</body>
+</html>
+    `.trim();
+
+    const element = document.createElement("a");
+    const file = new Blob([htmlContent], { type: 'application/vnd.ms-excel;charset=utf-8' });
+    element.href = URL.createObjectURL(file);
+    element.download = `[인사이트9교육연구소]출강강의요청서_${lecture.title.replace(/[\s/\\:*?"<>|]/g, '_')}.xls`;
+    document.body.appendChild(element);
+    element.click();
+    document.body.removeChild(element);
   };
 
   // Filter lists
@@ -489,28 +671,28 @@ export default function AdminPanel({
             <span className="text-[10px] text-neutral-500 font-sans">건 매칭중</span>
           </div>
           <div className="text-[9px] text-neutral-500 font-sans mt-2 flex items-center gap-0.5 group-hover:text-kpcia-gold transition-colors">
-            강사 배정 및 정산실 <ChevronRight className="w-3 h-3" />
+            출강 배정실 바로가기 <ChevronRight className="w-3 h-3" />
           </div>
         </button>
 
-        {/* KPI 4: Issued Mileage */}
+        {/* KPI 4: Settlements */}
         <button
-          onClick={() => setActiveTab('members')}
+          onClick={() => setActiveTab('settlements')}
           className="p-4 rounded-xl border border-neutral-800 bg-neutral-900/40 text-left transition-all duration-300 relative group hover:border-neutral-700 cursor-pointer"
-          id="kpi-mileage"
+          id="kpi-settlements"
         >
           <div className="flex justify-between items-start mb-2">
-            <span className="text-[10px] font-mono font-bold text-neutral-500 group-hover:text-neutral-400 transition-colors">전체 발행 마일리지</span>
-            <Coins className="w-4 h-4 text-emerald-400" />
+            <span className="text-[10px] font-mono font-bold text-neutral-500 group-hover:text-neutral-400 transition-colors">출강 정산 완료</span>
+            <CreditCard className="w-4 h-4 text-amber-500" />
           </div>
           <div className="flex items-baseline gap-1">
-            <span className="text-lg md:text-xl font-mono font-bold text-emerald-400">
-              {totalMileageIssued.toLocaleString()}
+            <span className="text-xl font-mono font-bold text-amber-500">
+              {completedLecturesCount}
             </span>
-            <span className="text-[10px] text-neutral-500 font-mono"> M</span>
+            <span className="text-[10px] text-neutral-500 font-sans">건 완료</span>
           </div>
           <div className="text-[9px] text-neutral-500 font-sans mt-2 flex items-center gap-0.5 group-hover:text-kpcia-gold transition-colors">
-            등급 및 마일리지 조율 <ChevronRight className="w-3 h-3" />
+            정산실 바로가기 <ChevronRight className="w-3 h-3" />
           </div>
         </button>
       </div>
@@ -558,10 +740,28 @@ export default function AdminPanel({
           id="tab-btn-lectures"
         >
           <CheckSquare className="w-4 h-4" />
-          <span>출강 배정 및 정산실</span>
+          <span>출강 배정실</span>
           {activeLecturesCount > 0 && (
             <span className="ml-1 px-1.5 py-0.5 text-[9px] font-bold bg-sky-500 text-neutral-950 rounded-full">
               {activeLecturesCount}
+            </span>
+          )}
+        </button>
+
+        <button
+          onClick={() => setActiveTab('settlements')}
+          className={`flex items-center gap-2 px-4 py-2.5 text-xs font-bold border-b-2 transition-all relative cursor-pointer ${
+            activeTab === 'settlements'
+              ? 'border-kpcia-gold text-kpcia-gold bg-neutral-900/20'
+              : 'border-transparent text-neutral-400 hover:text-neutral-200'
+          }`}
+          id="tab-btn-settlements"
+        >
+          <CreditCard className="w-4 h-4" />
+          <span>정산실</span>
+          {completedLecturesCount > 0 && (
+            <span className="ml-1 px-1.5 py-0.5 text-[9px] font-bold bg-amber-500 text-neutral-950 rounded-full">
+              {completedLecturesCount}
             </span>
           )}
         </button>
@@ -1084,16 +1284,16 @@ export default function AdminPanel({
           </div>
         )}
 
-        {/* ==================== TAB 3: LECTURE MATCHING & SETTLEMENTS ==================== */}
+        {/* ==================== TAB 3: LECTURE MATCHING (출강 배정실) ==================== */}
         {activeTab === 'lectures' && (
           <div className="bg-neutral-900/50 border border-neutral-800 rounded-xl p-5 text-left animate-in fade-in duration-200" id="matching-panel">
             <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 border-b border-neutral-800/80 pb-4 mb-5">
               <div>
                 <h3 className="text-xs font-bold font-display uppercase tracking-wider text-neutral-300 flex items-center gap-1.5 mb-1">
-                  <CheckSquare className="w-4 h-4 text-kpcia-gold" /> 출강 신청 강사 심사 & 강의 최종 정산 관리국
+                  <CheckSquare className="w-4 h-4 text-kpcia-gold" /> 출강 배정실 (강사 심의 및 최종 매칭)
                 </h3>
                 <p className="text-[11px] text-neutral-400 leading-relaxed">
-                  신청을 접수한 강사들의 등급 및 적합성을 평가하여 최종 배정하고, 강사의 출강이 성공적으로 끝났을 시 출강료와 프로그램 저작 마일리지를 자동 안전 분할 정산 지급합니다.
+                  출강 신청을 접수한 강사들의 등급 및 적합성을 평가하여 최종 강사로 배정하고, 공고별 공식 강의 요청서(엑셀 파일)를 실시간 출력합니다.
                 </p>
               </div>
               <button
@@ -1270,6 +1470,31 @@ export default function AdminPanel({
                   </div>
                 </div>
 
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-2">
+                  <div>
+                    <label className="text-[10px] font-mono text-neutral-400 block mb-1">현장 담당자 이름</label>
+                    <input
+                      type="text"
+                      placeholder="예: 김성진"
+                      value={lectManagerName}
+                      onChange={(e) => setLectManagerName(e.target.value)}
+                      className="w-full px-3.5 py-2 rounded-lg bg-neutral-900 border border-neutral-800 text-xs font-medium text-neutral-100 focus:border-kpcia-gold focus:outline-none"
+                      id="admin-lect-manager-name"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-[10px] font-mono text-neutral-400 block mb-1">현장 담당자 연락처</label>
+                    <input
+                      type="text"
+                      placeholder="예: 010-5259-7458"
+                      value={lectManagerPhone}
+                      onChange={(e) => setLectManagerPhone(e.target.value)}
+                      className="w-full px-3.5 py-2 rounded-lg bg-neutral-900 border border-neutral-800 text-xs font-medium text-neutral-100 focus:border-kpcia-gold focus:outline-none"
+                      id="admin-lect-manager-phone"
+                    />
+                  </div>
+                </div>
+
                 <div className="flex justify-end space-x-2 pt-2 border-t border-neutral-800">
                   <button
                     type="button"
@@ -1334,6 +1559,17 @@ export default function AdminPanel({
                       {/* Matching Action Module */}
                       <div className="flex flex-col sm:flex-row sm:items-center gap-3 shrink-0 pt-3 md:pt-0 border-t md:border-t-0 border-neutral-900" id={`admin-matching-actions-${lecture.id}`}>
                         
+                        <button
+                          type="button"
+                          onClick={() => downloadLectureAsExcel(lecture)}
+                          className="px-3.5 py-2 border border-neutral-800 bg-neutral-900 hover:bg-neutral-850 hover:border-kpcia-gold/40 text-neutral-200 hover:text-kpcia-gold text-[11px] font-bold rounded-lg transition-all flex items-center justify-center gap-1.5 cursor-pointer shadow-sm w-full sm:w-auto"
+                          title="출강 강의 요청서를 엑셀(XLS) 파일로 다운로드합니다."
+                          id={`admin-download-req-xls-${lecture.id}`}
+                        >
+                          <FileDown className="w-3.5 h-3.5 text-neutral-400" />
+                          <span>강의 요청서</span>
+                        </button>
+
                         {/* Status 1: Open for application - Admin selects the candidate to assign */}
                         {lecture.status === 'open' && (
                           <div className="space-y-1.5 w-full sm:w-auto">
@@ -1378,6 +1614,119 @@ export default function AdminPanel({
                   );
                 })
               )}
+            </div>
+          </div>
+        )}
+
+        {/* ==================== TAB 3.5: SETTLEMENTS (정산실) ==================== */}
+        {activeTab === 'settlements' && (
+          <div className="bg-neutral-900/50 border border-neutral-800 rounded-xl p-5 text-left animate-in fade-in duration-200" id="settlements-panel">
+            <div className="border-b border-neutral-800/80 pb-4 mb-5">
+              <h3 className="text-xs font-bold font-display uppercase tracking-wider text-neutral-300 flex items-center gap-1.5 mb-1">
+                <CreditCard className="w-4 h-4 text-kpcia-gold" /> 정산실 (강사별 출강 비용 원장 및 송금 제어소)
+              </h3>
+              <p className="text-[11px] text-neutral-400 leading-relaxed">
+                성공적으로 완료 처리된 출강 강의의 정산 예정 금액과 강사별 은행 계좌 정보를 대조하고, 익월 말일 자동 지급 일정을 관리 감독합니다.
+              </p>
+            </div>
+
+            {/* Settlement KPIs */}
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
+              <div className="p-3.5 bg-neutral-950 border border-neutral-850 rounded-xl text-left">
+                <span className="text-[9px] font-mono font-bold text-neutral-500 uppercase block">총 정산 완료 건수</span>
+                <span className="text-lg font-mono font-bold text-neutral-200">{completedLectures.length}건</span>
+              </div>
+              <div className="p-3.5 bg-neutral-950 border border-neutral-850 rounded-xl text-left">
+                <span className="text-[9px] font-mono font-bold text-neutral-500 uppercase block">총 누적 정산 지급액</span>
+                <span className="text-lg font-mono font-bold text-kpcia-gold">
+                  {completedLectures.reduce((sum, l) => sum + l.budget, 0).toLocaleString()}원
+                </span>
+              </div>
+              <div className="p-3.5 bg-neutral-950 border border-neutral-850 rounded-xl text-left">
+                <span className="text-[9px] font-mono font-bold text-neutral-500 uppercase block">미지급 대기 잔액</span>
+                <span className="text-lg font-mono font-bold text-amber-500">
+                  {completedLectures.reduce((sum, l) => sum + l.budget, 0).toLocaleString()}원
+                </span>
+              </div>
+            </div>
+
+            {/* List Table */}
+            <div className="overflow-x-auto border border-neutral-800 rounded-xl bg-neutral-950">
+              <table className="w-full text-left text-xs border-collapse">
+                <thead>
+                  <tr className="bg-neutral-900 border-b border-neutral-800 text-neutral-400 font-bold">
+                    <th className="p-3">배정 번호</th>
+                    <th className="p-3">출강 강사명 (계좌번호)</th>
+                    <th className="p-3">강의명 / 출강 주제</th>
+                    <th className="p-3 text-center">강의 수행일</th>
+                    <th className="p-3 text-right">정산 지급액</th>
+                    <th className="p-3 text-center">지급 예정일</th>
+                    <th className="p-3 text-center">송금 처리</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-neutral-850">
+                  {completedLectures.length === 0 ? (
+                    <tr>
+                      <td colSpan={7} className="text-center py-12 text-xs text-neutral-500 italic">
+                        정산 대상이 되는 완료된 출강 강의 건이 아직 없습니다.
+                      </td>
+                    </tr>
+                  ) : (
+                    completedLectures.map((lecture) => {
+                      const instructor = users.find(u => u.uid === lecture.assignedTo || u.name === lecture.assignedName);
+                      const bankAccount = instructor?.profileCard?.bankAccount || '계좌 정보 미기재';
+
+                      // Calculate settlement date (last day of following month)
+                      const getSettlementDate = (dateStr: string) => {
+                        if (!dateStr) return '익월 말일';
+                        try {
+                          const cleaned = dateStr.replace(/[\.\/]/g, '-').trim();
+                          const parts = cleaned.split('-');
+                          if (parts.length >= 2) {
+                            const year = parseInt(parts[0], 10);
+                            const month = parseInt(parts[1], 10); // 1-indexed
+                            if (!isNaN(year) && !isNaN(month)) {
+                              const lastDay = new Date(year, month + 1, 0);
+                              const y = lastDay.getFullYear();
+                              const m = String(lastDay.getMonth() + 1).padStart(2, '0');
+                              const d = String(lastDay.getDate()).padStart(2, '0');
+                              return `${y}년 ${m}월 ${d}일 (익월 말일)`;
+                            }
+                          }
+                          return '강의 다음 달 말일 정산';
+                        } catch (e) {
+                          return '강의 다음 달 말일 정산';
+                        }
+                      };
+
+                      return (
+                        <tr key={lecture.id} className="hover:bg-neutral-900/40 text-neutral-300">
+                          <td className="p-3 font-mono text-[10px] text-neutral-500">{lecture.id}</td>
+                          <td className="p-3">
+                            <div className="font-bold text-neutral-200">{lecture.assignedName || '지정 안됨'}</div>
+                            <div className="text-[10px] text-kpcia-gold font-mono flex items-center gap-1 mt-0.5">
+                              🏦 {bankAccount}
+                            </div>
+                          </td>
+                          <td className="p-3 font-medium text-neutral-200">{lecture.title}</td>
+                          <td className="p-3 text-center font-mono text-[11px] text-neutral-400">{lecture.date || '기재 없음'}</td>
+                          <td className="p-3 text-right font-mono font-bold text-kpcia-gold">{lecture.budget.toLocaleString()}원</td>
+                          <td className="p-3 text-center">
+                            <span className="px-2 py-0.5 rounded bg-neutral-900 text-neutral-400 font-mono text-[11px] border border-neutral-800">
+                              {getSettlementDate(lecture.date)}
+                            </span>
+                          </td>
+                          <td className="p-3 text-center">
+                            <span className="inline-flex items-center gap-1 text-[10px] px-2 py-0.5 rounded bg-amber-500/10 text-amber-500 border border-amber-500/20 font-bold">
+                              • 익월말 지급 대기
+                            </span>
+                          </td>
+                        </tr>
+                      );
+                    })
+                  )}
+                </tbody>
+              </table>
             </div>
           </div>
         )}
@@ -1444,6 +1793,10 @@ export default function AdminPanel({
                                 <span>출강 실적: <strong className="text-neutral-200 font-mono">{user.lectureCount || 0}회</strong></span>
                                 <span className="text-neutral-600 font-mono">|</span>
                                 <span>평균 만족도: <strong className="text-amber-500 font-mono">{user.averageRating !== undefined ? user.averageRating.toFixed(1) : '0.0'}점</strong></span>
+                              </div>
+                              <div className="text-[10px] text-neutral-400 font-sans flex items-center gap-1.5 pt-1 mt-1 border-t border-neutral-900/40">
+                                <span className="text-kpcia-gold font-bold">🏦 등록 계좌:</span>
+                                <span className="text-neutral-200 font-medium">{user.profileCard?.bankAccount || '미등록 (계좌 등록 필요)'}</span>
                               </div>
                             </div>
 
@@ -1577,13 +1930,27 @@ export default function AdminPanel({
                                   </div>
 
                                   <div className="pt-2 border-t border-neutral-800/60">
-                                    <label className="text-[10px] font-bold text-neutral-400 block mb-1">개별 강의 만족도 점수 추가 (0 ~ 100점)</label>
+                                    <label className="text-[10px] font-bold text-neutral-400 block mb-1">🏦 강사 계좌번호 (정산 정보)</label>
+                                    <input
+                                      type="text"
+                                      placeholder="예: 신한은행 110-345-234234"
+                                      value={perfBankAccount}
+                                      onChange={(e) => setPerfBankAccount(e.target.value)}
+                                      className="w-full px-2.5 py-1.5 rounded bg-neutral-950 border border-neutral-800 text-xs text-neutral-100 focus:border-kpcia-gold focus:outline-none"
+                                      id={`perf-bank-account-input-${user.uid}`}
+                                    />
+                                    <p className="text-[9px] text-neutral-500 mt-1">※ 이 계좌는 정산 완료 시 출강 강사 정산실에서 한눈에 조회됩니다.</p>
+                                  </div>
+
+                                  <div className="pt-2 border-t border-neutral-800/60">
+                                    <label className="text-[10px] font-bold text-neutral-400 block mb-1">개별 강의 만족도 점수 추가 (0.0 ~ 5.0점 만점)</label>
                                     <div className="flex items-center space-x-2">
                                       <input
                                         type="number"
                                         min={0}
-                                        max={100}
-                                        placeholder="예: 98"
+                                        max={5}
+                                        step={0.1}
+                                        placeholder="예: 4.8"
                                         value={newRatingInput}
                                         onChange={(e) => setNewRatingInput(e.target.value)}
                                         onKeyDown={(e) => {

@@ -1,0 +1,33 @@
+# KPCIA robots.txt - Optimized for SEO and AI Search Agents
+
+User-agent: *
+Allow: /
+
+# Directives for AI Search and LLM Crawlers
+User-agent: GPTBot
+Allow: /
+Crawl-delay: 1
+
+User-agent: ChatGPT-User
+Allow: /
+
+User-agent: ClaudeBot
+Allow: /
+
+User-agent: Claude-Web
+Allow: /
+
+User-agent: PerplexityBot
+Allow: /
+
+User-agent: Google-Extended
+Allow: /
+
+User-agent: Omgilibot
+Allow: /
+
+User-agent: facebookexternalhit
+Allow: /
+
+# Sitemap link
+Sitemap: https://kpcia.or.kr/sitemap.xml

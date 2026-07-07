@@ -124,6 +124,8 @@ export const INITIAL_LECTURES: LectureRequest[] = [
     duration: "3시간",
     location: "경기도 용인시 삼성인력개발원",
     attendees: 120,
+    managerName: "박준영 수석연구원",
+    managerPhone: "010-4321-8765",
     status: "open",
     applicants: [],
     createdAt: "2026-07-01T12:00:00Z"
@@ -142,6 +144,8 @@ export const INITIAL_LECTURES: LectureRequest[] = [
     duration: "3시간",
     location: "경기도 성남시 네이버 1784 사옥",
     attendees: 45,
+    managerName: "이서연 매니저",
+    managerPhone: "010-8765-4321",
     status: "open",
     applicants: [],
     createdAt: "2026-07-02T13:00:00Z"
@@ -160,6 +164,8 @@ export const INITIAL_LECTURES: LectureRequest[] = [
     duration: "2시간",
     location: "서울특별시 중구 SKT T-타워",
     attendees: 30,
+    managerName: "정우진 부장",
+    managerPhone: "010-5678-1234",
     status: "open",
     applicants: [],
     createdAt: "2026-07-03T14:00:00Z"

@@ -62,6 +62,8 @@ export interface LectureRequest {
   duration: string; // e.g. "2 hours"
   location: string;
   attendees?: number; // Number of lecture attendees
+  managerName?: string; // Contact manager name
+  managerPhone?: string; // Contact manager phone number
   status: 'open' | 'assigned' | 'completed';
   assignedTo?: string; // User ID of the assigned instructor
   assignedName?: string; // Name of the assigned instructor

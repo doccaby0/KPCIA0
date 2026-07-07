@@ -34,41 +34,177 @@ export default function LectureBoard({
     return userIndex >= requiredIndex;
   };
 
-  const downloadLectureAsTxt = (lecture: LectureRequest) => {
+  const downloadLectureAsExcel = (lecture: LectureRequest) => {
     const isPriceVisible = !currentUser || currentUser.uid === 'guest' 
       ? false 
       : currentUser.isAdmin || checkQualification(currentUser.tier, lecture.targetTier);
 
-    const textContent = `==================================================
-KPCIA 한국프레스티지강사협회 - 출강 공고 상세 정보
-==================================================
+    const totalCost = lecture.budget + 400000;
 
-■ 공고 제목       : ${lecture.title}
-■ 최저 지원 등급 : ${lecture.targetTier} 이상
-■ 출강 일자       : ${lecture.date}
-■ 출강 시간       : ${lecture.time} (${lecture.duration})
-■ 수강 대상       : ${lecture.attendees ? `${lecture.attendees}명` : '상세 정보 참조'}
-■ 출강 장소       : ${lecture.location}
-■ 출강 강사료     : ${isPriceVisible ? `${lecture.budget.toLocaleString()} KRW` : '[등급 달성시 공개]'}
-■ 마일리지 로열티 : ${lecture.mileageRoyalty.toLocaleString()} M
-■ 연계 교육 프로그램 : ${lecture.programTitle || '없음'}
-■ 공고 상태       : ${lecture.status === 'open' ? '모집중 (지원 가능)' : lecture.status === 'assigned' ? '배정 완료' : '종료'}
-
---------------------------------------------------
-[ 상세 강의 설명 ]
---------------------------------------------------
-${lecture.description}
-
-==================================================
-본 공고는 KPCIA 회원 및 검증된 소속 강사를 위한 공식 출강 정보입니다.
-출강 및 제휴 문의: KPCIA 한국프레스티지강사협회 (dh_kim@kpcia.or.kr)
-출력 일시: ${new Date().toLocaleString('ko-KR')}
-==================================================`;
+    const htmlContent = `
+<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel" xmlns="http://www.w3.org/TR/REC-html40">
+<head>
+<!--[if gte mso 9]>
+<xml>
+<x:ExcelWorkbook>
+<x:ExcelWorksheets>
+<x:ExcelWorksheet>
+<x:Name>출강강의파견안내서</x:Name>
+<x:WorksheetOptions>
+<x:DisplayGridlines/>
+</x:WorksheetOptions>
+</x:ExcelWorksheet>
+</x:ExcelWorksheets>
+</x:ExcelWorkbook>
+</xml>
+<![endif]-->
+<meta http-equiv="content-type" content="application/vnd.ms-excel; charset=UTF-8"/>
+<style>
+  table { border-collapse: collapse; font-family: 'Malgun Gothic', 'Dotum', sans-serif; }
+  td { border: 1px solid #D1D5DB; padding: 10px; font-size: 11px; vertical-align: middle; }
+  .header-title { background-color: #1F4E79; color: #FFFFFF; font-size: 16px; font-weight: bold; text-align: center; padding: 15px; border: 1px solid #1F4E79; }
+  .section-title { background-color: #D9E1F2; color: #1F4E79; font-size: 12px; font-weight: bold; text-align: left; padding: 8px; border: 1px solid #B4C6E7; }
+  .label-cell { background-color: #F2F2F2; font-weight: bold; text-align: center; width: 120px; }
+  .value-cell { text-align: left; }
+  .tbl-header { background-color: #D9E1F2; font-weight: bold; text-align: center; }
+  .align-center { text-align: center; }
+  .align-right { text-align: right; }
+  .total-row { background-color: #FFF2CC; font-weight: bold; }
+  .notice-text { color: #C00000; font-weight: bold; font-size: 11px; line-height: 1.6; }
+</style>
+</head>
+<body>
+<table>
+  <tr>
+    <td colspan="6" class="header-title">[인사이트9교육연구소] 출강 강의 파견 안내서</td>
+  </tr>
+  <tr style="height: 10px;"><td colspan="6" style="border: none;"></td></tr>
+  <tr>
+    <td colspan="6" class="section-title">1. 기본 강의 정보</td>
+  </tr>
+  <tr>
+    <td class="label-cell">기관명</td>
+    <td colspan="5" class="value-cell">${lecture.location ? lecture.location.split(' ')[0] : '협력기관'}</td>
+  </tr>
+  <tr>
+    <td class="label-cell">교육 일정</td>
+    <td colspan="2" class="value-cell">${lecture.date}</td>
+    <td class="label-cell">교육 시간</td>
+    <td colspan="2" class="value-cell">${lecture.time} (총 ${lecture.duration})</td>
+  </tr>
+  <tr>
+    <td class="label-cell">장소</td>
+    <td colspan="5" class="value-cell">${lecture.location}</td>
+  </tr>
+  <tr>
+    <td class="label-cell">교육 주제</td>
+    <td colspan="5" class="value-cell">${lecture.title}</td>
+  </tr>
+  <tr>
+    <td class="label-cell">현장 담당자</td>
+    <td colspan="2" class="value-cell">${lecture.managerName || '김성진'}</td>
+    <td class="label-cell">연락처</td>
+    <td colspan="2" class="value-cell">${lecture.managerPhone || '010-5259-7458'}</td>
+  </tr>
+  <tr style="height: 10px;"><td colspan="6" style="border: none;"></td></tr>
+  <tr>
+    <td colspan="6" class="section-title">2. 비용 및 정산 안내</td>
+  </tr>
+  <tr class="tbl-header">
+    <td colspan="2">항목</td>
+    <td>금액 / 계산 기준</td>
+    <td colspan="2">내용</td>
+    <td>비고 (주의사항)</td>
+  </tr>
+  <tr>
+    <td colspan="2" class="align-center">강사료</td>
+    <td class="align-right">${isPriceVisible ? `${lecture.budget.toLocaleString()}원` : '[등급 달성시 공개]'}</td>
+    <td colspan="2" class="align-center">${lecture.duration}</td>
+    <td>실비 정산 가능</td>
+  </tr>
+  <tr>
+    <td colspan="2" class="align-center">재료비</td>
+    <td class="align-right">400,000원</td>
+    <td colspan="2" class="align-center">20000 * 20</td>
+    <td>(정원 미달 시에도 남은 재료 소진 필수)</td>
+  </tr>
+  <tr class="total-row">
+    <td colspan="2" class="align-center">총 비용</td>
+    <td class="align-right">${isPriceVisible ? `${totalCost.toLocaleString()}원` : '[등급 달성시 공개]'}</td>
+    <td colspan="2" class="align-center"></td>
+    <td>합계 금액</td>
+  </tr>
+  <tr style="height: 10px;"><td colspan="6" style="border: none;"></td></tr>
+  <tr>
+    <td colspan="6" class="section-title">3. 프로그램 진행 플로우 (강사 행동 요령)</td>
+  </tr>
+  <tr class="tbl-header">
+    <td>단계</td>
+    <td colspan="2">시간 및 타이밍</td>
+    <td colspan="2">주요 행동 지침</td>
+    <td>완료 체크</td>
+  </tr>
+  <tr>
+    <td class="align-center">사전 준비</td>
+    <td colspan="2" class="align-center">강의 시작 30분 전</td>
+    <td colspan="2">현장 도착 완료 및 교육장 세팅 후 '세팅 완료 사진' 촬영 필수</td>
+    <td class="align-center">[ ]</td>
+  </tr>
+  <tr>
+    <td class="align-center">강의 진행</td>
+    <td colspan="2" class="align-center">강의 중</td>
+    <td colspan="2">수강생 교육 진행 및 활발한 스케치 사진(강의 중 사진) 촬영</td>
+    <td class="align-center">[ ]</td>
+  </tr>
+  <tr>
+    <td class="align-center">마무리</td>
+    <td colspan="2" class="align-center">강의 종료 10분 전</td>
+    <td colspan="2">프로그램 완료, 결과물 모아서 단체 사진 촬영 및 만족도 QR 조사 실시</td>
+    <td class="align-center">[ ]</td>
+  </tr>
+  <tr>
+    <td class="align-center">사후 보고</td>
+    <td colspan="2" class="align-center">강의 종료 후 즉시</td>
+    <td colspan="2">촬영한 모든 사진(세팅, 강의, 결과물 등)을 대표님 카카오톡으로 전송</td>
+    <td class="align-center">[ ]</td>
+  </tr>
+  <tr style="height: 10px;"><td colspan="6" style="border: none;"></td></tr>
+  <tr>
+    <td colspan="6" class="section-title">4. 강의 후 행정 및 결제 처리 안내</td>
+  </tr>
+  <tr>
+    <td colspan="2" class="label-cell">지출증빙 영수증 제출</td>
+    <td colspan="4" class="value-cell">총예산 지출증빙 영수증을 사진 촬영 또는 이메일로 발송 (insight9edu@naver.com)</td>
+  </tr>
+  <tr>
+    <td colspan="2" class="label-cell">현금영수증 발행 정보</td>
+    <td colspan="4" class="value-cell">사업자 지출증빙용: 702-41-00899 (인사이트9교육연구소)</td>
+  </tr>
+  <tr>
+    <td colspan="2" class="label-cell">현장 추가 문의 응대</td>
+    <td colspan="4" class="value-cell">현장 담당자의 프로그램/강의 예산 추가 문의 시 -> '인사이트9교육연구소(본사)에 연락하시면 안내해 드립니다'로 응대</td>
+  </tr>
+  <tr style="height: 10px;"><td colspan="6" style="border: none;"></td></tr>
+  <tr>
+    <td colspan="6" class="section-title">5. 주의 및 특이사항 (필수 준수)</td>
+  </tr>
+  <tr>
+    <td colspan="6" class="notice-text">
+      • 현장 담당자에게 소속 소개 시 인사이트9교육연구소와 함께하는 협력 기관·이라고 소개해주세요.<br/>
+      • 출강 전 현장 담당자와 연락하여 강의장 컨디션, 시간, 장소, 특이사항을 사전 체크해주세요.<br/>
+      • 현장에서 인원 추가는 절대 불가합니다. 요청 시 '본사에서 정해진 인원으로만 진행된다'고 안내해주세요.<br/>
+      • 개인/협회/공방 SNS나 블로그에 후기 PR 게시 시 '인사이트9교육연구소와 협업했다'는 내용을 꼭 기재해주세요.
+    </td>
+  </tr>
+</table>
+</body>
+</html>
+    `.trim();
 
     const element = document.createElement("a");
-    const file = new Blob([textContent], { type: 'text/plain;charset=utf-8' });
+    const file = new Blob([htmlContent], { type: 'application/vnd.ms-excel;charset=utf-8' });
     element.href = URL.createObjectURL(file);
-    element.download = `KPCIA_출강공고_${lecture.title.replace(/[\s/\\:*?"<>|]/g, '_')}.txt`;
+    element.download = `[인사이트9교육연구소]출강강의파견안내서_${lecture.title.replace(/[\s/\\:*?"<>|]/g, '_')}.xls`;
     document.body.appendChild(element);
     element.click();
     document.body.removeChild(element);
@@ -143,15 +279,6 @@ ${lecture.description}
 
                   {/* Required Tier Qualification */}
                   <div className="flex items-center space-x-2">
-                    <button
-                      onClick={() => downloadLectureAsTxt(lecture)}
-                      className="px-2 py-1 bg-neutral-950 hover:bg-neutral-800 border border-neutral-850 hover:border-kpcia-gold/30 text-[10px] text-neutral-400 hover:text-kpcia-gold rounded font-medium flex items-center gap-1 transition-all cursor-pointer"
-                      title="강의 내용을 메모장(TXT) 파일로 다운로드합니다."
-                      id={`download-txt-${lecture.id}`}
-                    >
-                      <FileDown className="w-3 h-3 text-neutral-500 group-hover:text-kpcia-gold" />
-                      <span>메모장 출력</span>
-                    </button>
                     <span className={`text-[9px] px-2.5 py-0.5 rounded-full font-mono font-bold border ${tierColors[lecture.targetTier]}`}>
                       {lecture.targetTier} ↑ 지원 가능
                     </span>

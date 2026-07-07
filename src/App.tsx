@@ -436,7 +436,7 @@ export default function App() {
   };
 
   // 8.05. Update Instructor Lecture Count & Satisfaction Ratings (Admin Only)
-  const handleUpdateUserPerformance = async (userId: string, lectureCount: number, ratings: number[]) => {
+  const handleUpdateUserPerformance = async (userId: string, lectureCount: number, ratings: number[], bankAccount?: string) => {
     const targetUser = users.find(u => u.uid === userId);
     if (!targetUser) return;
 
@@ -449,6 +449,10 @@ export default function App() {
       lectureCount,
       lectureRatings: ratings,
       averageRating: avg,
+      profileCard: {
+        ...targetUser.profileCard,
+        bankAccount: bankAccount !== undefined ? bankAccount : targetUser.profileCard?.bankAccount
+      },
       updatedAt: new Date().toISOString()
     };
 
@@ -459,7 +463,7 @@ export default function App() {
       setCurrentUser(updatedUser);
     }
 
-    triggerToast(`${targetUser.name} 강사님의 출강 실적(출강 횟수 ${lectureCount}회, 평균 만족도 ${avg}점)이 성공적으로 저장되었습니다!`);
+    triggerToast(`${targetUser.name} 강사님의 실적 및 정산 정보가 성공적으로 업데이트되었습니다!`);
   };
 
   // 8.1. Register Partnership Proposal
@@ -1113,87 +1117,87 @@ export default function App() {
                   className="space-y-4 text-left"
                 >
                   {verificationError && (
-                    <div className="p-2.5 rounded-lg bg-red-950/50 border border-red-900/50 text-[11px] text-red-400 font-medium">
-                      {verificationError}
+                    <div className="p-3 rounded-xl bg-red-950/40 border-2 border-red-800/50 text-xs text-red-300 font-semibold leading-relaxed">
+                      ⚠ {verificationError}
                     </div>
                   )}
 
                   <div className="space-y-1.5">
-                    <label className="block text-[10px] font-bold text-neutral-400 uppercase tracking-wide">성명 <span className="text-kpcia-gold">*</span></label>
+                    <label className="block text-[11px] font-bold text-neutral-300 uppercase tracking-wider">성명 <span className="text-kpcia-gold font-black">*</span></label>
                     <input
                       type="text"
                       required
                       value={gwName}
                       onChange={(e) => setGwName(e.target.value)}
                       placeholder="예: 김성우 강사"
-                      className="w-full px-3 py-1.5 bg-neutral-950 border border-neutral-800 rounded-lg text-xs text-neutral-100 focus:border-kpcia-gold/50 outline-none"
+                      className="w-full px-4 py-2.5 bg-neutral-950 border border-neutral-700 hover:border-neutral-500 focus:border-kpcia-gold rounded-xl text-sm text-neutral-100 outline-none transition-all placeholder:text-neutral-500 font-medium"
                     />
                   </div>
 
-                  <div className="grid grid-cols-2 gap-3">
+                  <div className="grid grid-cols-2 gap-4">
                     <div className="space-y-1.5">
-                      <label className="block text-[10px] font-bold text-neutral-400 uppercase tracking-wide">로그인용 아이디 <span className="text-kpcia-gold">*</span></label>
+                      <label className="block text-[11px] font-bold text-neutral-300 uppercase tracking-wider">로그인용 아이디 <span className="text-kpcia-gold font-black">*</span></label>
                       <input
                         type="text"
                         required
                         value={gwLoginId}
                         onChange={(e) => setGwLoginId(e.target.value.replace(/[^a-zA-Z0-9]/g, ''))}
                         placeholder="아이디 (영문/숫자)"
-                        className="w-full px-3 py-1.5 bg-neutral-950 border border-neutral-800 rounded-lg text-xs text-neutral-100 focus:border-kpcia-gold/50 outline-none"
+                        className="w-full px-4 py-2.5 bg-neutral-950 border border-neutral-700 hover:border-neutral-500 focus:border-kpcia-gold rounded-xl text-sm text-neutral-100 outline-none transition-all placeholder:text-neutral-500 font-medium"
                       />
                     </div>
 
                     <div className="space-y-1.5">
-                      <label className="block text-[10px] font-bold text-neutral-400 uppercase tracking-wide">비밀번호 <span className="text-kpcia-gold">*</span></label>
+                      <label className="block text-[11px] font-bold text-neutral-300 uppercase tracking-wider">비밀번호 <span className="text-kpcia-gold font-black">*</span></label>
                       <input
                         type="password"
                         required
                         value={gwPassword}
                         onChange={(e) => setGwPassword(e.target.value)}
                         placeholder="비밀번호"
-                        className="w-full px-3 py-1.5 bg-neutral-950 border border-neutral-800 rounded-lg text-xs text-neutral-100 focus:border-kpcia-gold/50 outline-none"
+                        className="w-full px-4 py-2.5 bg-neutral-950 border border-neutral-700 hover:border-neutral-500 focus:border-kpcia-gold rounded-xl text-sm text-neutral-100 outline-none transition-all placeholder:text-neutral-500 font-medium"
                       />
                     </div>
                   </div>
 
                   <div className="space-y-1.5">
-                    <label className="block text-[10px] font-bold text-neutral-400 uppercase tracking-wide">이메일 주소 <span className="text-kpcia-gold">*</span></label>
+                    <label className="block text-[11px] font-bold text-neutral-300 uppercase tracking-wider">이메일 주소 <span className="text-kpcia-gold font-black">*</span></label>
                     <input
                       type="email"
                       required
                       value={gwEmail}
                       onChange={(e) => setGwEmail(e.target.value)}
                       placeholder="sungwoo@kpcia.or.kr"
-                      className="w-full px-3 py-1.5 bg-neutral-950 border border-neutral-800 rounded-lg text-xs text-neutral-100 focus:border-kpcia-gold/50 outline-none"
+                      className="w-full px-4 py-2.5 bg-neutral-950 border border-neutral-700 hover:border-neutral-500 focus:border-kpcia-gold rounded-xl text-sm text-neutral-100 outline-none transition-all placeholder:text-neutral-500 font-medium"
                     />
                   </div>
 
                   <div className="space-y-1.5">
-                    <label className="block text-[10px] font-bold text-neutral-400 uppercase tracking-wide">연락처 (휴대폰)</label>
+                    <label className="block text-[11px] font-bold text-neutral-300 uppercase tracking-wider">연락처 (휴대폰)</label>
                     <input
                       type="tel"
                       value={gwPhone}
                       onChange={(e) => setGwPhone(e.target.value)}
                       placeholder="010-9999-8888"
-                      className="w-full px-3 py-1.5 bg-neutral-950 border border-neutral-800 rounded-lg text-xs text-neutral-100 focus:border-kpcia-gold/50 outline-none"
+                      className="w-full px-4 py-2.5 bg-neutral-950 border border-neutral-700 hover:border-neutral-500 focus:border-kpcia-gold rounded-xl text-sm text-neutral-100 outline-none transition-all placeholder:text-neutral-500 font-medium"
                     />
                   </div>
 
                   <div className="space-y-1.5">
-                    <label className="block text-[10px] font-bold text-neutral-400 uppercase tracking-wide">핵심 강의 전문 분야</label>
+                    <label className="block text-[11px] font-bold text-neutral-300 uppercase tracking-wider">핵심 강의 전문 분야</label>
                     <input
                       type="text"
                       value={gwTitle}
                       onChange={(e) => setGwTitle(e.target.value)}
                       placeholder="예: HRD 조직문화 및 리더십 혁신"
-                      className="w-full px-3 py-1.5 bg-neutral-950 border border-neutral-800 rounded-lg text-xs text-neutral-100 focus:border-kpcia-gold/50 outline-none"
+                      className="w-full px-4 py-2.5 bg-neutral-950 border border-neutral-700 hover:border-neutral-500 focus:border-kpcia-gold rounded-xl text-sm text-neutral-100 outline-none transition-all placeholder:text-neutral-500 font-medium"
                     />
                   </div>
 
-                  <div className="pt-3 border-t border-neutral-800/60 flex space-x-2">
+                  <div className="pt-4 border-t border-neutral-800/80 flex space-x-2">
                     <button
                       type="submit"
-                      className="w-full py-2.5 bg-kpcia-gold hover:bg-kpcia-gold-hover text-kpcia-dark text-xs font-black rounded-lg transition-all shadow-md shadow-kpcia-gold/10 text-center uppercase cursor-pointer"
+                      className="w-full py-3 bg-kpcia-gold hover:bg-kpcia-gold-hover text-kpcia-dark text-xs font-black rounded-xl transition-all shadow-lg shadow-kpcia-gold/15 text-center uppercase cursor-pointer"
                     >
                       KPCIA 강사 가입 신청 완료
                     </button>
