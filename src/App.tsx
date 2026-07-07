@@ -774,280 +774,8 @@ export default function App() {
     setLoginError('아이디 또는 비밀번호가 일치하지 않습니다.');
   };
 
-  // Global Register Modal Renderer with Interactive Email Verification Wizard
-  const renderRegisterModal = () => {
-    return null;
-  };
-
-  const _disabledRegisterModal = () => {
-    return (
-      <div className="fixed inset-0 z-[9999] bg-black/90 backdrop-blur-md flex items-start justify-center p-4 overflow-y-auto font-sans" id="gateway-register-modal">
-        <div className="bg-neutral-900 border-2 border-kpcia-gold/30 rounded-2xl w-full max-w-md overflow-hidden shadow-2xl relative my-auto" id="gateway-register-container">
-          <div className="p-5 border-b border-neutral-800 bg-neutral-950/50 flex justify-between items-center">
-            <div>
-              <h3 className="text-sm font-bold text-neutral-100 flex items-center gap-1.5">
-                <LogIn className="w-4 h-4 text-kpcia-gold" />
-                <span>KPCIA 신규 강사 회원가입</span>
-              </h3>
-              <p className="text-[10px] text-neutral-400 mt-0.5">
-                {verificationStep === 'input' 
-                  ? '협회 공식 명부에 등록하기 위해 필수 정보를 입력해 주세요.' 
-                  : '입력하신 이메일의 소유 여부를 확인합니다.'}
-              </p>
-            </div>
-            <button 
-              onClick={() => {
-                setShowGatewayRegister(false);
-                setGwName('');
-                setGwEmail('');
-                setGwTitle('');
-                setGwPhone('');
-                setGwLoginId('');
-                setGwPassword('');
-                setVerificationStep('input');
-                setVerificationCode('');
-                setGeneratedCode('');
-                setVerificationError('');
-              }}
-              className="text-neutral-400 hover:text-neutral-200 transition-colors cursor-pointer"
-            >
-              <X className="w-4 h-4" />
-            </button>
-          </div>
-
-          {verificationStep === 'input' ? (
-            <form 
-              onSubmit={(e) => {
-                e.preventDefault();
-                if (!gwName.trim() || !gwEmail.trim()) return;
-
-                const trimmedId = gwLoginId.trim();
-                const trimmedPw = gwPassword.trim();
-
-                if (!trimmedId || !trimmedPw) {
-                  setVerificationError('로그인용 아이디와 비밀번호를 모두 입력해 주세요.');
-                  return;
-                }
-
-                if (trimmedId.length < 3) {
-                  setVerificationError('아이디는 최소 3글자 이상이어야 합니다.');
-                  return;
-                }
-                
-                // Simple email check
-                const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-                if (!emailRegex.test(gwEmail.trim())) {
-                  setVerificationError('유효한 이메일 형식이 아닙니다.');
-                  return;
-                }
-
-                // Generate 6 digit simulated verification code
-                const code = Math.floor(100000 + Math.random() * 900000).toString();
-                setGeneratedCode(code);
-                setVerificationStep('verify');
-                setVerificationCode('');
-                setVerificationError('');
-                triggerToast('이메일 주소로 인증코드가 발송되었습니다. (하단 시뮬레이션 창을 확인하세요!)', 'info');
-              }} 
-              className="p-5 space-y-4 text-left font-sans"
-            >
-              {verificationError && (
-                <div className="p-3 rounded-lg bg-red-950/50 border border-red-900/50 text-[11px] text-red-400 font-medium">
-                  {verificationError}
-                </div>
-              )}
-
-              <div className="space-y-1.5">
-                <label className="block text-[10px] font-bold text-neutral-400 uppercase tracking-wide">성명 <span className="text-kpcia-gold">*</span></label>
-                <input
-                  type="text"
-                  required
-                  value={gwName}
-                  onChange={(e) => setGwName(e.target.value)}
-                  placeholder="예: 김성우 강사"
-                  className="w-full px-3 py-2 bg-neutral-950 border border-neutral-800 rounded-lg text-xs text-neutral-100 focus:border-kpcia-gold/50 outline-none"
-                />
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <div className="space-y-1.5">
-                  <label className="block text-[10px] font-bold text-neutral-400 uppercase tracking-wide">로그인용 아이디 <span className="text-kpcia-gold">*</span></label>
-                  <input
-                    type="text"
-                    required
-                    value={gwLoginId}
-                    onChange={(e) => setGwLoginId(e.target.value.replace(/[^a-zA-Z0-9]/g, ''))}
-                    placeholder="아이디 (영문/숫자)"
-                    className="w-full px-3 py-2 bg-neutral-950 border border-neutral-800 rounded-lg text-xs text-neutral-100 focus:border-kpcia-gold/50 outline-none animate-in fade-in"
-                  />
-                </div>
-
-                <div className="space-y-1.5">
-                  <label className="block text-[10px] font-bold text-neutral-400 uppercase tracking-wide">비밀번호 <span className="text-kpcia-gold">*</span></label>
-                  <input
-                    type="password"
-                    required
-                    value={gwPassword}
-                    onChange={(e) => setGwPassword(e.target.value)}
-                    placeholder="비밀번호"
-                    className="w-full px-3 py-2 bg-neutral-950 border border-neutral-800 rounded-lg text-xs text-neutral-100 focus:border-kpcia-gold/50 outline-none animate-in fade-in"
-                  />
-                </div>
-              </div>
-
-              <div className="space-y-1.5">
-                <label className="block text-[10px] font-bold text-neutral-400 uppercase tracking-wide">이메일 주소 <span className="text-kpcia-gold">*</span></label>
-                <input
-                  type="email"
-                  required
-                  value={gwEmail}
-                  onChange={(e) => setGwEmail(e.target.value)}
-                  placeholder="sungwoo@kpcia.or.kr"
-                  className="w-full px-3 py-2 bg-neutral-950 border border-neutral-800 rounded-lg text-xs text-neutral-100 focus:border-kpcia-gold/50 outline-none"
-                />
-              </div>
-
-              <div className="space-y-1.5">
-                <label className="block text-[10px] font-bold text-neutral-400 uppercase tracking-wide">연락처 (휴대폰)</label>
-                <input
-                  type="tel"
-                  value={gwPhone}
-                  onChange={(e) => setGwPhone(e.target.value)}
-                  placeholder="010-9999-8888"
-                  className="w-full px-3 py-2 bg-neutral-950 border border-neutral-800 rounded-lg text-xs text-neutral-100 focus:border-kpcia-gold/50 outline-none"
-                />
-              </div>
-
-              <div className="space-y-1.5">
-                <label className="block text-[10px] font-bold text-neutral-400 uppercase tracking-wide">핵심 강의 전문 분야</label>
-                <input
-                  type="text"
-                  value={gwTitle}
-                  onChange={(e) => setGwTitle(e.target.value)}
-                  placeholder="예: HRD 조직문화 및 리더십 혁신"
-                  className="w-full px-3 py-2 bg-neutral-950 border border-neutral-800 rounded-lg text-xs text-neutral-100 focus:border-kpcia-gold/50 outline-none"
-                />
-              </div>
-
-              <div className="space-y-1.5">
-                <label className="block text-[10px] font-bold text-neutral-400 uppercase tracking-wide">인증 등급 (회원 정책 고정)</label>
-                <div className="w-full px-3 py-2.5 bg-neutral-950/80 border border-neutral-800 rounded-lg text-xs text-neutral-300 font-mono flex justify-between items-center">
-                  <span>Prestige Member (일반 회원)</span>
-                  <span className="text-[10px] text-kpcia-gold bg-kpcia-gold/10 px-2 py-0.5 rounded border border-kpcia-gold/25 font-sans font-bold">기본 적용</span>
-                </div>
-                <p className="text-[9px] text-neutral-500 font-sans mt-1">
-                  ※ KPCIA 정관에 의거, 신규 가입 강사는 최초 Prestige Member(일반 회원) 등급으로 자동 등록되며, 출강 이력 만족도 산정에 의해 순차적으로 등급 승격 자격이 부여됩니다.
-                </p>
-              </div>
-
-              <div className="pt-3 border-t border-neutral-800/60 flex space-x-2">
-                <button
-                  type="button"
-                  onClick={() => {
-                    setShowGatewayRegister(false);
-                    setGwName('');
-                    setGwEmail('');
-                    setGwTitle('');
-                    setGwPhone('');
-                    setVerificationError('');
-                  }}
-                  className="flex-1 py-2 bg-neutral-950 hover:bg-neutral-900 border border-neutral-800 text-neutral-300 text-xs font-bold rounded-lg transition-all"
-                >
-                  취소
-                </button>
-                <button
-                  type="submit"
-                  className="flex-1 py-2 bg-kpcia-gold hover:bg-kpcia-gold-hover text-kpcia-dark text-xs font-extrabold rounded-lg transition-all shadow-md shadow-kpcia-gold/10"
-                >
-                  이메일 인증 요청
-                </button>
-              </div>
-            </form>
-          ) : (
-            <div className="p-5 space-y-4 text-left font-sans">
-              <div className="space-y-2">
-                <span className="text-[10px] font-bold text-kpcia-gold uppercase tracking-wider block">STEP 2: 이메일 검증 진행 중</span>
-                <p className="text-xs text-neutral-300 leading-relaxed">
-                  입력하신 이메일 주소 <strong className="text-neutral-100">{gwEmail}</strong>의 실제 소유주 확인을 위해 모의 전송된 6자리 코드를 아래에 기입해 주세요.
-                </p>
-              </div>
-
-              <div className="space-y-1.5">
-                <label className="block text-[10px] font-bold text-neutral-400 uppercase tracking-wide">6자리 인증코드 입력</label>
-                <input
-                  type="text"
-                  maxLength={6}
-                  value={verificationCode}
-                  onChange={(e) => setVerificationCode(e.target.value.replace(/[^0-9]/g, ''))}
-                  placeholder="XXXXXX"
-                  className="w-full px-4 py-3 bg-neutral-950 border border-neutral-800 rounded-lg text-lg text-center tracking-widest font-mono text-kpcia-gold focus:border-kpcia-gold outline-none"
-                />
-                {verificationError && (
-                  <p className="text-[10px] text-red-400 font-medium mt-1">※ {verificationError}</p>
-                )}
-              </div>
-
-              {/* Simulated Mailbox Widget for Developer preview and testing */}
-              <div className="bg-neutral-950/80 border border-neutral-800 p-3 rounded-xl space-y-2">
-                <div className="flex items-center justify-between text-[9px] font-mono text-neutral-500">
-                  <span className="text-kpcia-gold font-bold">✉ KPCIA 모의 이메일 전송 수신함</span>
-                  <span className="bg-kpcia-gold/10 text-kpcia-gold px-1.5 rounded">SIMULATOR ACTIVE</span>
-                </div>
-                <div className="text-[11px] font-mono space-y-1 text-neutral-300 border-t border-neutral-900 pt-1.5">
-                  <div><strong>수신:</strong> {gwEmail}</div>
-                  <div><strong>제목:</strong> KPCIA 강사 회원 검증용 인증 코드</div>
-                  <div className="mt-2 text-center p-2 bg-neutral-900 border border-neutral-800 text-base font-bold tracking-widest text-kpcia-gold select-all">
-                    {generatedCode}
-                  </div>
-                </div>
-                <p className="text-[9px] text-neutral-500 font-sans leading-normal">
-                  ※ 실제 가입을 시험해볼 수 있도록 시스템에서 가상의 메일함으로 코드를 실시간 발송해 시각화한 모듈입니다. 위 숫자를 클릭해 복사하여 상단 칸에 입력하세요.
-                </p>
-              </div>
-
-              <div className="pt-3 border-t border-neutral-800/60 flex space-x-2">
-                <button
-                  type="button"
-                  onClick={() => {
-                    setVerificationStep('input');
-                    setVerificationError('');
-                  }}
-                  className="flex-1 py-2 bg-neutral-950 hover:bg-neutral-900 border border-neutral-800 text-neutral-300 text-xs font-bold rounded-lg transition-all"
-                >
-                  이전 단계로
-                </button>
-                <button
-                  onClick={() => {
-                    if (verificationCode === generatedCode) {
-                      handleRegisterUser(gwName.trim(), gwEmail.trim(), gwTier, gwTitle.trim(), gwPhone.trim(), gwLoginId.trim(), gwPassword.trim());
-                      
-                      // Reset and Close
-                      setShowGatewayRegister(false);
-                      setGwName('');
-                      setGwEmail('');
-                      setGwTitle('');
-                      setGwPhone('');
-                      setGwLoginId('');
-                      setGwPassword('');
-                      setVerificationStep('input');
-                      setVerificationCode('');
-                      setGeneratedCode('');
-                      setVerificationError('');
-                    } else {
-                      setVerificationError('인증코드가 일치하지 않습니다. 시뮬레이터 수신함에 적힌 코드를 입력해 주세요.');
-                    }
-                  }}
-                  className="flex-1 py-2 bg-kpcia-gold hover:bg-kpcia-gold-hover text-kpcia-dark text-xs font-extrabold rounded-lg transition-all shadow-md shadow-kpcia-gold/10"
-                >
-                  인증 완료 및 가입
-                </button>
-              </div>
-            </div>
-          )}
-        </div>
-      </div>
-    );
-  };
+  // Unified auth modal registration entry points
+  const renderRegisterModal = () => null;
 
   const handleMobileLogin = async (emailOrName: string, password?: string): Promise<boolean> => {
     const trimmedId = emailOrName.trim();
@@ -1265,354 +993,212 @@ export default function App() {
                   </button>
                 </form>
               ) : (
-                /* ================= REGISTER FORM (WIZARD) ================= */
-                verificationStep === 'input' ? (
-                  <form 
-                    onSubmit={async (e) => {
-                      e.preventDefault();
-                      setVerificationError('');
-                      
-                      const nameStr = gwName.trim();
-                      const emailStr = gwEmail.trim();
-                      const trimmedId = gwLoginId.trim();
-                      const trimmedPw = gwPassword.trim();
+                <form 
+                  onSubmit={async (e) => {
+                    e.preventDefault();
+                    setVerificationError('');
+                    
+                    const nameStr = gwName.trim();
+                    const emailStr = gwEmail.trim();
+                    const trimmedId = gwLoginId.trim();
+                    const trimmedPw = gwPassword.trim();
 
-                      if (!nameStr || !emailStr || !trimmedId || !trimmedPw) {
-                        setVerificationError('모든 필수 항목(*)을 작성해 주세요.');
-                        return;
-                      }
+                    if (!nameStr || !emailStr || !trimmedId || !trimmedPw) {
+                      setVerificationError('모든 필수 항목(*)을 작성해 주세요.');
+                      return;
+                    }
 
-                      if (trimmedId.length < 3) {
-                        setVerificationError('아이디는 최소 3글자 이상이어야 합니다.');
-                        return;
-                      }
-                      
-                      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-                      if (!emailRegex.test(emailStr)) {
-                        setVerificationError('유효한 이메일 형식이 아닙니다.');
-                        return;
-                      }
+                    if (trimmedId.length < 3) {
+                      setVerificationError('아이디는 최소 3글자 이상이어야 합니다.');
+                      return;
+                    }
+                    
+                    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+                    if (!emailRegex.test(emailStr)) {
+                      setVerificationError('유효한 이메일 형식이 아닙니다.');
+                      return;
+                    }
 
-                      // Try registering via Firebase Auth
-                      if (auth && useFirestore && !forceSimulationAuth) {
-                        try {
-                          // Create the auth user
-                          const userCredential = await createUserWithEmailAndPassword(auth, emailStr, trimmedPw);
-                          // Send email verification
-                          await sendEmailVerification(userCredential.user);
-                          
-                          setVerificationStep('verify');
-                          setVerificationError('');
-                          setIsOperationNotAllowedError(false);
-                          triggerToast('Firebase Auth 인증 메일이 발송되었습니다. 가입하신 메일 수신함을 확인해 주세요.', 'success');
-                        } catch (err: any) {
-                          console.error("Firebase registration failed:", err);
-                          let errorMsg = err.message;
-                          if (err.code === 'auth/email-already-in-use') {
-                            errorMsg = '이미 가입된 이메일 주소입니다. 다른 이메일 주소를 입력하거나 로그인을 진행해 주세요.';
-                          } else if (err.code === 'auth/weak-password') {
-                            errorMsg = '비밀번호가 너무 취약합니다. 최소 6자리 이상의 비밀번호를 설정해 주세요.';
-                          } else if (err.code === 'auth/invalid-email') {
-                            errorMsg = '올바르지 않은 이메일 형식입니다.';
-                          } else if (err.code === 'auth/operation-not-allowed' || err.message?.includes('Operation-not-allowed')) {
-                            errorMsg = 'Firebase 가입 오류: Firebase 콘솔의 Authentication -> Sign-in method에서 이메일/비밀번호(Email/Password) 로그인이 활성화되어 있지 않습니다.';
-                            setIsOperationNotAllowedError(true);
-                          } else {
-                            errorMsg = `Firebase 가입 오류: ${err.message}. (Firebase Console의 Email/Password 활성화 상태를 점검해 보세요.)`;
-                          }
-                          setVerificationError(errorMsg);
-                        }
-                      } else {
-                        // Fallback to simulation if Firebase is not connected or bypass is on
-                        const code = Math.floor(100000 + Math.random() * 900000).toString();
-                        setGeneratedCode(code);
-                        setVerificationStep('verify');
-                        setVerificationCode('');
+                    // Try registering via Firebase Auth
+                    if (auth && useFirestore) {
+                      try {
+                        const userCredential = await createUserWithEmailAndPassword(auth, emailStr, trimmedPw);
+                        const fbUser = userCredential.user;
+                        
+                        await handleRegisterUser(
+                          nameStr,
+                          emailStr,
+                          gwTier,
+                          gwTitle.trim(),
+                          gwPhone.trim(),
+                          trimmedId,
+                          trimmedPw,
+                          fbUser.uid,
+                          true
+                        );
+                        
+                        setShowAuthModal(false);
+                        // Reset state
+                        setGwName('');
+                        setGwEmail('');
+                        setGwTitle('');
+                        setGwPhone('');
+                        setGwLoginId('');
+                        setGwPassword('');
                         setVerificationError('');
-                        setIsOperationNotAllowedError(false);
-                        triggerToast('시뮬레이션 인증 코드가 발송되었습니다. (하단 시뮬레이션 창을 확인하세요!)', 'info');
+                      } catch (err: any) {
+                        console.warn("Firebase Auth registration failed, fallback to local DB registration:", err);
+                        
+                        if (err.code === 'auth/email-already-in-use') {
+                          setVerificationError('이미 가입된 이메일 주소입니다. 다른 이메일 주소를 입력해 주세요.');
+                          return;
+                        } else if (err.code === 'auth/weak-password') {
+                          setVerificationError('비밀번호가 너무 취약합니다. 최소 6자리 이상의 비밀번호를 설정해 주세요.');
+                          return;
+                        } else if (err.code === 'auth/invalid-email') {
+                          setVerificationError('올바르지 않은 이메일 형식입니다.');
+                          return;
+                        }
+
+                        // For auth/operation-not-allowed or other issues, save directly as a database-only user!
+                        const tempUid = `user_${Date.now()}`;
+                        await handleRegisterUser(
+                          nameStr,
+                          emailStr,
+                          gwTier,
+                          gwTitle.trim(),
+                          gwPhone.trim(),
+                          trimmedId,
+                          trimmedPw,
+                          tempUid,
+                          true
+                        );
+                        
+                        setShowAuthModal(false);
+                        // Reset state
+                        setGwName('');
+                        setGwEmail('');
+                        setGwTitle('');
+                        setGwPhone('');
+                        setGwLoginId('');
+                        setGwPassword('');
+                        setVerificationError('');
                       }
-                    }} 
-                    className="space-y-4 text-left"
-                  >
-                    {verificationError && (
-                      <div className="p-2.5 rounded-lg bg-red-950/50 border border-red-900/50 text-[11px] text-red-400 font-medium">
-                        {verificationError}
-                      </div>
-                    )}
-
-                    {isOperationNotAllowedError && (
-                      <div className="p-3.5 rounded-xl bg-amber-950/40 border border-amber-900/40 text-xs text-amber-300 space-y-2.5">
-                        <p className="font-bold">💡 Firebase 이메일/비밀번호 기능이 비활성화 상태입니다.</p>
-                        <p className="text-[11px] text-neutral-300 leading-relaxed">
-                          원활한 배포 및 테스트를 위해 아래 버튼을 클릭하여 즉시 <strong>가상 이메일 시뮬레이션 모드</strong>로 가입을 시도해 보세요. (실제 Firebase 연결을 건너뛰고 가상 인증번호로 빠른 가입이 가능합니다!)
-                        </p>
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setForceSimulationAuth(true);
-                            setIsOperationNotAllowedError(false);
-                            // Trigger simulation registration sequence immediately
-                            const code = Math.floor(100000 + Math.random() * 900000).toString();
-                            setGeneratedCode(code);
-                            setVerificationStep('verify');
-                            setVerificationCode('');
-                            setVerificationError('');
-                            triggerToast('가상 이메일 시뮬레이션 인증 코드가 발송되었습니다.', 'info');
-                          }}
-                          className="w-full py-2 bg-amber-500 hover:bg-amber-600 text-neutral-950 font-black text-[11px] rounded-lg transition-all cursor-pointer text-center"
-                        >
-                          시뮬레이션 가입 모드로 즉시 우회하기
-                        </button>
-                      </div>
-                    )}
-
-                    <div className="space-y-1.5">
-                      <label className="block text-[10px] font-bold text-neutral-400 uppercase tracking-wide">성명 <span className="text-kpcia-gold">*</span></label>
-                      <input
-                        type="text"
-                        required
-                        value={gwName}
-                        onChange={(e) => setGwName(e.target.value)}
-                        placeholder="예: 김성우 강사"
-                        className="w-full px-3 py-1.5 bg-neutral-950 border border-neutral-800 rounded-lg text-xs text-neutral-100 focus:border-kpcia-gold/50 outline-none"
-                      />
+                    } else {
+                      // Fallback if Firebase not fully active
+                      const tempUid = `user_${Date.now()}`;
+                      await handleRegisterUser(
+                        nameStr,
+                        emailStr,
+                        gwTier,
+                        gwTitle.trim(),
+                        gwPhone.trim(),
+                        trimmedId,
+                        trimmedPw,
+                        tempUid,
+                        true
+                      );
+                      
+                      setShowAuthModal(false);
+                      // Reset state
+                      setGwName('');
+                      setGwEmail('');
+                      setGwTitle('');
+                      setGwPhone('');
+                      setGwLoginId('');
+                      setGwPassword('');
+                      setVerificationError('');
+                    }
+                  }} 
+                  className="space-y-4 text-left"
+                >
+                  {verificationError && (
+                    <div className="p-2.5 rounded-lg bg-red-950/50 border border-red-900/50 text-[11px] text-red-400 font-medium">
+                      {verificationError}
                     </div>
+                  )}
 
-                    <div className="grid grid-cols-2 gap-3">
-                      <div className="space-y-1.5">
-                        <label className="block text-[10px] font-bold text-neutral-400 uppercase tracking-wide">로그인용 아이디 <span className="text-kpcia-gold">*</span></label>
-                        <input
-                          type="text"
-                          required
-                          value={gwLoginId}
-                          onChange={(e) => setGwLoginId(e.target.value.replace(/[^a-zA-Z0-9]/g, ''))}
-                          placeholder="아이디 (영문/숫자)"
-                          className="w-full px-3 py-1.5 bg-neutral-950 border border-neutral-800 rounded-lg text-xs text-neutral-100 focus:border-kpcia-gold/50 outline-none"
-                        />
-                      </div>
-
-                      <div className="space-y-1.5">
-                        <label className="block text-[10px] font-bold text-neutral-400 uppercase tracking-wide">비밀번호 <span className="text-kpcia-gold">*</span></label>
-                        <input
-                          type="password"
-                          required
-                          value={gwPassword}
-                          onChange={(e) => setGwPassword(e.target.value)}
-                          placeholder="비밀번호"
-                          className="w-full px-3 py-1.5 bg-neutral-950 border border-neutral-800 rounded-lg text-xs text-neutral-100 focus:border-kpcia-gold/50 outline-none"
-                        />
-                      </div>
-                    </div>
-
-                    <div className="space-y-1.5">
-                      <label className="block text-[10px] font-bold text-neutral-400 uppercase tracking-wide">이메일 주소 <span className="text-kpcia-gold">*</span></label>
-                      <input
-                        type="email"
-                        required
-                        value={gwEmail}
-                        onChange={(e) => setGwEmail(e.target.value)}
-                        placeholder="sungwoo@kpcia.or.kr"
-                        className="w-full px-3 py-1.5 bg-neutral-950 border border-neutral-800 rounded-lg text-xs text-neutral-100 focus:border-kpcia-gold/50 outline-none"
-                      />
-                    </div>
-
-                    <div className="space-y-1.5">
-                      <label className="block text-[10px] font-bold text-neutral-400 uppercase tracking-wide">연락처 (휴대폰)</label>
-                      <input
-                        type="tel"
-                        value={gwPhone}
-                        onChange={(e) => setGwPhone(e.target.value)}
-                        placeholder="010-9999-8888"
-                        className="w-full px-3 py-1.5 bg-neutral-950 border border-neutral-800 rounded-lg text-xs text-neutral-100 focus:border-kpcia-gold/50 outline-none"
-                      />
-                    </div>
-
-                    <div className="space-y-1.5">
-                      <label className="block text-[10px] font-bold text-neutral-400 uppercase tracking-wide">핵심 강의 전문 분야</label>
-                      <input
-                        type="text"
-                        value={gwTitle}
-                        onChange={(e) => setGwTitle(e.target.value)}
-                        placeholder="예: HRD 조직문화 및 리더십 혁신"
-                        className="w-full px-3 py-1.5 bg-neutral-950 border border-neutral-800 rounded-lg text-xs text-neutral-100 focus:border-kpcia-gold/50 outline-none"
-                      />
-                    </div>
-
-                    <div className="pt-3 border-t border-neutral-800/60 flex space-x-2">
-                      <button
-                        type="submit"
-                        className="w-full py-2 bg-kpcia-gold hover:bg-kpcia-gold-hover text-kpcia-dark text-xs font-extrabold rounded-lg transition-all shadow-md shadow-kpcia-gold/10"
-                      >
-                        이메일 인증 요청
-                      </button>
-                    </div>
-                  </form>
-                ) : (
-                  <div className="space-y-4 text-left animate-in fade-in">
-                    <div className="space-y-1">
-                      <span className="text-[10px] font-bold text-kpcia-gold uppercase tracking-wider block">STEP 2: 이메일 인증 진행 중</span>
-                      <p className="text-xs text-neutral-300 leading-relaxed">
-                        이메일 <strong className="text-neutral-100">{gwEmail}</strong>의 실제 소유주 확인을 완료해 주세요.
-                      </p>
-                    </div>
-
-                    {auth && useFirestore && !forceSimulationAuth ? (
-                      /* Real Firebase Auth instructions */
-                      <div className="space-y-3">
-                        <div className="p-3 bg-neutral-950 border border-neutral-800 rounded-xl space-y-2">
-                          <p className="text-[11px] text-neutral-350 leading-relaxed">
-                            입력하신 메일 수신함으로 <strong>Firebase 인증 링크</strong>가 발송되었습니다. 수신된 메일에서 인증 링크를 클릭한 후, 아래 <strong className="text-kpcia-gold">"이메일 인증 완료 확인 및 가입"</strong> 버튼을 눌러주세요.
-                          </p>
-                          <div className="flex justify-end pt-1">
-                            <button
-                              type="button"
-                              onClick={async () => {
-                                try {
-                                  if (auth.currentUser) {
-                                    await sendEmailVerification(auth.currentUser);
-                                    triggerToast('인증 이메일을 다시 발송하였습니다.', 'success');
-                                  } else {
-                                    triggerToast('세션이 만료되었습니다. 이전 단계로 돌아가 주세요.', 'info');
-                                  }
-                                } catch (err: any) {
-                                  triggerToast('메일 재전송 실패: ' + err.message, 'info');
-                                }
-                              }}
-                              className="text-[9px] text-neutral-400 hover:text-kpcia-gold underline"
-                            >
-                              인증 메일 다시 보내기
-                            </button>
-                          </div>
-                        </div>
-
-                        {verificationError && (
-                          <p className="text-[10px] text-red-400 font-medium">⚠ {verificationError}</p>
-                        )}
-
-                        <div className="pt-3 border-t border-neutral-800/60 flex space-x-2">
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setVerificationStep('input');
-                              setVerificationError('');
-                            }}
-                            className="flex-1 py-2 bg-neutral-950 hover:bg-neutral-900 border border-neutral-800 text-neutral-300 text-xs font-bold rounded-lg transition-all"
-                          >
-                            이전 단계로
-                          </button>
-                          <button
-                            type="button"
-                            onClick={async () => {
-                              setVerificationError('');
-                              try {
-                                const fbUser = auth.currentUser;
-                                if (fbUser) {
-                                  await fbUser.reload();
-                                  if (fbUser.emailVerified) {
-                                    await handleRegisterUser(gwName.trim(), gwEmail.trim(), gwTier, gwTitle.trim(), gwPhone.trim(), gwLoginId.trim(), gwPassword.trim(), fbUser.uid, true);
-                                    setShowAuthModal(false);
-                                    
-                                    // Reset state
-                                    setGwName('');
-                                    setGwEmail('');
-                                    setGwTitle('');
-                                    setGwPhone('');
-                                    setGwLoginId('');
-                                    setGwPassword('');
-                                    setVerificationStep('input');
-                                    setVerificationCode('');
-                                    setGeneratedCode('');
-                                  } else {
-                                    setVerificationError('아직 이메일 인증이 완료되지 않았습니다. 메일 수신함의 링크를 클릭한 후 다시 시도해 주세요.');
-                                  }
-                                } else {
-                                  setVerificationError('인증 세션이 유효하지 않습니다. 다시 가입 단계를 진행해 주세요.');
-                                }
-                              } catch (err: any) {
-                                setVerificationError('인증 상태 확인 중 오류 발생: ' + err.message);
-                              }
-                            }}
-                            className="flex-1 py-2 bg-kpcia-gold hover:bg-kpcia-gold-hover text-kpcia-dark text-xs font-extrabold rounded-lg transition-all shadow-md shadow-kpcia-gold/10"
-                          >
-                            이메일 인증 완료 확인 및 가입
-                          </button>
-                        </div>
-                      </div>
-                    ) : (
-                      /* Fallback simulator instructions if offline/localStorage mode */
-                      <div className="space-y-3">
-                        <div className="space-y-1.5">
-                          <label className="block text-[10px] font-bold text-neutral-400 uppercase tracking-wide">6자리 인증코드 입력</label>
-                          <input
-                            type="text"
-                            maxLength={6}
-                            value={verificationCode}
-                            onChange={(e) => setVerificationCode(e.target.value.replace(/[^0-9]/g, ''))}
-                            placeholder="XXXXXX"
-                            className="w-full px-4 py-2.5 bg-neutral-950 border border-neutral-800 rounded-lg text-lg text-center tracking-widest font-mono text-kpcia-gold focus:border-kpcia-gold outline-none"
-                          />
-                          {verificationError && (
-                            <p className="text-[10px] text-red-400 font-medium mt-1">⚠ {verificationError}</p>
-                          )}
-                        </div>
-
-                        <div className="bg-neutral-950/80 border border-neutral-800 p-3 rounded-xl space-y-2">
-                          <div className="flex items-center justify-between text-[9px] font-mono text-neutral-500">
-                            <span className="text-kpcia-gold font-bold">✉ KPCIA 모의 이메일 수신함</span>
-                            <span className="bg-kpcia-gold/10 text-kpcia-gold px-1.5 rounded">SIMULATOR ACTIVE</span>
-                          </div>
-                          <div className="text-[11px] font-mono space-y-1 text-neutral-300 border-t border-neutral-900 pt-1.5">
-                            <div><strong>수신:</strong> {gwEmail}</div>
-                            <div><strong>제목:</strong> KPCIA 강사 인증 코드</div>
-                            <div className="mt-2 text-center p-1.5 bg-neutral-900 border border-neutral-800 text-sm font-bold tracking-widest text-kpcia-gold select-all">
-                              {generatedCode}
-                            </div>
-                          </div>
-                        </div>
-
-                        <div className="pt-3 border-t border-neutral-800/60 flex space-x-2">
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setVerificationStep('input');
-                              setVerificationError('');
-                            }}
-                            className="flex-1 py-2 bg-neutral-950 hover:bg-neutral-900 border border-neutral-800 text-neutral-300 text-xs font-bold rounded-lg transition-all"
-                          >
-                            이전 단계로
-                          </button>
-                          <button
-                            type="button"
-                            onClick={async () => {
-                              if (verificationCode === generatedCode) {
-                                await handleRegisterUser(gwName.trim(), gwEmail.trim(), gwTier, gwTitle.trim(), gwPhone.trim(), gwLoginId.trim(), gwPassword.trim());
-                                setShowAuthModal(false);
-                                
-                                // Reset state
-                                setGwName('');
-                                setGwEmail('');
-                                setGwTitle('');
-                                setGwPhone('');
-                                setGwLoginId('');
-                                setGwPassword('');
-                                setVerificationStep('input');
-                                setVerificationCode('');
-                                setGeneratedCode('');
-                                setVerificationError('');
-                              } else {
-                                setVerificationError('인증코드가 일치하지 않습니다.');
-                              }
-                            }}
-                            className="flex-1 py-2 bg-kpcia-gold hover:bg-kpcia-gold-hover text-kpcia-dark text-xs font-extrabold rounded-lg transition-all shadow-md shadow-kpcia-gold/10"
-                          >
-                            인증 완료 및 가입
-                          </button>
-                        </div>
-                      </div>
-                    )}
+                  <div className="space-y-1.5">
+                    <label className="block text-[10px] font-bold text-neutral-400 uppercase tracking-wide">성명 <span className="text-kpcia-gold">*</span></label>
+                    <input
+                      type="text"
+                      required
+                      value={gwName}
+                      onChange={(e) => setGwName(e.target.value)}
+                      placeholder="예: 김성우 강사"
+                      className="w-full px-3 py-1.5 bg-neutral-950 border border-neutral-800 rounded-lg text-xs text-neutral-100 focus:border-kpcia-gold/50 outline-none"
+                    />
                   </div>
-                )
+
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="space-y-1.5">
+                      <label className="block text-[10px] font-bold text-neutral-400 uppercase tracking-wide">로그인용 아이디 <span className="text-kpcia-gold">*</span></label>
+                      <input
+                        type="text"
+                        required
+                        value={gwLoginId}
+                        onChange={(e) => setGwLoginId(e.target.value.replace(/[^a-zA-Z0-9]/g, ''))}
+                        placeholder="아이디 (영문/숫자)"
+                        className="w-full px-3 py-1.5 bg-neutral-950 border border-neutral-800 rounded-lg text-xs text-neutral-100 focus:border-kpcia-gold/50 outline-none"
+                      />
+                    </div>
+
+                    <div className="space-y-1.5">
+                      <label className="block text-[10px] font-bold text-neutral-400 uppercase tracking-wide">비밀번호 <span className="text-kpcia-gold">*</span></label>
+                      <input
+                        type="password"
+                        required
+                        value={gwPassword}
+                        onChange={(e) => setGwPassword(e.target.value)}
+                        placeholder="비밀번호"
+                        className="w-full px-3 py-1.5 bg-neutral-950 border border-neutral-800 rounded-lg text-xs text-neutral-100 focus:border-kpcia-gold/50 outline-none"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <label className="block text-[10px] font-bold text-neutral-400 uppercase tracking-wide">이메일 주소 <span className="text-kpcia-gold">*</span></label>
+                    <input
+                      type="email"
+                      required
+                      value={gwEmail}
+                      onChange={(e) => setGwEmail(e.target.value)}
+                      placeholder="sungwoo@kpcia.or.kr"
+                      className="w-full px-3 py-1.5 bg-neutral-950 border border-neutral-800 rounded-lg text-xs text-neutral-100 focus:border-kpcia-gold/50 outline-none"
+                    />
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <label className="block text-[10px] font-bold text-neutral-400 uppercase tracking-wide">연락처 (휴대폰)</label>
+                    <input
+                      type="tel"
+                      value={gwPhone}
+                      onChange={(e) => setGwPhone(e.target.value)}
+                      placeholder="010-9999-8888"
+                      className="w-full px-3 py-1.5 bg-neutral-950 border border-neutral-800 rounded-lg text-xs text-neutral-100 focus:border-kpcia-gold/50 outline-none"
+                    />
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <label className="block text-[10px] font-bold text-neutral-400 uppercase tracking-wide">핵심 강의 전문 분야</label>
+                    <input
+                      type="text"
+                      value={gwTitle}
+                      onChange={(e) => setGwTitle(e.target.value)}
+                      placeholder="예: HRD 조직문화 및 리더십 혁신"
+                      className="w-full px-3 py-1.5 bg-neutral-950 border border-neutral-800 rounded-lg text-xs text-neutral-100 focus:border-kpcia-gold/50 outline-none"
+                    />
+                  </div>
+
+                  <div className="pt-3 border-t border-neutral-800/60 flex space-x-2">
+                    <button
+                      type="submit"
+                      className="w-full py-2.5 bg-kpcia-gold hover:bg-kpcia-gold-hover text-kpcia-dark text-xs font-black rounded-lg transition-all shadow-md shadow-kpcia-gold/10 text-center uppercase cursor-pointer"
+                    >
+                      KPCIA 강사 가입 신청 완료
+                    </button>
+                  </div>
+                </form>
               )}
             </div>
           </div>
