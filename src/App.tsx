@@ -1590,6 +1590,7 @@ export default function App() {
                   allUsers={users}
                   onAssignAssistant={handleAssignAssistant}
                   onEvaluateAssistant={handleEvaluateAssistant}
+                  onCompleteLecture={handleCompleteLecture}
                 />
               )
             )}

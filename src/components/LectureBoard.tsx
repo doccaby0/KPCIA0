@@ -11,6 +11,7 @@ interface LectureBoardProps {
   allUsers?: UserProfile[];
   onAssignAssistant?: (lectureId: string, assistantId: string, assistantName: string) => void;
   onEvaluateAssistant?: (lectureId: string, assistantId: string, rating: number, comment: string) => void;
+  onCompleteLecture?: (lectureId: string) => void;
 }
 
 export default function LectureBoard({
@@ -21,7 +22,8 @@ export default function LectureBoard({
   onOpenAuthModal,
   allUsers,
   onAssignAssistant,
-  onEvaluateAssistant
+  onEvaluateAssistant,
+  onCompleteLecture
 }: LectureBoardProps) {
   // Map popup states
   const [selectedMapLocation, setSelectedMapLocation] = useState<string | null>(null);
@@ -462,7 +464,12 @@ export default function LectureBoard({
                       {/* Evaluation Panel */}
                       {isAssignedToMe && (
                         <div className="pt-2 border-t border-neutral-850 space-y-2 text-left">
-                          {lecture.assistantEvaluated ? (
+                          {lecture.status !== 'completed' ? (
+                            <div className="text-[10px] text-neutral-400 italic bg-neutral-950/40 p-2.5 rounded-lg border border-neutral-850/60 text-center flex items-center justify-center gap-1.5">
+                              <AlertCircle className="w-3.5 h-3.5 text-kpcia-gold animate-pulse shrink-0" />
+                              <span>⏰ 본 출강 강의 완료(종료) 처리 후 보조강사 실무 평가가 활성화됩니다.</span>
+                            </div>
+                          ) : lecture.assistantEvaluated ? (
                             <div className="flex items-center justify-center gap-1.5 bg-emerald-500/10 border border-emerald-500/20 py-1.5 px-2.5 rounded-lg text-emerald-400 text-[10.5px] font-bold font-sans">
                               <Check className="w-3.5 h-3.5" />
                               <span>보조강사 실무 평가 완료 (출강 1회 반영됨)</span>
@@ -592,9 +599,25 @@ export default function LectureBoard({
                     )
                   ) : lecture.status === 'assigned' ? (
                     isAssignedToMe ? (
-                      <div className="flex items-center space-x-1.5 text-xs text-kpcia-gold font-bold bg-kpcia-gold/5 border border-kpcia-gold/15 px-3 py-1.5 rounded-lg" id={`assigned-to-me-${lecture.id}`}>
-                        <CheckCircle2 className="w-4 h-4 text-kpcia-gold animate-bounce" />
-                        <span>내게 배정된 강의</span>
+                      <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
+                        <div className="flex items-center space-x-1.5 text-xs text-kpcia-gold font-bold bg-kpcia-gold/5 border border-kpcia-gold/15 px-3 py-1.5 rounded-lg shrink-0 animate-pulse" id={`assigned-to-me-${lecture.id}`}>
+                          <CheckCircle2 className="w-4 h-4 text-kpcia-gold" />
+                          <span>내게 배정된 강의</span>
+                        </div>
+                        {onCompleteLecture && (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              if (window.confirm("본 출강 강의를 완전히 완료(종료) 처리하시겠습니까? 완료 후 동행 보조강사의 실습 평점 및 피드백을 즉시 입력하실 수 있습니다.")) {
+                                onCompleteLecture(lecture.id);
+                              }
+                            }}
+                            className="px-3.5 py-1.5 bg-kpcia-gold hover:bg-kpcia-gold-hover text-kpcia-dark text-[10.5px] font-extrabold rounded-lg transition-all cursor-pointer shadow-md text-center shrink-0"
+                            id={`lecturer-complete-btn-${lecture.id}`}
+                          >
+                            강의 완료(종료) 처리
+                          </button>
+                        )}
                       </div>
                     ) : (
                       <div className="text-xs text-neutral-500 font-medium" id={`assigned-other-${lecture.id}`}>
