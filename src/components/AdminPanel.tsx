@@ -140,6 +140,8 @@ interface AdminPanelProps {
   onUpdateLectureSettlementStatus?: (lectureId: string, status: 'pending' | 'completed') => void;
   onDeleteUser?: (userId: string) => void;
   onDeleteProgram?: (programId: string) => void;
+  onDeleteLecture?: (lectureId: string) => void;
+  onEvaluateAssistant?: (lectureId: string, assistantId: string, rating: number, comment: string) => void;
   onResetDatabase?: () => void;
 }
 
@@ -164,6 +166,8 @@ export default function AdminPanel({
   onUpdateLectureSettlementStatus,
   onDeleteUser,
   onDeleteProgram,
+  onDeleteLecture,
+  onEvaluateAssistant,
   onResetDatabase
 }: AdminPanelProps) {
   // Navigation State
@@ -207,6 +211,7 @@ export default function AdminPanel({
   const [selectedUser, setSelectedUser] = useState<string>('');
   const [newTier, setNewTier] = useState<InstructorTier>('Prestige Associate');
   const [adjustAmount, setAdjustAmount] = useState<number>(1000);
+  const [adjustType, setAdjustType] = useState<'add' | 'subtract'>('add');
   const [adjustReason, setAdjustReason] = useState('특별 우수 교안 가산 마일리지 지급');
   const [mileageInputs, setMileageInputs] = useState<Record<string, string>>({});
   const [royaltyInputs, setRoyaltyInputs] = useState<Record<string, string>>({});
@@ -235,6 +240,11 @@ export default function AdminPanel({
   const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
   const [editingUserForModal, setEditingUserForModal] = useState<UserProfile | null>(null);
 
+  // Assistant Evaluation Modal states
+  const [evaluatingLecture, setEvaluatingLecture] = useState<LectureRequest | null>(null);
+  const [evalRating, setEvalRating] = useState<number>(5);
+  const [evalComment, setEvalComment] = useState<string>('보조강사 업무를 훌륭하고 성실하게 수행해 주셨습니다.');
+
   const startEditingProfile = (user: UserProfile) => {
     setEditingUserForModal(user);
     setEditName(user.name || '');
@@ -249,6 +259,16 @@ export default function AdminPanel({
     setEditCardTheme(user.profileCard?.cardTheme || 'classic');
     setPerfBankAccount(user.profileCard?.bankAccount || '');
     setIsProfileModalOpen(true);
+  };
+
+  const handleCompleteClick = (lecture: LectureRequest) => {
+    if (lecture.assistantId && onEvaluateAssistant) {
+      setEvaluatingLecture(lecture);
+      setEvalRating(5);
+      setEvalComment('보조강사 업무를 훌륭하고 성실하게 수행해 주셨습니다.');
+    } else {
+      onCompleteLecture(lecture.id);
+    }
   };
 
   const handleSaveProfile = (userId: string) => {
@@ -474,9 +494,10 @@ export default function AdminPanel({
   const handleAdjustSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedUser || !adjustAmount) return;
-    onAdjustMileage(selectedUser, adjustAmount, adjustReason);
+    const finalAmount = adjustType === 'add' ? Math.abs(adjustAmount) : -Math.abs(adjustAmount);
+    onAdjustMileage(selectedUser, finalAmount, adjustReason);
     setAdjustAmount(1000);
-    setAdjustReason('특별 우수 교안 가산 마일리지 지급');
+    setAdjustReason(adjustType === 'add' ? '특별 우수 교안 가산 마일리지 지급' : '특별 규정 위반 또는 취소 사유 마일리지 회수');
   };
 
   const downloadLectureAsExcel = (lecture: LectureRequest) => {
@@ -1824,6 +1845,23 @@ export default function AdminPanel({
                           <span>강의 요청서</span>
                         </button>
 
+                        {lecture.status === 'open' && onDeleteLecture && (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              if (window.confirm(`정말로 '${lecture.title}' 출강 공고를 취소하고 영구 삭제하시겠습니까?`)) {
+                                onDeleteLecture(lecture.id);
+                              }
+                            }}
+                            className="px-3.5 py-2 border border-red-900/30 bg-red-950/10 hover:bg-red-950/25 hover:border-red-500 text-red-400 hover:text-red-300 text-[11px] font-bold rounded-lg transition-all flex items-center justify-center gap-1.5 cursor-pointer shadow-sm w-full sm:w-auto"
+                            title="출강 강의 요청 공고를 취소하고 영구 삭제합니다."
+                            id={`admin-cancel-lecture-${lecture.id}`}
+                          >
+                            <Trash2 className="w-3.5 h-3.5 text-red-500/80" />
+                            <span>공고 취소</span>
+                          </button>
+                        )}
+
                         {/* Status 1: Open for application - Admin selects the candidate to assign */}
                         {lecture.status === 'open' && (
                           <div className="space-y-1.5 w-full sm:w-auto">
@@ -1854,7 +1892,7 @@ export default function AdminPanel({
                               수행 강사: <strong className="text-neutral-200">{lecture.assignedName}</strong>
                             </div>
                             <button
-                              onClick={() => onCompleteLecture(lecture.id)}
+                              onClick={() => handleCompleteClick(lecture)}
                               className="w-full sm:w-auto px-4 py-2 bg-kpcia-gold text-kpcia-dark text-xs font-extrabold rounded-lg hover:bg-kpcia-gold-hover transition-all flex items-center justify-center space-x-1 shadow-lg shadow-kpcia-gold/10 cursor-pointer"
                               id={`complete-btn-${lecture.id}`}
                             >
@@ -2703,6 +2741,40 @@ export default function AdminPanel({
                       </select>
                     </div>
 
+                    <div>
+                      <label className="text-[10px] font-bold text-neutral-400 block mb-1">마일리지 조정 구분</label>
+                      <div className="grid grid-cols-2 gap-2 mb-3">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setAdjustType('add');
+                            setAdjustReason('특별 우수 교안 가산 마일리지 지급');
+                          }}
+                          className={`py-1.5 rounded-lg text-xs font-bold transition-all border cursor-pointer ${
+                            adjustType === 'add'
+                              ? 'bg-emerald-950/40 border-emerald-500 text-emerald-400 shadow-sm shadow-emerald-500/10'
+                              : 'bg-neutral-950 border-neutral-800 text-neutral-400 hover:text-neutral-300'
+                          }`}
+                        >
+                          ➕ 마일리지 지급 (넣기)
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setAdjustType('subtract');
+                            setAdjustReason('특별 규정 위반 또는 취소 사유 마일리지 회수');
+                          }}
+                          className={`py-1.5 rounded-lg text-xs font-bold transition-all border cursor-pointer ${
+                            adjustType === 'subtract'
+                              ? 'bg-red-950/40 border-red-500 text-red-400 shadow-sm shadow-red-500/10'
+                              : 'bg-neutral-950 border-neutral-800 text-neutral-400 hover:text-neutral-300'
+                          }`}
+                        >
+                          ➖ 마일리지 차감 (빼기)
+                        </button>
+                      </div>
+                    </div>
+
                     <div className="grid grid-cols-2 gap-3">
                       <div>
                         <label className="text-[10px] font-bold text-neutral-400 block mb-1">변동 마일리지 값</label>
@@ -2710,7 +2782,7 @@ export default function AdminPanel({
                           type="number"
                           placeholder="예: 3000"
                           value={adjustAmount}
-                          onChange={(e) => setAdjustAmount(Number(e.target.value))}
+                          onChange={(e) => setAdjustAmount(Math.abs(Number(e.target.value)))}
                           required
                           className="w-full px-3 py-1.5 rounded-lg bg-neutral-950 border border-neutral-800 text-xs font-medium text-neutral-100 focus:border-kpcia-gold focus:outline-none"
                         />
@@ -2718,10 +2790,10 @@ export default function AdminPanel({
                       <div>
                         <label className="text-[10px] font-bold text-neutral-400 block mb-1">변동 형식</label>
                         <div className="px-3 py-1.5 bg-neutral-950 border border-neutral-800 rounded-lg text-xs font-bold text-center">
-                          {adjustAmount >= 0 ? (
-                            <span className="text-emerald-400">+ 가산 처리</span>
+                          {adjustType === 'add' ? (
+                            <span className="text-emerald-400">+ 지급 처리 (가산)</span>
                           ) : (
-                            <span className="text-red-400">- 차감 처리</span>
+                            <span className="text-red-400">- 회수 처리 (차감)</span>
                           )}
                         </div>
                       </div>
@@ -2744,7 +2816,7 @@ export default function AdminPanel({
                       disabled={!selectedUser}
                       className="w-full py-2 bg-neutral-950 hover:bg-neutral-900 border border-kpcia-gold text-kpcia-gold font-bold text-xs rounded-lg transition-all disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
                     >
-                      마일리지 수동 정산 발행 실행
+                      {adjustType === 'add' ? '🎁 마일리지 지급 실행' : '⚠️ 마일리지 차감/회수 실행'}
                     </button>
                   </form>
                 </div>
@@ -3115,6 +3187,112 @@ export default function AdminPanel({
                 >
                   <Check className="w-4 h-4 text-kpcia-dark" />
                   <span>변경사항 저장하기</span>
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* ==================== ASSISTANT EVALUATION MODAL ==================== */}
+        {evaluatingLecture && evaluatingLecture.assistantId && (
+          <div className="fixed inset-0 bg-neutral-950/85 backdrop-blur-md z-[9999] flex items-center justify-center p-4">
+            <div className="bg-neutral-900 border border-neutral-800 rounded-2xl w-full max-w-md max-h-[90vh] flex flex-col shadow-2xl animate-in zoom-in duration-200">
+              {/* Modal Header */}
+              <div className="p-4 border-b border-neutral-800 flex items-center justify-between bg-neutral-950/40">
+                <div className="flex items-center gap-2">
+                  <Award className="w-5 h-5 text-kpcia-gold" />
+                  <div>
+                    <h3 className="text-xs font-bold text-neutral-200">
+                      보조강사 파트너 종합 평가 피드백
+                    </h3>
+                    <p className="text-[10px] text-neutral-500 font-mono">
+                      강의명: {evaluatingLecture.title}
+                    </p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setEvaluatingLecture(null)}
+                  className="w-7 h-7 rounded-lg bg-neutral-950 border border-neutral-800 text-neutral-400 hover:text-neutral-200 flex items-center justify-center text-xs transition-colors cursor-pointer"
+                >
+                  ✕
+                </button>
+              </div>
+
+              {/* Modal Body */}
+              <div className="p-6 space-y-5 text-left">
+                <div className="p-3 bg-neutral-950 rounded-xl border border-neutral-850 text-xs">
+                  <p className="text-neutral-400 leading-relaxed">
+                    동행한 보조강사 <strong className="text-kpcia-gold">{evaluatingLecture.assistantName}</strong> 님의 강의 실습 및 지원 업무 성과를 공정하게 평가해 주세요. 본 피드백은 강사 역량 향상 및 출강 데이터 원장에 기록됩니다.
+                  </p>
+                </div>
+
+                {/* Star rating selector */}
+                <div className="space-y-1.5">
+                  <label className="text-[10px] font-bold text-neutral-400 block">만족도 평점</label>
+                  <div className="flex items-center space-x-2">
+                    {[1, 2, 3, 4, 5].map((score) => (
+                      <button
+                        key={score}
+                        type="button"
+                        onClick={() => setEvalRating(score)}
+                        className="p-1 cursor-pointer transition-transform hover:scale-110 focus:outline-none"
+                      >
+                        <svg
+                          className={`w-8 h-8 ${score <= evalRating ? 'text-amber-400 fill-current' : 'text-neutral-600'}`}
+                          fill="none"
+                          stroke="currentColor"
+                          viewBox="0 0 24 24"
+                          xmlns="http://www.w3.org/2000/svg"
+                        >
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth={2}
+                            d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.907c.961 0 1.36 1.24.588 1.81l-3.97 2.88a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.97-2.88a1 1 0 00-1.176 0l-3.97 2.88c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.97-2.88c-.772-.57-.372-1.81.588-1.81h4.907a1 1 0 00.95-.69l1.519-4.674z"
+                          />
+                        </svg>
+                      </button>
+                    ))}
+                    <span className="text-sm font-mono font-bold text-amber-400 ml-2">{evalRating}.0 / 5.0</span>
+                  </div>
+                </div>
+
+                {/* Comment area */}
+                <div className="space-y-1">
+                  <label className="text-[10px] font-bold text-neutral-400 block">종합 지원 의견 및 피드백</label>
+                  <textarea
+                    rows={3}
+                    value={evalComment}
+                    onChange={(e) => setEvalComment(e.target.value)}
+                    placeholder="보조강사의 실습 태도, 학습 조력 정도 등에 대한 피드백을 기재해 주세요."
+                    className="w-full px-3 py-2 rounded-lg bg-neutral-950 border border-neutral-800 text-xs font-medium text-neutral-100 focus:border-kpcia-gold focus:outline-none resize-none"
+                  />
+                </div>
+              </div>
+
+              {/* Modal Footer */}
+              <div className="p-4 border-t border-neutral-800 bg-neutral-950/40 flex items-center justify-end gap-2.5">
+                <button
+                  type="button"
+                  onClick={() => setEvaluatingLecture(null)}
+                  className="px-4 py-2 border border-neutral-800 bg-neutral-950 hover:bg-neutral-900 text-neutral-400 text-xs font-bold rounded-xl cursor-pointer"
+                >
+                  취소
+                </button>
+                <button
+                  type="button"
+                  onClick={async () => {
+                    if (onEvaluateAssistant && evaluatingLecture.assistantId) {
+                      await onEvaluateAssistant(evaluatingLecture.id, evaluatingLecture.assistantId, evalRating, evalComment);
+                    }
+                    onCompleteLecture(evaluatingLecture.id);
+                    setEvaluatingLecture(null);
+                  }}
+                  className="px-5 py-2 bg-kpcia-gold hover:bg-kpcia-gold-hover text-kpcia-dark text-xs font-extrabold rounded-xl flex items-center gap-1.5 shadow-md shadow-kpcia-gold/10 cursor-pointer"
+                >
+                  <Check className="w-4 h-4 text-kpcia-dark" />
+                  <span>평가 완료 & 출강 최종 승인</span>
                 </button>
               </div>
             </div>

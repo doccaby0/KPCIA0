@@ -1,11 +1,12 @@
 import React, { useState } from 'react';
 import { UserProfile, LectureRequest, InstructorTier } from '../types';
-import { Calendar, Clock, MapPin, Award, CheckCircle2, AlertCircle, Users, Check, Banknote, Sparkles, X, FileDown } from 'lucide-react';
+import { Calendar, Clock, MapPin, Award, CheckCircle2, AlertCircle, Users, User, Check, Banknote, Sparkles, X, FileDown, Mail, Phone } from 'lucide-react';
 
 interface LectureBoardProps {
   currentUser: UserProfile | null;
   lectures: LectureRequest[];
   onApplyLecture: (lectureId: string) => void;
+  onCancelApplyLecture?: (lectureId: string) => void;
   onOpenAuthModal?: (tab: 'login' | 'register') => void;
   allUsers?: UserProfile[];
   onAssignAssistant?: (lectureId: string, assistantId: string, assistantName: string) => void;
@@ -16,6 +17,7 @@ export default function LectureBoard({
   currentUser,
   lectures,
   onApplyLecture,
+  onCancelApplyLecture,
   onOpenAuthModal,
   allUsers,
   onAssignAssistant,
@@ -24,6 +26,11 @@ export default function LectureBoard({
   // Map popup states
   const [selectedMapLocation, setSelectedMapLocation] = useState<string | null>(null);
   const [selectedMapTitle, setSelectedMapTitle] = useState<string>('');
+
+  // Apply popup and View Card states
+  const [applyingLecture, setApplyingLecture] = useState<LectureRequest | null>(null);
+  const [viewingCardForUser, setViewingCardForUser] = useState<UserProfile | null>(null);
+  const [asstSearchQuery, setAsstSearchQuery] = useState('');
 
   // Assistant evaluation local states
   const [evalRating, setEvalRating] = useState<{ [lectureId: string]: number }>({});
@@ -555,17 +562,18 @@ export default function LectureBoard({
                     ) : isQualified ? (
                       hasApplied ? (
                         <button
-                          disabled
-                          className="px-4 py-2 bg-neutral-800 text-neutral-400 text-xs font-bold rounded-lg border border-neutral-700 flex items-center gap-1.5 cursor-not-allowed"
+                          onClick={() => onCancelApplyLecture && onCancelApplyLecture(lecture.id)}
+                          className="px-4 py-2 bg-red-950/40 hover:bg-red-950/60 text-red-400 border border-red-900/40 text-xs font-bold rounded-lg transition-all flex items-center gap-1.5 cursor-pointer"
                           id={`applied-btn-${lecture.id}`}
+                          title="신청 취소하기"
                         >
-                          <Check className="w-3.5 h-3.5 text-emerald-500" />
-                          <span>신청 완료</span>
+                          <X className="w-3.5 h-3.5 text-red-400" />
+                          <span>신청 취소</span>
                         </button>
                       ) : (
                         <button
-                          onClick={() => onApplyLecture(lecture.id)}
-                          className="px-4 py-2 bg-kpcia-gold hover:bg-kpcia-gold-hover text-kpcia-dark text-xs font-bold rounded-lg transition-all shadow-md hover:shadow-kpcia-gold/10"
+                          onClick={() => setApplyingLecture(lecture)}
+                          className="px-4 py-2 bg-kpcia-gold hover:bg-kpcia-gold-hover text-kpcia-dark text-xs font-bold rounded-lg transition-all shadow-md hover:shadow-kpcia-gold/10 cursor-pointer"
                           id={`apply-btn-${lecture.id}`}
                         >
                           출강 신청하기
@@ -678,6 +686,348 @@ export default function LectureBoard({
           </div>
         </div>
       )}
+
+      {/* Assistant Matching Popup during Lecture Application */}
+      {applyingLecture && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/85 backdrop-blur-sm animate-in fade-in duration-200">
+          <div className="relative w-full max-w-4xl bg-neutral-900 border border-neutral-800 rounded-2xl shadow-2xl shadow-black/80 overflow-hidden flex flex-col max-h-[90vh]">
+            {/* Modal Header */}
+            <div className="flex items-center justify-between p-4 border-b border-neutral-800 bg-neutral-950">
+              <div className="space-y-0.5">
+                <h3 className="text-sm font-bold text-kpcia-gold flex items-center gap-2">
+                  <Users className="w-4 h-4 text-kpcia-gold" /> 보조강사 동행 매칭 정보 & 출강 신청 확정
+                </h3>
+                <p className="text-[10px] text-neutral-400 font-sans truncate max-w-md">
+                  신청 강의: {applyingLecture.title}
+                </p>
+              </div>
+              <button
+                onClick={() => setApplyingLecture(null)}
+                className="p-1.5 rounded-lg bg-neutral-900 hover:bg-neutral-800 text-neutral-400 hover:text-neutral-100 transition-colors cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            {/* Modal Body */}
+            <div className="p-5 space-y-4 overflow-y-auto flex-1">
+              <div className="bg-neutral-950/60 p-4 rounded-xl border border-neutral-850 space-y-1 text-xs">
+                <p className="text-neutral-200 font-medium">
+                  💡 <strong>Prestige Member (보조 강사) 등급 동행 매칭 시스템</strong>
+                </p>
+                <p className="text-neutral-400 leading-relaxed mt-1">
+                  KPCIA 주강사 위원님께서 출강하실 때, 실습 성장을 희망하는 Prestige Member 등급의 보조 강사를 지정하여 동행할 수 있습니다. 
+                  동행을 신청할 경우, 출강 완료 후 위원님이 보조강사 평점 및 피드백을 부여하게 되며 해당 보조강사에게는 출강 1회 실적이 적립됩니다.
+                </p>
+              </div>
+
+              <div className="space-y-3">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-neutral-800 pb-2">
+                  <h4 className="text-xs font-bold text-neutral-300 flex items-center gap-1.5">
+                    <span>👥 매칭 가능한 Prestige Member 보조강사 리스트 ({allUsers?.filter(u => u.tier === 'Prestige Member' && !u.isAdmin && u.isApproved !== false).length || 0}명)</span>
+                  </h4>
+                  <div className="relative w-full sm:w-64">
+                    <input
+                      type="text"
+                      placeholder="🔍 보조강사 이름, 활동 지역, 전문분야 검색..."
+                      value={asstSearchQuery}
+                      onChange={(e) => setAsstSearchQuery(e.target.value)}
+                      className="w-full px-3 py-1.5 rounded-lg bg-neutral-950 border border-neutral-800 text-[11px] font-medium text-neutral-100 focus:border-kpcia-gold focus:outline-none"
+                      id="asst-search-input"
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {(() => {
+                    const filteredList = (allUsers || [])
+                      .filter(u => u.tier === 'Prestige Member' && !u.isAdmin && u.isApproved !== false)
+                      .filter(u => {
+                        if (!asstSearchQuery.trim()) return true;
+                        const query = asstSearchQuery.toLowerCase();
+                        const nameMatch = u.name?.toLowerCase().includes(query);
+                        const regionMatch = u.profileCard?.region?.toLowerCase().includes(query);
+                        const titleMatch = u.profileCard?.title?.toLowerCase().includes(query);
+                        const specMatch = u.profileCard?.specialties?.some(s => s.toLowerCase().includes(query));
+                        return nameMatch || regionMatch || titleMatch || specMatch;
+                      });
+
+                    if (filteredList.length === 0) {
+                      return (
+                        <div className="col-span-2 text-center py-8 text-xs text-neutral-500">
+                          검색 조건에 부합하는 보조강사가 존재하지 않습니다.
+                        </div>
+                      );
+                    }
+
+                    return filteredList.map((asst) => {
+                      return (
+                      <div 
+                        key={asst.uid}
+                        className="p-4 rounded-xl border border-neutral-800 bg-neutral-950/40 hover:border-neutral-750 hover:bg-neutral-950/60 transition-all duration-300 flex flex-col justify-between space-y-3.5"
+                      >
+                        <div className="flex items-start justify-between">
+                          <div className="flex items-center space-x-3">
+                            <div className="w-10 h-10 rounded-lg bg-neutral-900 border border-neutral-800 overflow-hidden shrink-0 flex items-center justify-center">
+                              {asst.profileCard?.imageUrl ? (
+                                <img src={asst.profileCard.imageUrl} alt={asst.name} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                              ) : (
+                                <User className="w-5 h-5 text-neutral-500" />
+                              )}
+                            </div>
+                            <div className="text-left">
+                              <div className="flex items-center space-x-1.5">
+                                <span className="text-xs font-bold text-neutral-100">{asst.name}</span>
+                                <span className="text-[8px] px-1.5 py-0.2 rounded bg-neutral-800 text-neutral-400 font-bold border border-neutral-700">Prestige Member</span>
+                              </div>
+                              <span className="text-[10px] text-neutral-400 font-mono block mt-0.5">{asst.profileCard?.title || 'KPCIA 파트너 강사'}</span>
+                            </div>
+                          </div>
+                          
+                          <button
+                            type="button"
+                            onClick={() => setViewingCardForUser(asst)}
+                            className="px-2 py-1 rounded bg-kpcia-gold/10 hover:bg-kpcia-gold/20 border border-kpcia-gold/30 text-kpcia-gold text-[9px] font-bold transition-all cursor-pointer"
+                          >
+                            💳 강사 카드 정보
+                          </button>
+                        </div>
+
+                        {/* Contact & Info fields */}
+                        <div className="grid grid-cols-2 gap-2 text-[10px] bg-neutral-950 p-2.5 rounded border border-neutral-900 font-sans">
+                          <div>
+                            <span className="text-neutral-500 block text-[8.5px] uppercase font-mono">📞 비상 연락처</span>
+                            <strong className="text-neutral-300 font-mono">{asst.profileCard?.contactPhone || '010-5259-7458'}</strong>
+                          </div>
+                          <div>
+                            <span className="text-neutral-500 block text-[8.5px] uppercase font-mono">📧 이메일</span>
+                            <strong className="text-neutral-300 font-mono truncate block">{asst.profileCard?.contactEmail || asst.email}</strong>
+                          </div>
+                          <div className="col-span-2 border-t border-neutral-900/50 pt-1.5 mt-1">
+                            <span className="text-neutral-500 block text-[8.5px] uppercase font-mono">📍 주요 활동 지역</span>
+                            <strong className="text-neutral-300">{asst.profileCard?.region || '서울 및 수도권'}</strong>
+                          </div>
+                        </div>
+
+                        {/* Bio preview */}
+                        <p className="text-[10px] text-neutral-450 leading-relaxed font-sans line-clamp-2">
+                          {asst.profileCard?.bio || '인사이트9교육연구소 및 KPCIA 소속으로 전문 실무진 보조 지도를 성실히 수행합니다.'}
+                        </p>
+
+                        {/* Action select */}
+                        <button
+                          type="button"
+                          onClick={async () => {
+                            onApplyLecture(applyingLecture.id);
+                            if (onAssignAssistant) {
+                              onAssignAssistant(applyingLecture.id, asst.uid, asst.name);
+                            }
+                            setApplyingLecture(null);
+                          }}
+                          className="w-full py-1.5 bg-neutral-900 hover:bg-neutral-850 text-kpcia-gold hover:text-white border border-kpcia-gold/30 text-[10px] font-bold rounded-lg transition-all cursor-pointer"
+                        >
+                          🤝 {asst.name} 보조강사 동행 지정하여 출강 신청
+                        </button>
+                      </div>
+                    );
+                    });
+                  })()}
+                </div>
+              </div>
+            </div>
+
+            {/* Modal Footer */}
+            <div className="flex flex-col sm:flex-row items-center justify-between gap-3 p-4 border-t border-neutral-800 bg-neutral-950">
+              <span className="text-[9px] text-neutral-500 font-sans text-left">
+                ※ 보조강사 동행 지정을 원치 않으시면 '단독 출강 신청' 버튼을 통해 단독으로 신청하실 수 있습니다.
+              </span>
+              <div className="flex items-center gap-2 w-full sm:w-auto shrink-0 justify-end">
+                <button
+                  type="button"
+                  onClick={() => {
+                    onApplyLecture(applyingLecture.id);
+                    setApplyingLecture(null);
+                  }}
+                  className="px-4 py-2 bg-kpcia-gold hover:bg-kpcia-gold-hover text-kpcia-dark text-xs font-bold rounded-lg transition-all shadow-md cursor-pointer"
+                >
+                  🚀 보조강사 동행 없이 단독 출강 신청
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setApplyingLecture(null)}
+                  className="px-4 py-2 bg-neutral-850 hover:bg-neutral-800 text-neutral-300 text-xs font-bold rounded-lg transition-all cursor-pointer"
+                >
+                  취소
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Viewing Card Full Dialog */}
+      {viewingCardForUser && (() => {
+        const themeStyles = {
+          classic: {
+            bg: 'bg-gradient-to-br from-[#1c1d1f] to-[#0e0f10]',
+            border: 'border-neutral-700',
+            textAccent: 'text-neutral-300',
+            goldAccent: 'text-neutral-400',
+            badgeBg: 'bg-neutral-800/80',
+            accentBorder: 'border-neutral-600',
+            cardBadgeGlow: 'shadow-neutral-900/50',
+            textTitle: 'text-neutral-100'
+          },
+          gold_luxury: {
+            bg: 'bg-gradient-to-br from-[#1c1a15] to-[#0a0907]',
+            border: 'border-kpcia-gold/30',
+            textAccent: 'text-kpcia-gold',
+            goldAccent: 'text-kpcia-gold',
+            badgeBg: 'bg-kpcia-gold/10',
+            accentBorder: 'border-kpcia-gold/20',
+            cardBadgeGlow: 'shadow-kpcia-gold/10',
+            textTitle: 'text-kpcia-gold'
+          },
+          midnight_sapphire: {
+            bg: 'bg-gradient-to-br from-[#0f172a] to-[#030712]',
+            border: 'border-blue-900/40',
+            textAccent: 'text-blue-400',
+            goldAccent: 'text-kpcia-gold',
+            badgeBg: 'bg-blue-950/50',
+            accentBorder: 'border-blue-800/30',
+            cardBadgeGlow: 'shadow-blue-900/20',
+            textTitle: 'text-blue-100'
+          },
+          elite_emerald: {
+            bg: 'bg-gradient-to-br from-[#064e3b] to-[#022c22]',
+            border: 'border-emerald-800/40',
+            textAccent: 'text-emerald-400',
+            goldAccent: 'text-kpcia-gold',
+            badgeBg: 'bg-emerald-950/40',
+            accentBorder: 'border-emerald-800/20',
+            cardBadgeGlow: 'shadow-emerald-900/20',
+            textTitle: 'text-emerald-500'
+          }
+        };
+
+        const uCard = viewingCardForUser.profileCard || {};
+        const uTheme = uCard.cardTheme || 'classic';
+        const selectedStyle = themeStyles[uTheme] || themeStyles.classic;
+
+        return (
+          <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/90 backdrop-blur-sm animate-in fade-in duration-200">
+            <div className="relative w-full max-w-[620px] bg-neutral-900 border border-neutral-800 rounded-2xl shadow-2xl overflow-hidden flex flex-col">
+              <div className="flex items-center justify-between p-4 border-b border-neutral-850 bg-neutral-950">
+                <span className="text-xs font-bold text-kpcia-gold flex items-center gap-1.5">
+                  <Award className="w-4 h-4 text-kpcia-gold" /> {viewingCardForUser.name} 강사님의 KPCIA 공식 강사 카드 정보
+                </span>
+                <button
+                  onClick={() => setViewingCardForUser(null)}
+                  className="p-1.5 rounded-lg bg-neutral-900 hover:bg-neutral-800 text-neutral-400 hover:text-neutral-100 transition-colors cursor-pointer"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+
+              <div className="p-6 flex justify-center bg-neutral-950/50">
+                <div 
+                  className={`w-full max-w-[500px] aspect-[1.586/1] rounded-2xl border ${selectedStyle.border} ${selectedStyle.bg} p-5 relative overflow-hidden shadow-2xl flex flex-col justify-between`}
+                >
+                  <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(212,175,55,0.05),transparent)] pointer-events-none" />
+                  
+                  {/* Top row */}
+                  <div className="flex items-start justify-between relative z-10">
+                    <div className="flex items-center space-x-3">
+                      <div className="relative">
+                        <div className="absolute -inset-0.5 bg-gradient-to-r from-kpcia-gold to-amber-500 rounded-xl blur-[1px] opacity-75" />
+                        <div className="relative w-10 h-10 rounded-xl bg-neutral-950 overflow-hidden flex items-center justify-center">
+                          {uCard.imageUrl ? (
+                            <img src={uCard.imageUrl} alt={viewingCardForUser.name} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                          ) : (
+                            <User className="w-4 h-4 text-neutral-500" />
+                          )}
+                        </div>
+                      </div>
+
+                      <div className="text-left">
+                        <div className="flex items-center space-x-1.5">
+                          <span className={`text-[7px] font-mono tracking-widest uppercase font-semibold ${selectedStyle.textAccent}`}>
+                            KPCIA CERTIFIED INSTRUCTOR CARD
+                          </span>
+                        </div>
+                        <h3 className="text-sm font-bold tracking-tight text-neutral-100 font-display mt-0.5">
+                          {viewingCardForUser.name}
+                        </h3>
+                        <p className={`text-[9px] font-medium ${selectedStyle.textAccent}`}>
+                          {uCard.title || 'KPCIA 파트너 강사'}
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="text-right">
+                      <div className="inline-flex items-center space-x-1 border border-kpcia-gold/30 rounded px-1.5 py-0.5 bg-kpcia-gold/5 text-[7px] font-mono font-bold text-kpcia-gold">
+                        {viewingCardForUser.tier.toUpperCase()}
+                      </div>
+                      <div className="text-[7.5px] font-mono text-neutral-400 mt-1">출강 {viewingCardForUser.lectureCount || 0}회 | 평점 {viewingCardForUser.averageRating?.toFixed(1) || '0.0'}점</div>
+                    </div>
+                  </div>
+
+                  {/* Middle Row */}
+                  <div className="grid grid-cols-2 gap-3 my-2 py-2 border-y border-neutral-800/50 relative z-10 text-left">
+                    <div className="space-y-1 border-r border-neutral-800/50 pr-2">
+                      <span className="text-[7.5px] font-mono text-neutral-500 block">INTRODUCTION</span>
+                      <p className="text-[8.5px] text-neutral-300 leading-relaxed font-sans line-clamp-3">
+                        {uCard.bio || '기업의 미래 인재 육성을 위해 혁신적인 실무 교육 과정을 설계하고 실행하는 KPCIA 프레스티지 강사입니다.'}
+                      </p>
+                    </div>
+                    <div className="pl-2 space-y-1">
+                      <span className="text-[7.5px] font-mono text-neutral-500 block">SPECIALTIES</span>
+                      <div className="flex flex-wrap gap-1">
+                        {uCard.specialties && uCard.specialties.length > 0 ? (
+                          uCard.specialties.slice(0, 3).map((spec, i) => (
+                            <span 
+                              key={i} 
+                              className={`text-[7.5px] px-1 py-0.2 rounded font-medium ${selectedStyle.badgeBg} ${selectedStyle.textAccent} border ${selectedStyle.accentBorder}`}
+                            >
+                              {spec}
+                            </span>
+                          ))
+                        ) : (
+                          <span className="text-[7.5px] text-neutral-500">등록된 전문분야 없음</span>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Bottom row */}
+                  <div className="flex items-center justify-between relative z-10 text-[8px] font-mono text-neutral-400">
+                    <div className="flex items-center space-x-1">
+                      <Mail className="w-2.5 h-2.5 text-neutral-500" />
+                      <span>{uCard.contactEmail || viewingCardForUser.email}</span>
+                    </div>
+                    {uCard.contactPhone && (
+                      <div className="flex items-center space-x-1">
+                        <Phone className="w-2.5 h-2.5 text-neutral-500" />
+                        <span>{uCard.contactPhone}</span>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              <div className="p-4 border-t border-neutral-850 bg-neutral-950 flex justify-end">
+                <button
+                  type="button"
+                  onClick={() => setViewingCardForUser(null)}
+                  className="px-4 py-1.5 bg-kpcia-gold hover:bg-kpcia-gold-hover text-kpcia-dark text-xs font-bold rounded-lg cursor-pointer"
+                >
+                  닫기
+                </button>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
     </div>
   );
 }

@@ -199,6 +199,34 @@ export default function App() {
     triggerToast(`'${lecture.title}' 과정에 성공적으로 출강 신청이 접수되었습니다! 운영사무국의 배정 승인을 대기합니다.`);
   };
 
+  const handleCancelApplyLecture = async (lectureId: string) => {
+    if (!currentUser) return;
+
+    const lecture = lectures.find(l => l.id === lectureId);
+    if (!lecture) return;
+
+    if (!lecture.applicants.includes(currentUser.uid)) {
+      triggerToast('본 강의에 신청한 내역이 없습니다.', 'info');
+      return;
+    }
+
+    const updatedLecture: LectureRequest = {
+      ...lecture,
+      applicants: lecture.applicants.filter(id => id !== currentUser.uid),
+      status: lecture.instructorId === currentUser.uid ? 'open' as const : lecture.status,
+      instructorId: lecture.instructorId === currentUser.uid ? undefined : lecture.instructorId,
+      instructorName: lecture.instructorId === currentUser.uid ? undefined : lecture.instructorName,
+      assistantId: lecture.instructorId === currentUser.uid ? undefined : lecture.assistantId,
+      assistantName: lecture.instructorId === currentUser.uid ? undefined : lecture.assistantName,
+    };
+
+    const updatedLectures = lectures.map(l => l.id === lectureId ? updatedLecture : l);
+    setLectures(updatedLectures);
+    await StorageService.saveLecture(updatedLecture);
+
+    triggerToast(`'${lecture.title}' 과정의 출강 신청이 성공적으로 취소되었습니다.`, 'info');
+  };
+
   // 3. Post a new lecture request (Admin Only)
   const handleAddLecture = async (lectureData: any) => {
     const sanitizedData = {
@@ -370,31 +398,54 @@ export default function App() {
       await StorageService.addTransaction(lecturerTx);
     }
 
-    // ROYALTY LOGIC: Check if lecture was based on a registered program owned by ANOTHER instructor
+    // ROYALTY LOGIC: Check if lecture was based on a registered program owned by a copyright-holding instructor
     if (lecture.programId) {
       const associatedProgram = programs.find(p => p.id === lecture.programId);
-      if (associatedProgram && associatedProgram.authorId !== lecturerId) {
-        // Yes! Pay royalty to the program creator!
+      if (associatedProgram) {
         const creatorId = associatedProgram.authorId;
         const creator = users.find(u => u.uid === creatorId);
 
         if (creator) {
-          // Add royalty transaction log
-          const royaltyTx: MileageTransaction = {
-            id: `tx_royalty_${Date.now()}`,
-            userId: creatorId,
-            userName: creator.name,
-            type: 'royalty',
-            amount: associatedProgram.royaltyRate,
-            description: `타 강사(${lecturer?.name || '협회강사'})가 '${associatedProgram.title}' 교안으로 출강 완료함에 따른 저작권 마일리지 누적 대기 (+${associatedProgram.royaltyRate.toLocaleString()} M)`,
-            relatedId: lectureId,
-            createdAt: new Date().toISOString()
-          };
-          setTransactions(prev => [...prev, royaltyTx]);
-          await StorageService.addTransaction(royaltyTx);
+          // Yes! Automatically pay royalty (mileage accumulation) to the program creator!
+          const royaltyAmount = associatedProgram.royaltyRate || 0;
+          
+          if (royaltyAmount > 0) {
+            // Update creator's mileage automatically
+            const updatedCreator: UserProfile = {
+              ...creator,
+              mileage: creator.mileage + royaltyAmount
+            };
 
-          triggerToast(`출강 종료 승인 완료! 마일리지 자동 연동 대신 정산 명세가 트랜잭션 원장에 기록되었습니다. 관리자가 확인 후 수동으로 지급합니다.`);
-          return;
+            // We must update the users state and database
+            setUsers(prev => prev.map(u => u.uid === creatorId ? updatedCreator : u));
+            await StorageService.saveUser(updatedCreator);
+
+            if (currentUser && currentUser.uid === creatorId) {
+              setCurrentUser(updatedCreator);
+            }
+
+            // Add royalty transaction log
+            const isSelf = creatorId === lecturerId;
+            const descriptionStr = isSelf
+              ? `본인의 '${associatedProgram.title}' 저작권 교안으로 직접 출강 완료하여 저작권 마일리지 자동 적립 (+${royaltyAmount.toLocaleString()} M)`
+              : `타 강사(${lecturer?.name || '협회강사'})가 '${associatedProgram.title}' 교안으로 출강 완료함에 따른 저작권 마일리지 자동 적립 (+${royaltyAmount.toLocaleString()} M)`;
+
+            const royaltyTx: MileageTransaction = {
+              id: `tx_royalty_${Date.now()}`,
+              userId: creatorId,
+              userName: creator.name,
+              type: 'royalty',
+              amount: royaltyAmount,
+              description: descriptionStr,
+              relatedId: lectureId,
+              createdAt: new Date().toISOString()
+            };
+            setTransactions(prev => [...prev, royaltyTx]);
+            await StorageService.addTransaction(royaltyTx);
+
+            triggerToast(`출강 종료 승인 완료! '${associatedProgram.title}'의 저작권 강사(${creator.name})에게 저작권 마일리지 ${royaltyAmount.toLocaleString()} M이 자동으로 정밀 누적 처리되었습니다.`, 'success');
+            return;
+          }
         }
       }
     }
@@ -678,6 +729,15 @@ export default function App() {
     setPrograms(prev => prev.filter(p => p.id !== programId));
     await StorageService.deleteProgram(programId);
     triggerToast(`'${targetProg.title}' 교육 콘텐츠가 영구 삭제 처리되었습니다.`, 'info');
+  };
+
+  // 8.5.3. Delete/Cancel Lecture request (Admin Only)
+  const handleDeleteLecture = async (lectureId: string) => {
+    const targetLect = lectures.find(l => l.id === lectureId);
+    if (!targetLect) return;
+    setLectures(prev => prev.filter(l => l.id !== lectureId));
+    await StorageService.deleteLecture(lectureId);
+    triggerToast(`'${targetLect.title}' 출강 공고 요청서가 출강 배정실에서 공식 취소 및 영구 삭제되었습니다.`, 'info');
   };
 
   // 8.6. Approve and finalize Educational Program Copyright (Admin Only)
@@ -1381,6 +1441,8 @@ export default function App() {
               activeMobileTab={activeMobileTab}
               onMobileTabChange={setActiveMobileTab}
               onApplyLecture={handleApplyLecture}
+              onCancelApplyLecture={handleCancelApplyLecture}
+              onAssignAssistant={handleAssignAssistant}
               onInstantApprove={handleInstantApprove}
               onTabChange={(tab) => {
                 setActiveTab(tab);
@@ -1520,6 +1582,7 @@ export default function App() {
                   currentUser={currentUser}
                   lectures={lectures}
                   onApplyLecture={handleApplyLecture}
+                  onCancelApplyLecture={handleCancelApplyLecture}
                   onOpenAuthModal={(tab) => {
                     setAuthModalTab(tab);
                     setShowAuthModal(true);
@@ -1589,6 +1652,8 @@ export default function App() {
                 onUpdateLectureSettlementStatus={handleUpdateLectureSettlementStatus}
                 onDeleteUser={handleDeleteUser}
                 onDeleteProgram={handleDeleteProgram}
+                onDeleteLecture={handleDeleteLecture}
+                onEvaluateAssistant={handleEvaluateAssistant}
                 onResetDatabase={handleResetData}
               />
             )}

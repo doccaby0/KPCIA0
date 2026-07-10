@@ -370,6 +370,16 @@ export class StorageService {
     }, null);
   }
 
+  static async deleteLecture(lectureId: string): Promise<void> {
+    const current = await this.getLectures();
+    const updated = current.filter(l => l.id !== lectureId);
+    this.setLocal('lectures', updated);
+
+    await this.runWithTimeout(async () => {
+      await deleteDoc(doc(db, 'lectures', lectureId));
+    }, null);
+  }
+
   // Programs Operations
   static async getPrograms(): Promise<EducationalProgram[]> {
     const localData = this.getLocal<EducationalProgram[]>('programs', INITIAL_PROGRAMS);
