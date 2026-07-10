@@ -48,6 +48,7 @@ export default function InstructorCard({ currentUser, onSaveProfileCard, onGoHom
   const [contactEmail, setContactEmail] = useState(currentUser.profileCard?.contactEmail || currentUser.email);
   const [contactPhone, setContactPhone] = useState(currentUser.profileCard?.contactPhone || '');
   const [bankAccount, setBankAccount] = useState(currentUser.profileCard?.bankAccount || '');
+  const [region, setRegion] = useState(currentUser.profileCard?.region || '서울');
   const [cardTheme, setCardTheme] = useState<'classic' | 'gold_luxury' | 'midnight_sapphire' | 'elite_emerald'>(
     currentUser.profileCard?.cardTheme || 'classic'
   );
@@ -73,6 +74,7 @@ export default function InstructorCard({ currentUser, onSaveProfileCard, onGoHom
     setContactEmail(currentUser.profileCard?.contactEmail || currentUser.email);
     setContactPhone(currentUser.profileCard?.contactPhone || '');
     setBankAccount(currentUser.profileCard?.bankAccount || '');
+    setRegion(currentUser.profileCard?.region || '서울');
     setCardTheme(currentUser.profileCard?.cardTheme || 'classic');
     setImageUrl(currentUser.profileCard?.imageUrl || '');
   }, [currentUser]);
@@ -125,7 +127,8 @@ export default function InstructorCard({ currentUser, onSaveProfileCard, onGoHom
       contactPhone,
       cardTheme,
       imageUrl,
-      bankAccount
+      bankAccount,
+      region
     };
     onSaveProfileCard(updatedCard);
     setIsEditing(false);
@@ -145,9 +148,45 @@ export default function InstructorCard({ currentUser, onSaveProfileCard, onGoHom
     }, 700);
   };
 
-  const handlePrintCertificate = () => {
-    document.body.classList.add('certificate-printing');
-    window.print();
+  const handlePrintCertificate = async () => {
+    const element = document.getElementById('print-certificate');
+    if (!element) return;
+    
+    setIsDownloadSimulating(true);
+    
+    try {
+      const html2canvas = (await import('html2canvas')).default;
+      const { jsPDF } = await import('jspdf');
+      
+      const canvas = await html2canvas(element, {
+        scale: 2,
+        useCORS: true,
+        logging: false,
+        backgroundColor: null
+      });
+      
+      const imgData = canvas.toDataURL('image/png');
+      
+      const pdf = new jsPDF('p', 'mm', 'a4');
+      const imgWidth = 210;
+      const imgHeight = (canvas.height * imgWidth) / canvas.width;
+      
+      const yOffset = (297 - imgHeight) / 2;
+      
+      pdf.addImage(imgData, 'PNG', 0, yOffset > 0 ? yOffset : 0, imgWidth, imgHeight);
+      
+      const fileName = `KPCIA_인증서_${currentUser.name || '강사'}.pdf`;
+      pdf.save(fileName);
+      
+      alert(`🎉 [다운로드 완료] KPCIA 공식 등급 인증서가 성공적으로 고해상도 PDF 파일로 다운로드되었습니다.`);
+    } catch (error) {
+      console.error("PDF generation failed:", error);
+      alert("PDF 다운로드 중 문제가 발생했습니다. 브라우저 인쇄 기능을 통해 PDF로 저장합니다.");
+      document.body.classList.add('certificate-printing');
+      window.print();
+    } finally {
+      setIsDownloadSimulating(false);
+    }
   };
 
   const handleCloseCertificate = () => {
@@ -448,6 +487,10 @@ export default function InstructorCard({ currentUser, onSaveProfileCard, onGoHom
                   <span>{bankAccount}</span>
                 </div>
               )}
+              <div className="flex items-center space-x-1 text-neutral-300">
+                <MapPin className="w-3 h-3 text-kpcia-gold/60" />
+                <span className="font-semibold">활동 지역: {region || '미정 (서울)'}</span>
+              </div>
             </div>
 
             {/* Digital Badge Icons in Bottom Right */}
@@ -826,6 +869,19 @@ export default function InstructorCard({ currentUser, onSaveProfileCard, onGoHom
               />
             </div>
 
+            {/* Active Region */}
+            <div>
+              <label className="text-[10px] font-mono text-neutral-400 uppercase block mb-1">활동 주 지역 (예: 서울, 경기, 인천, 부산, 충남 등)</label>
+              <input 
+                type="text" 
+                placeholder="예: 서울, 경기, 인천" 
+                value={region} 
+                onChange={(e) => setRegion(e.target.value)} 
+                className="w-full px-3.5 py-2 rounded-lg bg-neutral-950 border border-neutral-800 text-xs font-medium text-neutral-100 focus:border-kpcia-gold focus:outline-none"
+                id="form-region"
+              />
+            </div>
+
             {/* Action Buttons */}
             <div className="pt-2 border-t border-neutral-800 flex justify-end space-x-2">
               <button
@@ -860,8 +916,8 @@ export default function InstructorCard({ currentUser, onSaveProfileCard, onGoHom
                 className="px-4 py-2 bg-kpcia-gold hover:bg-kpcia-gold-hover text-kpcia-dark text-xs font-bold rounded-lg transition-all flex items-center gap-1.5 shadow-lg shadow-kpcia-gold/10 cursor-pointer"
                 id="cert-print-btn"
               >
-                <Printer className="w-3.5 h-3.5" />
-                <span>PDF 저장 / 인쇄</span>
+                <Download className="w-3.5 h-3.5 text-kpcia-dark" />
+                <span>공식 인증서 PDF 다운로드</span>
               </button>
               <button
                 onClick={handleCloseCertificate}
@@ -965,8 +1021,8 @@ export default function InstructorCard({ currentUser, onSaveProfileCard, onGoHom
               onClick={handlePrintCertificate}
               className="w-full sm:w-auto px-6 py-3 bg-gradient-to-r from-kpcia-gold to-amber-500 hover:from-kpcia-gold-hover hover:to-amber-600 text-kpcia-dark text-sm font-bold rounded-xl transition-all flex items-center justify-center gap-2 shadow-lg shadow-kpcia-gold/20 cursor-pointer"
             >
-              <Printer className="w-4 h-4" />
-              <span>KPCIA 공식 인증서 출력하기 (PDF 인쇄)</span>
+              <Download className="w-4 h-4 text-kpcia-dark" />
+              <span>KPCIA 공식 인증서 고해상도 PDF 다운로드</span>
             </button>
             <button
               onClick={handleGoHomeFromCert}
@@ -1041,6 +1097,16 @@ export default function InstructorCard({ currentUser, onSaveProfileCard, onGoHom
                 디지털 배지 인증 주소 복사하기
               </button>
             </div>
+          </div>
+        </div>
+      )}
+      
+      {isDownloadSimulating && (
+        <div className="fixed inset-0 bg-neutral-950/80 backdrop-blur-md z-[9999] flex flex-col items-center justify-center space-y-4">
+          <div className="w-12 h-12 rounded-full border-4 border-kpcia-gold border-t-transparent animate-spin" />
+          <div className="text-center">
+            <p className="text-xs font-mono tracking-widest text-kpcia-gold font-bold">GENERATING PREMIUM HIGH-FIDELITY PDF...</p>
+            <p className="text-[10px] text-neutral-400 mt-1">한국프레스티지기업강사협회 공식 보안 검증 필터 적용 중</p>
           </div>
         </div>
       )}

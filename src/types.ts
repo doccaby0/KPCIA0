@@ -26,6 +26,7 @@ export interface InstructorCardInfo {
   pdfUrl?: string;
   cardTheme: 'classic' | 'gold_luxury' | 'midnight_sapphire' | 'elite_emerald';
   bankAccount?: string;
+  region?: string; // Active main region (e.g. 서울, 경기, 부산)
 }
 
 export interface UserProfile {
@@ -46,6 +47,19 @@ export interface UserProfile {
   lectureCount?: number;
   lectureRatings?: number[];
   averageRating?: number;
+  assistantEvaluations?: AssistantEvaluation[];
+}
+
+export interface AssistantEvaluation {
+  id: string;
+  lectureId: string;
+  lectureTitle: string;
+  evaluatorId: string;
+  evaluatorName: string;
+  evaluatorTier: InstructorTier;
+  rating: number;
+  comment: string;
+  createdAt: string;
 }
 
 export interface LectureRequest {
@@ -65,10 +79,17 @@ export interface LectureRequest {
   managerName?: string; // Contact manager name
   managerPhone?: string; // Contact manager phone number
   status: 'open' | 'assigned' | 'completed';
+  settlementStatus?: 'pending' | 'completed'; // Settlement processing status
   assignedTo?: string; // User ID of the assigned instructor
   assignedName?: string; // Name of the assigned instructor
   applicants: string[]; // User IDs of instructors who applied
   createdAt: string;
+  mainHours?: number;
+  assistantHours?: number;
+  materialCost?: number;
+  assistantId?: string;
+  assistantName?: string;
+  assistantEvaluated?: boolean;
 }
 
 export interface EducationalProgram {

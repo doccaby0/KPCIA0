@@ -7,17 +7,27 @@ interface LectureBoardProps {
   lectures: LectureRequest[];
   onApplyLecture: (lectureId: string) => void;
   onOpenAuthModal?: (tab: 'login' | 'register') => void;
+  allUsers?: UserProfile[];
+  onAssignAssistant?: (lectureId: string, assistantId: string, assistantName: string) => void;
+  onEvaluateAssistant?: (lectureId: string, assistantId: string, rating: number, comment: string) => void;
 }
 
 export default function LectureBoard({
   currentUser,
   lectures,
   onApplyLecture,
-  onOpenAuthModal
+  onOpenAuthModal,
+  allUsers,
+  onAssignAssistant,
+  onEvaluateAssistant
 }: LectureBoardProps) {
   // Map popup states
   const [selectedMapLocation, setSelectedMapLocation] = useState<string | null>(null);
   const [selectedMapTitle, setSelectedMapTitle] = useState<string>('');
+
+  // Assistant evaluation local states
+  const [evalRating, setEvalRating] = useState<{ [lectureId: string]: number }>({});
+  const [evalComment, setEvalComment] = useState<{ [lectureId: string]: string }>({});
 
   // Tier order list to check qualification
   const tiersOrder: InstructorTier[] = [
@@ -39,7 +49,12 @@ export default function LectureBoard({
       ? false 
       : currentUser.isAdmin || checkQualification(currentUser.tier, lecture.targetTier);
 
-    const totalCost = lecture.budget + 400000;
+    const mainHrs = lecture.mainHours || 0;
+    const asstHrs = lecture.assistantHours || 0;
+    const materialFee = lecture.materialCost || 0;
+    const mainFee = mainHrs * 100000;
+    const asstFee = asstHrs * 50000;
+    const totalCost = lecture.budget + materialFee;
 
     const htmlContent = `
 <html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel" xmlns="http://www.w3.org/TR/REC-html40">
@@ -60,25 +75,33 @@ export default function LectureBoard({
 <![endif]-->
 <meta http-equiv="content-type" content="application/vnd.ms-excel; charset=UTF-8"/>
 <style>
-  table { border-collapse: collapse; font-family: 'Malgun Gothic', 'Dotum', sans-serif; }
-  td { border: 1px solid #D1D5DB; padding: 10px; font-size: 11px; vertical-align: middle; }
-  .header-title { background-color: #1F4E79; color: #FFFFFF; font-size: 16px; font-weight: bold; text-align: center; padding: 15px; border: 1px solid #1F4E79; }
-  .section-title { background-color: #D9E1F2; color: #1F4E79; font-size: 12px; font-weight: bold; text-align: left; padding: 8px; border: 1px solid #B4C6E7; }
-  .label-cell { background-color: #F2F2F2; font-weight: bold; text-align: center; width: 120px; }
-  .value-cell { text-align: left; }
-  .tbl-header { background-color: #D9E1F2; font-weight: bold; text-align: center; }
+  table { border-collapse: collapse; font-family: 'Malgun Gothic', 'Dotum', sans-serif; width: 100%; }
+  td { border: 1px solid #A0AEC0; padding: 12px 14px; font-size: 11px; color: #2D3748; height: 26px; vertical-align: middle; }
+  .header-title { background-color: #1A365D; color: #FFFFFF; font-size: 16px; font-weight: bold; text-align: center; padding: 18px; border: 1px solid #1A365D; }
+  .section-title { background-color: #E2E8F0; color: #2B6CB0; font-size: 12px; font-weight: bold; text-align: left; padding: 10px; border: 1px solid #CBD5E0; }
+  .label-cell { background-color: #F7FAFC; font-weight: bold; text-align: center; color: #4A5568; width: 130px; }
+  .value-cell { text-align: left; background-color: #FFFFFF; }
+  .tbl-header { background-color: #EDF2F7; font-weight: bold; text-align: center; color: #2D3748; }
   .align-center { text-align: center; }
-  .align-right { text-align: right; }
-  .total-row { background-color: #FFF2CC; font-weight: bold; }
-  .notice-text { color: #C00000; font-weight: bold; font-size: 11px; line-height: 1.6; }
+  .align-right { text-align: right; font-family: 'Courier New', monospace; font-weight: bold; }
+  .total-row { background-color: #FEFCBF; font-weight: bold; color: #975A16; }
+  .notice-text { color: #C53030; font-weight: bold; font-size: 11px; line-height: 1.6; background-color: #FFF5F5; padding: 12px; }
 </style>
 </head>
 <body>
 <table>
+  <colgroup>
+    <col width="110" style="width: 110px;" />
+    <col width="120" style="width: 120px;" />
+    <col width="130" style="width: 130px;" />
+    <col width="120" style="width: 120px;" />
+    <col width="180" style="width: 180px;" />
+    <col width="220" style="width: 220px;" />
+  </colgroup>
   <tr>
     <td colspan="6" class="header-title">[인사이트9교육연구소] 출강 강의 파견 안내서</td>
   </tr>
-  <tr style="height: 10px;"><td colspan="6" style="border: none;"></td></tr>
+  <tr style="height: 10px;"><td colspan="6" style="border: none; height: 10px;"></td></tr>
   <tr>
     <td colspan="6" class="section-title">1. 기본 강의 정보</td>
   </tr>
@@ -106,35 +129,41 @@ export default function LectureBoard({
     <td class="label-cell">연락처</td>
     <td colspan="2" class="value-cell">${lecture.managerPhone || '010-5259-7458'}</td>
   </tr>
-  <tr style="height: 10px;"><td colspan="6" style="border: none;"></td></tr>
+  <tr style="height: 10px;"><td colspan="6" style="border: none; height: 10px;"></td></tr>
   <tr>
     <td colspan="6" class="section-title">2. 비용 및 정산 안내</td>
   </tr>
   <tr class="tbl-header">
     <td colspan="2">항목</td>
-    <td>금액 / 계산 기준</td>
-    <td colspan="2">내용</td>
+    <td>금액</td>
+    <td colspan="2">계산 기준 및 내용</td>
     <td>비고 (주의사항)</td>
   </tr>
   <tr>
-    <td colspan="2" class="align-center">강사료</td>
-    <td class="align-right">${isPriceVisible ? `${lecture.budget.toLocaleString()}원` : '[등급 달성시 공개]'}</td>
-    <td colspan="2" class="align-center">${lecture.duration}</td>
-    <td>실비 정산 가능</td>
+    <td colspan="2" class="align-center">주강사료</td>
+    <td class="align-right">${isPriceVisible ? `${mainFee.toLocaleString()}원` : '[등급 달성시 공개]'}</td>
+    <td colspan="2" class="align-center">100,000원 * ${mainHrs}시간</td>
+    <td>소득세 원천징수 후 지급</td>
   </tr>
   <tr>
-    <td colspan="2" class="align-center">재료비</td>
-    <td class="align-right">400,000원</td>
-    <td colspan="2" class="align-center">20000 * 20</td>
-    <td>(정원 미달 시에도 남은 재료 소진 필수)</td>
+    <td colspan="2" class="align-center">보조강사료</td>
+    <td class="align-right">${isPriceVisible ? `${asstFee.toLocaleString()}원` : '[등급 달성시 공개]'}</td>
+    <td colspan="2" class="align-center">50,000원 * ${asstHrs}시간</td>
+    <td>배정 시간 기준 실비 지급</td>
+  </tr>
+  <tr>
+    <td colspan="2" class="align-center">소모 재료비</td>
+    <td class="align-right">${materialFee.toLocaleString()}원</td>
+    <td colspan="2" class="align-center">실비 정산 (키트 및 재료)</td>
+    <td>정원 미달 시에도 남은 재료 소진 필수</td>
   </tr>
   <tr class="total-row">
-    <td colspan="2" class="align-center">총 비용</td>
+    <td colspan="2" class="align-center">총 정산 금액</td>
     <td class="align-right">${isPriceVisible ? `${totalCost.toLocaleString()}원` : '[등급 달성시 공개]'}</td>
-    <td colspan="2" class="align-center"></td>
-    <td>합계 금액</td>
+    <td colspan="2" class="align-center">강사료 합계 + 재료 실비</td>
+    <td>지급 완료시 마일리지 전환 가능</td>
   </tr>
-  <tr style="height: 10px;"><td colspan="6" style="border: none;"></td></tr>
+  <tr style="height: 10px;"><td colspan="6" style="border: none; height: 10px;"></td></tr>
   <tr>
     <td colspan="6" class="section-title">3. 프로그램 진행 플로우 (강사 행동 요령)</td>
   </tr>
@@ -168,7 +197,7 @@ export default function LectureBoard({
     <td colspan="2">촬영한 모든 사진(세팅, 강의, 결과물 등)을 대표님 카카오톡으로 전송</td>
     <td class="align-center">[ ]</td>
   </tr>
-  <tr style="height: 10px;"><td colspan="6" style="border: none;"></td></tr>
+  <tr style="height: 10px;"><td colspan="6" style="border: none; height: 10px;"></td></tr>
   <tr>
     <td colspan="6" class="section-title">4. 강의 후 행정 및 결제 처리 안내</td>
   </tr>
@@ -184,13 +213,13 @@ export default function LectureBoard({
     <td colspan="2" class="label-cell">현장 추가 문의 응대</td>
     <td colspan="4" class="value-cell">현장 담당자의 프로그램/강의 예산 추가 문의 시 -> '인사이트9교육연구소(본사)에 연락하시면 안내해 드립니다'로 응대</td>
   </tr>
-  <tr style="height: 10px;"><td colspan="6" style="border: none;"></td></tr>
+  <tr style="height: 10px;"><td colspan="6" style="border: none; height: 10px;"></td></tr>
   <tr>
     <td colspan="6" class="section-title">5. 주의 및 특이사항 (필수 준수)</td>
   </tr>
   <tr>
     <td colspan="6" class="notice-text">
-      • 현장 담당자에게 소속 소개 시 인사이트9교육연구소와 함께하는 협력 기관·이라고 소개해주세요.<br/>
+      • 현장 담당자에게 소속 소개 시 '인사이트9교육연구소와 함께하는 협력 기관'이라고 소개해주세요.<br/>
       • 출강 전 현장 담당자와 연락하여 강의장 컨디션, 시간, 장소, 특이사항을 사전 체크해주세요.<br/>
       • 현장에서 인원 추가는 절대 불가합니다. 요청 시 '본사에서 정해진 인원으로만 진행된다'고 안내해주세요.<br/>
       • 개인/협회/공방 SNS나 블로그에 후기 PR 게시 시 '인사이트9교육연구소와 협업했다'는 내용을 꼭 기재해주세요.
@@ -202,7 +231,7 @@ export default function LectureBoard({
     `.trim();
 
     const element = document.createElement("a");
-    const file = new Blob([htmlContent], { type: 'application/vnd.ms-excel;charset=utf-8' });
+    const file = new Blob(["\ufeff", htmlContent], { type: 'application/vnd.ms-excel;charset=utf-8' });
     element.href = URL.createObjectURL(file);
     element.download = `[인사이트9교육연구소]출강강의파견안내서_${lecture.title.replace(/[\s/\\:*?"<>|]/g, '_')}.xls`;
     document.body.appendChild(element);
@@ -346,6 +375,137 @@ export default function LectureBoard({
                     </span>
                   </div>
                 )}
+
+                {/* Assistant Instructor Matching & Feedback Panel */}
+                {(lecture.status === 'assigned' || lecture.status === 'completed') && (() => {
+                  const assistantUser = allUsers?.find(u => u.uid === lecture.assistantId);
+                  const isViewerHigherTier = currentUser && (currentUser.isAdmin || currentUser.tier !== 'Prestige Member');
+                  
+                  // Only high tier users (Prestige Associate+) are allowed to assign/bring assistant instructors (Prestige Member)
+                  const canAssignAssistant = currentUser && (currentUser.isAdmin || currentUser.tier !== 'Prestige Member') && isAssignedToMe;
+
+                  if (!lecture.assistantId) {
+                    if (canAssignAssistant && lecture.status === 'assigned') {
+                      return (
+                        <div className="mt-3.5 p-3 rounded-lg bg-neutral-950/40 border border-neutral-800 space-y-2 text-left" id={`asst-match-${lecture.id}`}>
+                          <div className="text-[10px] font-bold text-neutral-300 flex items-center gap-1.5 uppercase font-sans tracking-wide">
+                            <Users className="w-3.5 h-3.5 text-kpcia-gold" />
+                            보조강사 매칭 (Prestige Member 동행 신청)
+                          </div>
+                          <p className="text-[9.5px] text-neutral-400 font-sans leading-relaxed">
+                            본 출강에 보조강사(Prestige Member)를 동행 지정할 수 있습니다. 동행 후 위원님께서 직접 평가 및 출강 실적(1회)을 인정해 주실 수 있습니다.
+                          </p>
+                          <select
+                            id={`select-asst-${lecture.id}`}
+                            className="w-full px-2.5 py-1.5 rounded bg-neutral-900 border border-neutral-800 text-[11px] text-neutral-200 focus:border-kpcia-gold focus:outline-none cursor-pointer"
+                            onChange={(e) => {
+                              const val = e.target.value;
+                              if (val) {
+                                const u = allUsers?.find(usr => usr.uid === val);
+                                if (u && onAssignAssistant) {
+                                  onAssignAssistant(lecture.id, u.uid, u.name);
+                                }
+                              }
+                            }}
+                            defaultValue=""
+                          >
+                            <option value="" disabled>보조강사(Prestige Member) 선택하기...</option>
+                            {allUsers?.filter(u => u.tier === 'Prestige Member' && !u.isAdmin && u.isApproved !== false).map(u => (
+                              <option key={u.uid} value={u.uid}>{u.name} (출강: {u.lectureCount || 0}회 | 평점: {u.averageRating?.toFixed(1) || '0.0'}점)</option>
+                            ))}
+                          </select>
+                        </div>
+                      );
+                    }
+                    return null;
+                  }
+
+                  return (
+                    <div className="mt-3.5 p-3 rounded-lg bg-neutral-950/45 border border-kpcia-gold/15 space-y-3 text-left" id={`asst-details-${lecture.id}`}>
+                      <div className="flex items-center justify-between border-b border-neutral-850 pb-1.5">
+                        <span className="text-[10.5px] font-bold text-kpcia-gold flex items-center gap-1.5">
+                          <Users className="w-3.5 h-3.5 text-kpcia-gold animate-pulse" />
+                          동행 보조강사: {lecture.assistantName}
+                        </span>
+                        <span className="text-[8.5px] bg-neutral-900 border border-neutral-800 text-neutral-450 px-1.5 py-0.5 rounded font-mono font-bold uppercase">
+                          PARTNER
+                        </span>
+                      </div>
+
+                      {/* Contact Phone & Region - Restricted to Upper Tiers */}
+                      <div className="text-[10.5px] space-y-1 text-neutral-350 bg-neutral-900/60 p-2.5 rounded border border-neutral-850/40">
+                        {isViewerHigherTier ? (
+                          <div className="grid grid-cols-2 gap-2 font-sans text-[10px]">
+                            <div>
+                              <span className="text-neutral-500 block text-[9px] uppercase font-mono">📍 활동 지역</span>
+                              <strong className="text-neutral-200">{assistantUser?.profileCard?.region || '서울'}</strong>
+                            </div>
+                            <div>
+                              <span className="text-neutral-500 block text-[9px] uppercase font-mono">📞 비상 연락처</span>
+                              <strong className="text-neutral-200">{assistantUser?.profileCard?.contactPhone || '미등록'}</strong>
+                            </div>
+                          </div>
+                        ) : (
+                          <div className="text-[9px] text-neutral-450 italic text-center flex items-center justify-center gap-1 py-0.5">
+                            <span>🔒 보조강사 개인연락처/지역은 상위 등급 권한자만 열람 가능합니다.</span>
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Evaluation Panel */}
+                      {isAssignedToMe && (
+                        <div className="pt-2 border-t border-neutral-850 space-y-2 text-left">
+                          {lecture.assistantEvaluated ? (
+                            <div className="flex items-center justify-center gap-1.5 bg-emerald-500/10 border border-emerald-500/20 py-1.5 px-2.5 rounded-lg text-emerald-400 text-[10.5px] font-bold font-sans">
+                              <Check className="w-3.5 h-3.5" />
+                              <span>보조강사 실무 평가 완료 (출강 1회 반영됨)</span>
+                            </div>
+                          ) : (
+                            <div className="space-y-2">
+                              <div className="text-[10px] font-extrabold text-neutral-300">
+                                ⭐ 동행 보조강사 평가 및 피드백 전송
+                              </div>
+                              <div className="flex items-center justify-between gap-2 bg-neutral-900/50 p-1 rounded border border-neutral-850">
+                                <span className="text-[9px] text-neutral-400 pl-1">수행 성과 점수:</span>
+                                <select
+                                  value={evalRating[lecture.id] || 5}
+                                  onChange={(e) => setEvalRating(prev => ({ ...prev, [lecture.id]: Number(e.target.value) }))}
+                                  className="px-1.5 py-0.5 rounded bg-neutral-950 border border-neutral-800 text-[10px] font-bold text-kpcia-gold focus:border-kpcia-gold focus:outline-none cursor-pointer"
+                                >
+                                  <option value={5}>★★★★★ (5.0 / 최고)</option>
+                                  <option value={4.5}>★★★★☆ (4.5 / 우수)</option>
+                                  <option value={4}>★★★★☆ (4.0 / 양호)</option>
+                                  <option value={3.5}>★★★☆☆ (3.5 / 보통)</option>
+                                  <option value={3}>★★★☆☆ (3.0 / 미흡)</option>
+                                </select>
+                              </div>
+                              <textarea
+                                rows={2}
+                                placeholder="동행 보조강사의 성실성, 교육 애티튜드 및 피드백을 기록해 주세요."
+                                value={evalComment[lecture.id] || ''}
+                                onChange={(e) => setEvalComment(prev => ({ ...prev, [lecture.id]: e.target.value }))}
+                                className="w-full px-2 py-1.5 rounded bg-neutral-900 border border-neutral-800 text-[10px] text-neutral-200 placeholder-neutral-500 focus:border-kpcia-gold focus:outline-none font-sans leading-relaxed resize-none"
+                              />
+                              <button
+                                onClick={() => {
+                                  if (onEvaluateAssistant && lecture.assistantId) {
+                                    const rating = evalRating[lecture.id] || 5;
+                                    const comment = evalComment[lecture.id]?.trim() || '동행 및 실무 실습 성실히 이행함.';
+                                    onEvaluateAssistant(lecture.id, lecture.assistantId, rating, comment);
+                                  }
+                                }}
+                                disabled={!evalComment[lecture.id]?.trim()}
+                                className="w-full py-1 bg-kpcia-gold hover:bg-kpcia-gold-hover text-kpcia-dark text-[10px] font-extrabold rounded-lg transition-all shadow-md cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
+                              >
+                                동행 평가 피드백 전송하기
+                              </button>
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })()}
               </div>
 
               {/* Pricing, Applicants & Actions */}

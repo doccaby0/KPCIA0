@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { UserProfile, LectureRequest, EducationalProgram, MileageTransaction, InstructorTier, DigitalBadge, PartnershipProposal } from './types';
+import { UserProfile, LectureRequest, EducationalProgram, MileageTransaction, InstructorTier, DigitalBadge, PartnershipProposal, AssistantEvaluation } from './types';
 import { StorageService, generateBadgeForTier, auth, useFirestore } from './lib/firebase';
 import { createUserWithEmailAndPassword, sendEmailVerification, signInWithEmailAndPassword } from 'firebase/auth';
 import { sanitizeString, sanitizePhone, checkRateLimit } from './utils/security';
@@ -402,6 +402,110 @@ export default function App() {
     triggerToast(`'${lecture.title}' 출강 종료 승인이 완료되었습니다. 마일리지 명세가 트랜잭션 원장에 기록되었습니다. (관리자 수동 정산 대기)`);
   };
 
+  // 7.5. Update Lecture Settlement Status (Admin Only)
+  const handleUpdateLectureSettlementStatus = async (lectureId: string, status: 'pending' | 'completed') => {
+    const lecture = lectures.find(l => l.id === lectureId);
+    if (!lecture) return;
+
+    const updatedLecture: LectureRequest = {
+      ...lecture,
+      settlementStatus: status
+    };
+
+    setLectures(prev => prev.map(l => l.id === lectureId ? updatedLecture : l));
+    await StorageService.saveLecture(updatedLecture);
+
+    triggerToast(`배정번호 ${lectureId}번의 정산 상태가 '${status === 'completed' ? '정산 완료' : '지급 대기'}'로 변경되었습니다.`, 'success');
+  };
+
+  // 7.8. Assign Assistant Instructor for Assigned Lecture (Main Instructor Only)
+  const handleAssignAssistant = async (lectureId: string, assistantId: string, assistantName: string) => {
+    const lecture = lectures.find(l => l.id === lectureId);
+    if (!lecture) return;
+
+    const updatedLecture: LectureRequest = {
+      ...lecture,
+      assistantId,
+      assistantName
+    };
+
+    setLectures(prev => prev.map(l => l.id === lectureId ? updatedLecture : l));
+    await StorageService.saveLecture(updatedLecture);
+
+    triggerToast(`'${lecture.title}' 강의에 ${assistantName} 보조강사님이 동행 지정되었습니다.`, 'success');
+  };
+
+  // 7.9. Evaluate Assistant Instructor (Main Instructor Only)
+  const handleEvaluateAssistant = async (lectureId: string, assistantId: string, rating: number, comment: string) => {
+    const lecture = lectures.find(l => l.id === lectureId);
+    if (!lecture) return;
+
+    const assistant = users.find(u => u.uid === assistantId);
+    if (!assistant) return;
+
+    if (!currentUser) return;
+
+    const newEvaluation: AssistantEvaluation = {
+      id: `eval_${Date.now()}`,
+      lectureId,
+      lectureTitle: lecture.title,
+      evaluatorId: currentUser.uid,
+      evaluatorName: currentUser.name,
+      evaluatorTier: currentUser.tier,
+      rating,
+      comment,
+      createdAt: new Date().toISOString()
+    };
+
+    const existingEvals = assistant.assistantEvaluations || [];
+    const updatedEvals = [...existingEvals, newEvaluation];
+
+    const existingRatings = assistant.lectureRatings || [];
+    const updatedRatings = [...existingRatings, rating];
+
+    const sum = updatedRatings.reduce((s, r) => s + r, 0);
+    const updatedAverage = updatedRatings.length > 0 ? Number((sum / updatedRatings.length).toFixed(1)) : 0;
+
+    // Increment lecture count for the assistant as they participated!
+    const updatedCount = (assistant.lectureCount || 0) + 1;
+
+    const updatedAssistant: UserProfile = {
+      ...assistant,
+      assistantEvaluations: updatedEvals,
+      lectureRatings: updatedRatings,
+      averageRating: updatedAverage,
+      lectureCount: updatedCount,
+      updatedAt: new Date().toISOString()
+    };
+
+    // Update users state
+    setUsers(prev => prev.map(u => u.uid === assistantId ? updatedAssistant : u));
+    await StorageService.saveUser(updatedAssistant);
+
+    // Mark lecture as assistant-evaluated
+    const updatedLecture: LectureRequest = {
+      ...lecture,
+      assistantEvaluated: true
+    };
+    setLectures(prev => prev.map(l => l.id === lectureId ? updatedLecture : l));
+    await StorageService.saveLecture(updatedLecture);
+
+    // Create a transaction record for auditing/ledger
+    const assistantTx: MileageTransaction = {
+      id: `tx_asst_${Date.now()}`,
+      userId: assistantId,
+      userName: assistant.name,
+      type: 'lecture_payout',
+      amount: 0,
+      description: `'${lecture.title}' 보조강사 출강 및 우수 평가 피드백 완료 (+1회 실적 자동 반영)`,
+      createdAt: new Date().toISOString()
+    };
+    setTransactions(prev => [...prev, assistantTx]);
+    await StorageService.addTransaction(assistantTx);
+
+    triggerToast(`${assistant.name} 보조강사에 대한 평가 피드백이 정식 반영되었으며, 출강 횟수가 가산되었습니다!`, 'success');
+  };
+
   // 8. Manual Mileage Adjustment (Admin Only)
   const handleAdjustMileage = async (userId: string, amount: number, description: string) => {
     const targetUser = users.find(u => u.uid === userId);
@@ -464,6 +568,31 @@ export default function App() {
     }
 
     triggerToast(`${targetUser.name} 강사님의 실적 및 정산 정보가 성공적으로 업데이트되었습니다!`);
+  };
+
+  // 8.06. Update Instructor Profile Fields (Admin Only)
+  const handleUpdateUserProfile = async (userId: string, updatedFields: Partial<UserProfile>) => {
+    const targetUser = users.find(u => u.uid === userId);
+    if (!targetUser) return;
+
+    const updatedUser: UserProfile = {
+      ...targetUser,
+      ...updatedFields,
+      profileCard: {
+        ...targetUser.profileCard,
+        ...(updatedFields.profileCard || {})
+      },
+      updatedAt: new Date().toISOString()
+    };
+
+    setUsers(prev => prev.map(u => u.uid === userId ? updatedUser : u));
+    await StorageService.saveUser(updatedUser);
+
+    if (currentUser && currentUser.uid === userId) {
+      setCurrentUser(updatedUser);
+    }
+
+    triggerToast(`${targetUser.name} 강사님의 프로필 정보가 성공적으로 수정되었습니다!`);
   };
 
   // 8.1. Register Partnership Proposal
@@ -602,6 +731,7 @@ export default function App() {
       imageUrl: cardInfo.imageUrl ? sanitizeString(cardInfo.imageUrl) : undefined,
       pdfUrl: cardInfo.pdfUrl ? sanitizeString(cardInfo.pdfUrl) : undefined,
       bankAccount: cardInfo.bankAccount ? sanitizeString(cardInfo.bankAccount) : undefined,
+      region: cardInfo.region ? sanitizeString(cardInfo.region) : undefined,
       specialties: Array.isArray(cardInfo.specialties) 
         ? cardInfo.specialties.map((s: string) => sanitizeString(s)) 
         : [],
@@ -659,7 +789,8 @@ export default function App() {
         education: [`대학 졸업 및 실무 교육 이수 완료`],
         contactEmail: sEmail,
         contactPhone: sPhone || '010-0000-0000',
-        cardTheme: 'classic'
+        cardTheme: 'classic',
+        region: '서울'
       },
       badges: [initialBadge],
       createdAt: new Date().toISOString(),
@@ -1360,7 +1491,7 @@ export default function App() {
 
                   <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4" id="tiers-showcase">
                     {[
-                      { title: 'Prestige Member', kor: '프레스티지 멤버', desc: '일반 회원 (초기 가입 단계)', badge: '🎖️ Member' },
+                      { title: 'Prestige Member', kor: '프레스티지 멤버', desc: '기업/기관 참관 보조 강사 5회 이상', badge: '🎖️ Member' },
                       { title: 'Prestige Associate', kor: '프레스티지 어소시에이트', desc: '10강의 출강 & 누적 만족도 4.5 이상 / 5.0 만점', badge: '🥉 Bronze' },
                       { title: 'Prestige Professional', kor: '프레스티지 프로페셔널', desc: '100강의 출강 & 누적 만족도 4.6 이상 / 5.0 만점', badge: '🥈 Silver' },
                       { title: 'Prestige Master', kor: '프레스티지 마스터', desc: '1000강의 출강 & 누적 만족도 4.8 이상 / 5.0 만점', badge: '🥇 Ruby' },
@@ -1393,6 +1524,9 @@ export default function App() {
                     setAuthModalTab(tab);
                     setShowAuthModal(true);
                   }}
+                  allUsers={users}
+                  onAssignAssistant={handleAssignAssistant}
+                  onEvaluateAssistant={handleEvaluateAssistant}
                 />
               )
             )}
@@ -1451,6 +1585,8 @@ export default function App() {
                 onApproveProgram={handleApproveProgram}
                 onAddLecture={handleAddLecture}
                 onUpdateUserPerformance={handleUpdateUserPerformance}
+                onUpdateUserProfile={handleUpdateUserProfile}
+                onUpdateLectureSettlementStatus={handleUpdateLectureSettlementStatus}
                 onDeleteUser={handleDeleteUser}
                 onDeleteProgram={handleDeleteProgram}
                 onResetDatabase={handleResetData}
