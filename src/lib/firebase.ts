@@ -247,7 +247,7 @@ export class StorageService {
   }
 
   // Robust helper to execute Firestore operations with a fast timeout fallback
-  private static async runWithTimeout<T>(op: () => Promise<T>, fallback: T, timeoutMs: number = 1500): Promise<T> {
+  private static async runWithTimeout<T>(op: () => Promise<T>, fallback: T, timeoutMs: number = 5000): Promise<T> {
     if (!useFirestore || !db) return fallback;
     try {
       return await Promise.race([
@@ -255,12 +255,8 @@ export class StorageService {
         new Promise<T>((_, reject) => setTimeout(() => reject(new Error("Timeout")), timeoutMs))
       ]);
     } catch (e) {
-      console.warn("Firestore connection timed out or failed. Dynamically fallback to robust LocalStorage/LocalState.", e);
-      // If a timeout occurs, disable future Firestore requests to make transitions instant and zero-latency
-      if (e instanceof Error && e.message === "Timeout") {
-        console.warn("Disabling Firestore queries for this session to ensure responsive UI experience.");
-        useFirestore = false;
-      }
+      console.error("Firestore operation timed out or failed. Dynamically fallback to robust LocalStorage/LocalState.", e);
+      // We don't disable firestore immediately on a single timeout anymore to avoid permanent sync divergence
       return fallback;
     }
   }
@@ -297,7 +293,7 @@ export class StorageService {
             console.log("Firestore successfully seeded!");
           }
         })(),
-        new Promise((_, reject) => setTimeout(() => reject(new Error("Timeout")), 1500))
+        new Promise((_, reject) => setTimeout(() => reject(new Error("Timeout")), 8000))
       ]);
     } catch (e) {
       console.warn("Could not seed Firestore due to permissions/connection/timeout. Standard operation continues via local state.", e);

@@ -733,11 +733,19 @@ export default function App() {
 
   // 8.5.3. Delete/Cancel Lecture request (Admin Only)
   const handleDeleteLecture = async (lectureId: string) => {
-    const targetLect = lectures.find(l => l.id === lectureId);
-    if (!targetLect) return;
-    setLectures(prev => prev.filter(l => l.id !== lectureId));
-    await StorageService.deleteLecture(lectureId);
-    triggerToast(`'${targetLect.title}' 출강 공고 요청서가 출강 배정실에서 공식 취소 및 영구 삭제되었습니다.`, 'info');
+    try {
+      const targetLect = lectures.find(l => l.id === lectureId);
+      if (!targetLect) return;
+      
+      // Update state first for instant response
+      setLectures(prev => prev.filter(l => l.id !== lectureId));
+      
+      await StorageService.deleteLecture(lectureId);
+      triggerToast(`'${targetLect.title}' 출강 공고 요청서가 출강 배정실에서 공식 취소 및 영구 삭제되었습니다.`, 'info');
+    } catch (error: any) {
+      console.error("Failed to delete lecture:", error);
+      triggerToast(`공고 삭제 처리 중 오류가 발생했습니다: ${error.message || error}`, 'error');
+    }
   };
 
   // 8.6. Approve and finalize Educational Program Copyright (Admin Only)

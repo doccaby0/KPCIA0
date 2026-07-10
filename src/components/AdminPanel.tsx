@@ -1845,7 +1845,7 @@ export default function AdminPanel({
                           <span>강의 요청서</span>
                         </button>
 
-                        {lecture.status === 'open' && onDeleteLecture && (
+                        {onDeleteLecture && (
                           <button
                             type="button"
                             onClick={() => {
@@ -1858,7 +1858,7 @@ export default function AdminPanel({
                             id={`admin-cancel-lecture-${lecture.id}`}
                           >
                             <Trash2 className="w-3.5 h-3.5 text-red-500/80" />
-                            <span>공고 취소</span>
+                            <span>공고 삭제</span>
                           </button>
                         )}
 
@@ -1956,12 +1956,13 @@ export default function AdminPanel({
                     <th className="p-3 text-right">정산 지급액</th>
                     <th className="p-3 text-center">지급 예정일</th>
                     <th className="p-3 text-center">송금 처리 및 완료</th>
+                    <th className="p-3 text-center">공고 삭제</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-neutral-850">
                   {completedLectures.length === 0 ? (
                     <tr>
-                      <td colSpan={7} className="text-center py-12 text-xs text-neutral-500 italic">
+                      <td colSpan={8} className="text-center py-12 text-xs text-neutral-500 italic">
                         정산 대상이 되는 완료된 출강 강의 건이 아직 없습니다.
                       </td>
                     </tr>
@@ -2042,6 +2043,23 @@ export default function AdminPanel({
                                 </>
                               )}
                             </div>
+                          </td>
+                          <td className="p-3 text-center">
+                            {onDeleteLecture && (
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  if (window.confirm(`정말로 완료된 '${lecture.title}' 출강 공고 및 모든 관련 정산 내역을 데이터베이스에서 영구히 삭제하시겠습니까?`)) {
+                                    onDeleteLecture(lecture.id);
+                                  }
+                                }}
+                                className="p-1.5 border border-red-900/30 bg-red-950/10 hover:bg-red-950/30 text-red-400 hover:text-red-300 rounded-lg transition-all inline-flex items-center justify-center cursor-pointer hover:border-red-500"
+                                title="완료된 공고 영구 삭제"
+                                id={`settlement-delete-btn-${lecture.id}`}
+                              >
+                                <Trash2 className="w-3.5 h-3.5 text-red-500" />
+                              </button>
+                            )}
                           </td>
                         </tr>
                       );
