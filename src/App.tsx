@@ -254,6 +254,23 @@ export default function App() {
     triggerToast(`신규 기업 출강 강의 공고 '${newLecture.title}'가 전체 위원회 게시판에 실시간으로 게시되었습니다.`);
   };
 
+  // 3.1. Update an existing lecture request (Admin Only)
+  const handleUpdateLecture = async (updatedLecture: LectureRequest) => {
+    const sanitizedLecture: LectureRequest = {
+      ...updatedLecture,
+      title: sanitizeString(updatedLecture.title),
+      description: sanitizeString(updatedLecture.description),
+      location: sanitizeString(updatedLecture.location),
+      duration: sanitizeString(updatedLecture.duration),
+      time: sanitizeString(updatedLecture.time),
+      date: sanitizeString(updatedLecture.date)
+    };
+    
+    setLectures(prev => prev.map(l => l.id === sanitizedLecture.id ? sanitizedLecture : l));
+    await StorageService.saveLecture(sanitizedLecture);
+    triggerToast(`'${sanitizedLecture.title}' 출강 공고 정보가 성공적으로 수정 및 업데이트되었습니다.`, 'success');
+  };
+
   // 4. Register a new custom Educational Program
   const handleRegisterProgram = async (programData: any) => {
     if (!currentUser) return;
@@ -744,7 +761,7 @@ export default function App() {
       triggerToast(`'${targetLect.title}' 출강 공고 요청서가 출강 배정실에서 공식 취소 및 영구 삭제되었습니다.`, 'info');
     } catch (error: any) {
       console.error("Failed to delete lecture:", error);
-      triggerToast(`공고 삭제 처리 중 오류가 발생했습니다: ${error.message || error}`, 'error');
+      triggerToast(`공고 삭제 처리 중 오류가 발생했습니다: ${error.message || error}`, 'info');
     }
   };
 
@@ -1561,7 +1578,7 @@ export default function App() {
 
                   <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4" id="tiers-showcase">
                     {[
-                      { title: 'Prestige Member', kor: '프레스티지 멤버', desc: '기업/기관 참관 보조 강사 5회 이상', badge: '🎖️ Member' },
+                      { title: 'Prestige Member', kor: '프레스티지 멤버', desc: '기업/기관 참관 보조 강사 5회 이상 & 주 강사 평가 4.5 이상', badge: '🎖️ Member' },
                       { title: 'Prestige Associate', kor: '프레스티지 어소시에이트', desc: '10강의 출강 & 누적 만족도 4.5 이상 / 5.0 만점', badge: '🥉 Bronze' },
                       { title: 'Prestige Professional', kor: '프레스티지 프로페셔널', desc: '100강의 출강 & 누적 만족도 4.6 이상 / 5.0 만점', badge: '🥈 Silver' },
                       { title: 'Prestige Master', kor: '프레스티지 마스터', desc: '1000강의 출강 & 누적 만족도 4.8 이상 / 5.0 만점', badge: '🥇 Ruby' },
@@ -1656,6 +1673,7 @@ export default function App() {
                 onRejectUser={handleRejectUser}
                 onApproveProgram={handleApproveProgram}
                 onAddLecture={handleAddLecture}
+                onUpdateLecture={handleUpdateLecture}
                 onUpdateUserPerformance={handleUpdateUserPerformance}
                 onUpdateUserProfile={handleUpdateUserProfile}
                 onUpdateLectureSettlementStatus={handleUpdateLectureSettlementStatus}

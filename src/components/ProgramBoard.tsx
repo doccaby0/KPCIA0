@@ -158,7 +158,7 @@ export default function ProgramBoard({ currentUser, programs, onRegisterProgram 
             <Award className="w-4 h-4" /> KPCIA 마일리지 누적 지급 구조
           </h4>
           <p className="text-xs text-neutral-400 leading-relaxed max-w-2xl font-sans">
-            협회 정식 프로그램 등재 후, 다른 회원이 해당 라이선스로 출강을 마쳤을 때, <strong>누적 마일리지(M)</strong>가 원작 설계자의 잔액으로 즉각 자동 지급되는 특허 제도를 운영하고 있습니다.
+            협회 정식 프로그램 등재 후, 다른 회원이 해당 라이선스로 출강을 마쳤을 때, <strong>누적 마일리지(M)</strong>가 원작 설계자의 마일리지로 즉각 자동 지급되는 특허 제도를 운영하고 있습니다.
           </p>
         </div>
         <div className="bg-neutral-900 border border-neutral-800 rounded-lg px-4 py-3 text-center min-w-44" id="stat-support">

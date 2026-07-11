@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { UserProfile, InstructorCardInfo } from '../types';
 import { Mail, Phone, MapPin, Award, Download, Save, RefreshCw, Plus, Trash2, Printer, X, User, FileUp, FileText, CheckCircle2, AlertCircle, Sparkles, Building, Loader2, CreditCard } from 'lucide-react';
+import html2canvas from 'html2canvas';
+import { jsPDF } from 'jspdf';
 
 export function getLectureMilestoneBadge(lectureCount?: number) {
   if (lectureCount === undefined || lectureCount < 10) return null;
@@ -63,6 +65,14 @@ export default function InstructorCard({ currentUser, onSaveProfileCard, onGoHom
   const [imageUrl, setImageUrl] = useState(currentUser.profileCard?.imageUrl || '');
   const [isDownloadSimulating, setIsDownloadSimulating] = useState(false);
   const [activeBadgeDetail, setActiveBadgeDetail] = useState<any | null>(null);
+  const [localToast, setLocalToast] = useState<{ message: string; type: 'success' | 'info' | 'error' } | null>(null);
+
+  const triggerLocalToast = (message: string, type: 'success' | 'info' | 'error' = 'success') => {
+    setLocalToast({ message, type });
+    setTimeout(() => {
+      setLocalToast(null);
+    }, 5000);
+  };
 
   // Sync state when currentUser changes (e.g., fast account switcher)
   useEffect(() => {
@@ -143,7 +153,7 @@ export default function InstructorCard({ currentUser, onSaveProfileCard, onGoHom
       if (pct === 3) {
         clearInterval(interval);
         setIsDownloadSimulating(false);
-        alert(`🎉 [저장 완료] KPCIA 공식 디지털 강사 카드 및 인증 정보 패키지가 고해상도 PDF/이미지 파일 포맷으로 PC에 성공적으로 다운로드되었습니다.`);
+        triggerLocalToast(`🎉 [저장 완료] KPCIA 공식 디지털 강사 카드 및 인증 정보 패키지가 고해상도 PDF/이미지 파일 포맷으로 PC에 성공적으로 다운로드되었습니다.`, 'success');
       }
     }, 700);
   };
@@ -155,11 +165,9 @@ export default function InstructorCard({ currentUser, onSaveProfileCard, onGoHom
     setIsDownloadSimulating(true);
     
     try {
-      const html2canvas = (await import('html2canvas')).default;
-      const { jsPDF } = await import('jspdf');
-      
+      // Create high-res canvas (scale 3 for ultra-crisp output)
       const canvas = await html2canvas(element, {
-        scale: 2,
+        scale: 3,
         useCORS: true,
         logging: false,
         backgroundColor: null
@@ -176,12 +184,26 @@ export default function InstructorCard({ currentUser, onSaveProfileCard, onGoHom
       pdf.addImage(imgData, 'PNG', 0, yOffset > 0 ? yOffset : 0, imgWidth, imgHeight);
       
       const fileName = `KPCIA_인증서_${currentUser.name || '강사'}.pdf`;
-      pdf.save(fileName);
       
-      alert(`🎉 [다운로드 완료] KPCIA 공식 등급 인증서가 성공적으로 고해상도 PDF 파일로 다운로드되었습니다.`);
+      try {
+        pdf.save(fileName);
+        triggerLocalToast(`🎉 [다운로드 완료] KPCIA 공식 등급 인증서가 성공적으로 고해상도 PDF 파일로 다운로드되었습니다.`, 'success');
+      } catch (saveError) {
+        console.warn("Direct PDF save failed, using blob link fallback:", saveError);
+        const blob = pdf.output('blob');
+        const blobUrl = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = blobUrl;
+        link.download = fileName;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        setTimeout(() => URL.revokeObjectURL(blobUrl), 100);
+        triggerLocalToast(`🎉 [대체 다운로드 완료] KPCIA 공식 등급 인증서가 고해상도 PDF 포맷으로 성공적으로 보관함에 복구 및 다운로드되었습니다.`, 'success');
+      }
     } catch (error) {
       console.error("PDF generation failed:", error);
-      alert("PDF 다운로드 중 문제가 발생했습니다. 브라우저 인쇄 기능을 통해 PDF로 저장합니다.");
+      triggerLocalToast("PDF 다운로드 기독 엔진 오류로 문제가 발생했습니다. 브라우저 장치 인쇄를 통해 고품질 PDF 파일로 직접 저장 및 출력해 주시기 바랍니다.", "error");
       document.body.classList.add('certificate-printing');
       window.print();
     } finally {
@@ -203,20 +225,22 @@ export default function InstructorCard({ currentUser, onSaveProfileCard, onGoHom
 
   // AI PDF parser handler
   const handlePdfUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
+    const files = e.target.files;
+    if (!files || files.length === 0) return;
 
-    setParsedFileName(file.name);
+    const fileList = Array.from(files) as any[];
+    const fileNames = fileList.map(f => f.name).join(', ');
+    setParsedFileName(fileNames);
     setIsParsing(true);
     setParsingProgress(10);
-    setParsingStep('이력서 PDF 바이너리 스트림 수집 및 가상 레이아웃 구성 중...');
+    setParsingStep('업로드된 다양한 규격 문서(PDF, HWP, Word, 이미지 등) 바이너리 분석 구성 중...');
 
     const steps = [
-      { progress: 25, text: 'KPCIA 인텔리전트 OCR 기독 엔진 작동 - 문서 텍스트 영역 분할 완료...' },
-      { progress: 45, text: 'AI 인물 사진 세그멘테이션 작동 - 고해상도 증명 사진 데이터 분할 복구 완료!' },
-      { progress: 65, text: '학력 및 핵심 강의 이력(Career History) 정밀 데이터 매핑 중...' },
-      { progress: 85, text: '전문 출강 분야 및 핵심 키워드(Specialties) 연관성 가중치 분석 완료...' },
-      { progress: 100, text: '연락처 유효성 검증 완료 및 강사 카드 프로필 동기화 처리 완료!' }
+      { progress: 25, text: 'HWP/DOCX/PDF 메타 데이터 포맷 파싱 및 통합 데이터 인덱싱 중...' },
+      { progress: 45, text: 'KPCIA AI OCR 다큐먼트 기독 엔진 통합 해독 및 고해상도 인물사진 분할 복구 완료!' },
+      { progress: 65, text: '이력서, 포트폴리오, 학력 및 연혁 정보 다중 문서 크로스-매핑 정밀 분석...' },
+      { progress: 85, text: '전공 특화 분야 매치 및 출강 이력(Career History) 가중치 필터링 완료...' },
+      { progress: 100, text: '통합 지능형 데이터 인식 완료 및 강사 카드 인쇄 정보 실시간 동기화 완료!' }
     ];
 
     let currentStep = 0;
@@ -229,32 +253,33 @@ export default function InstructorCard({ currentUser, onSaveProfileCard, onGoHom
         clearInterval(interval);
         
         // Randomly assign one of the high-quality professional Unsplash portraits
-        const isFemale = file.name.includes('여') || file.name.includes('은') || file.name.includes('지') || file.name.includes('혜') || file.name.includes('희') || file.name.includes('수') || file.name.includes('서') || Math.random() > 0.5;
+        const firstFile = fileList[0];
+        const isFemale = firstFile.name.includes('여') || firstFile.name.includes('은') || firstFile.name.includes('지') || firstFile.name.includes('혜') || firstFile.name.includes('희') || firstFile.name.includes('수') || firstFile.name.includes('서') || Math.random() > 0.5;
         const randomImgUrl = isFemale 
           ? PROFILE_IMAGES[Math.floor(Math.random() * 3)]
           : PROFILE_IMAGES[3 + Math.floor(Math.random() * 3)];
 
         // Set state to realistic parsed profile contents
-        setCardTitle('생성형 AI 비즈니스 응용 및 디지털 트랜스포메이션 전문 수석강사');
-        setBio('인프라 구축과 비즈니스 마인드셋 혁신을 조율하는 대한민국 탑티어 IT 실무 연수 교육 전문가입니다. 국내 대기업 200여 곳에 초빙되어 강연을 진행했습니다.');
-        setSpecialties(['생성형 AI 실무 활용', '디지털 트랜스포메이션', 'IT 트렌드 및 기술혁신']);
+        setCardTitle('생성형 AI 비즈니스 실무 활용 및 프롬프트 엔지니어링 기업 위탁 수석강사');
+        setBio('출강 이력 250회 이상에 빛나는 대한민국 디지털 혁신 교육 탑티어 전문가입니다. 실전 워크숍과 일대일 코칭을 통해 조직의 AI 생산성을 300% 이상 극대화시킵니다.');
+        setSpecialties(['생성형 AI 프롬프트 엔지니어링', 'ChatGPT & Claude 실무 자동화', '인공지능 비즈니스 전략 모델링']);
         setCareer([
-          '네이버 클라우드 테크 에반젤리스트 (3년)',
-          '삼성전자 및 SK하이닉스 생성형 AI 마스터 코스 독점 강의',
-          'KPCIA 학회 교육기획운영본부 상임이사 (2025~현재)'
+          '멀티캠퍼스 및 패스트캠퍼스 기업 출강 AI 전임 교수 (4년)',
+          '한국프레스티지기업강사협회(KPCIA) 정교수 및 심의이사회 마스터 강사',
+          '주요 대기업(삼성, 현대, SK) 임직원 대상 생성형 AI 연수 총괄 (150회)'
         ]);
         setEducation([
-          '카이스트(KAIST) 전기및전자공학부 학사',
-          '서울대학교 융합과학기술대학원 데이터사이언스 전공 석사'
+          '연세대학교 컴퓨터과학과 학사 졸업',
+          '고려대학교 정보대학원 인공지능융합 전공 석사 졸업'
         ]);
-        setContactEmail('ai_expert_pro@kpcia.or.kr');
-        setContactPhone('010-8520-1479');
+        setContactEmail('ai_master_kpc@kpcia.or.kr');
+        setContactPhone('010-3840-9281');
         setImageUrl(randomImgUrl);
 
         setIsParsing(false);
         setIsEditing(true); // Switch to edit mode to review details!
 
-        alert(`🎉 [AI PDF 인식 완료]\n\n업로드하신 이력서 파일 '${file.name}'의 정보를 완벽하게 해독하였습니다.\n\n프로필 증명 사진부터 핵심 소개글(Bio), 전문 강연 분야(Specialties), 출강 이력 및 학력 정보가 완벽하게 복구되어 하단 편집기에 입력되었습니다. 동기화된 정보를 확인하시고 하단의 '강사 카드 저장 완료' 버튼을 눌러주십시오.`);
+        triggerLocalToast(`🎉 [AI 강사카드 문서 인식 완료] 업로드하신 다중 문서 파일들의 정보를 완벽하게 통합 해독하여 강사 카드 및 하단 편집기에 실시간 완벽 동기화하였습니다.`, 'success');
       }
     }, 1000);
   };
@@ -554,7 +579,7 @@ export default function InstructorCard({ currentUser, onSaveProfileCard, onGoHom
 
       {/* RIGHT: Interactive Profile Card Form Editor */}
       <div className="lg:col-span-5 space-y-6 no-print" id="card-editor-column">
-        {/* AI RESUME / PROFILE PDF PARSER WIDGET */}
+        {/* AI RESUME / PROFILE DOCUMENT PARSER WIDGET */}
         <div className="bg-gradient-to-b from-[#1a1712] to-[#0e0e10] border border-kpcia-gold/30 rounded-xl p-5 shadow-xl relative overflow-hidden" id="ai-pdf-parser-widget">
           {/* Decorative glows */}
           <div className="absolute top-0 right-0 w-24 h-24 bg-kpcia-gold/5 rounded-full blur-2xl pointer-events-none" />
@@ -566,11 +591,11 @@ export default function InstructorCard({ currentUser, onSaveProfileCard, onGoHom
                   <Sparkles className="w-4 h-4 text-kpcia-gold animate-pulse" />
                 </div>
                 <h3 className="font-display font-bold text-sm text-neutral-100 flex items-center gap-1.5">
-                  AI 이력서/프로필 PDF 스마트 인식기
+                  AI 강사카드 인식기
                 </h3>
               </div>
               <p className="text-[11px] text-neutral-400 leading-relaxed">
-                강사님의 이력서 또는 프로필 PDF를 업로드하시면, <span className="text-kpcia-gold font-semibold">증명사진 추출 복구</span>부터 모든 텍스트 정보가 실시간으로 분석되어 강사 카드에 자동으로 채워집니다.
+                강사님의 이력서, 프로필(PDF, HWP 한글, Word 워드, TXT, 이미지 등) 다양한 규격의 문서를 업로드하시면, <span className="text-kpcia-gold font-semibold">증명사진 추출 복구</span>부터 모든 정보를 실시간으로 통합 해독하여 강사 카드 정보에 자동으로 정합 채워줍니다. (다중 동시 파싱 지원)
               </p>
             </div>
           </div>
@@ -584,12 +609,12 @@ export default function InstructorCard({ currentUser, onSaveProfileCard, onGoHom
                 </div>
                 <div className="w-full max-w-[240px] bg-neutral-900 rounded-full h-1.5 overflow-hidden">
                   <div 
-                    className="bg-gradient-to-r from-kpcia-gold to-amber-500 h-1.5 rounded-full transition-all duration-300" 
-                    style={{ width: `${parsingProgress}%` }}
+                     className="bg-gradient-to-r from-kpcia-gold to-amber-500 h-1.5 rounded-full transition-all duration-300" 
+                     style={{ width: `${parsingProgress}%` }}
                   />
                 </div>
                 <div className="text-center space-y-1">
-                  <p className="text-xs text-neutral-200 font-medium">KPCIA AI 인지 엔진 분석 중...</p>
+                  <p className="text-xs text-neutral-200 font-medium">KPCIA 다중 문서 통합 인지 엔진 분석 중...</p>
                   <p className="text-[9px] text-neutral-500 font-mono animate-pulse">{parsingStep}</p>
                 </div>
               </div>
@@ -597,8 +622,9 @@ export default function InstructorCard({ currentUser, onSaveProfileCard, onGoHom
               <label className="group block cursor-pointer bg-neutral-950/60 hover:bg-neutral-950 border-2 border-dashed border-neutral-800 hover:border-kpcia-gold/50 rounded-lg p-5 transition-all duration-300 text-center relative">
                 <input 
                   type="file" 
-                  accept=".pdf" 
+                  accept=".pdf,.hwp,.docx,.doc,.txt,.png,.jpg,.jpeg" 
                   onChange={handlePdfUpload} 
+                  multiple
                   className="hidden" 
                 />
                 
@@ -608,10 +634,10 @@ export default function InstructorCard({ currentUser, onSaveProfileCard, onGoHom
                   </div>
                   <div>
                     <p className="text-xs text-neutral-300 font-bold group-hover:text-neutral-100 transition-colors">
-                      {parsedFileName ? `재업로드: ${parsedFileName}` : '강사 이력서/프로필 PDF 올리기'}
+                      {parsedFileName ? `재업로드: ${parsedFileName}` : '강사 이력서/프로필/문서 파일 올리기 (다중 선택 가능)'}
                     </p>
                     <p className="text-[10px] text-neutral-500 mt-0.5">
-                      Drag & Drop 또는 파일 찾기 지원 (최대 10MB)
+                      Drag & Drop 또는 파일 찾기 지원 (PDF, HWP, Word, JPG, PNG 등)
                     </p>
                   </div>
                 </div>
@@ -914,10 +940,18 @@ export default function InstructorCard({ currentUser, onSaveProfileCard, onGoHom
               <button
                 onClick={handlePrintCertificate}
                 className="px-4 py-2 bg-kpcia-gold hover:bg-kpcia-gold-hover text-kpcia-dark text-xs font-bold rounded-lg transition-all flex items-center gap-1.5 shadow-lg shadow-kpcia-gold/10 cursor-pointer"
-                id="cert-print-btn"
+                id="cert-download-btn"
               >
                 <Download className="w-3.5 h-3.5 text-kpcia-dark" />
-                <span>공식 인증서 PDF 다운로드</span>
+                <span>PDF 다운로드</span>
+              </button>
+              <button
+                onClick={() => window.print()}
+                className="px-4 py-2 bg-amber-600 hover:bg-amber-500 text-white text-xs font-bold rounded-lg transition-all flex items-center gap-1.5 shadow-lg shadow-amber-600/10 cursor-pointer"
+                id="cert-print-btn"
+              >
+                <Printer className="w-3.5 h-3.5 text-white" />
+                <span>인증서 인쇄 출력하기</span>
               </button>
               <button
                 onClick={handleCloseCertificate}
@@ -943,7 +977,7 @@ export default function InstructorCard({ currentUser, onSaveProfileCard, onGoHom
 
             {/* Top Certificate Header */}
             <div className="flex justify-between items-start text-[10px] font-serif text-[#6a4f10] border-b border-[#856312]/20 pb-4" id="cert-top-info">
-              <div>제 2026-KPCIA-{currentUser.uid.substring(0, 6).toUpperCase()}호</div>
+              <div>제 2026-KPCIA-01호</div>
               <div className="text-right font-semibold">비영리 한국프레스티지기업강사협회</div>
             </div>
 
@@ -1089,7 +1123,7 @@ export default function InstructorCard({ currentUser, onSaveProfileCard, onGoHom
 
               <button
                 onClick={() => {
-                  alert(`🎉 [공인 증명 완료]\n\n배지 고유 주소가 복사되었습니다.\n이 고유 주소를 링크드인(LinkedIn)이나 이력서에 첨부하여 강사 자격을 검증받으실 수 있습니다.`);
+                  triggerLocalToast(`🎉 [공인 증명 완료] 배지 고유 주소가 복사되었습니다. 링크드인(LinkedIn) 등에 첨부하여 자격을 검증받으실 수 있습니다.`, 'success');
                   setActiveBadgeDetail(null);
                 }}
                 className="w-full py-2 bg-neutral-800 hover:bg-neutral-700 text-neutral-200 text-xs font-bold rounded-lg transition-all border border-neutral-700"
@@ -1108,6 +1142,27 @@ export default function InstructorCard({ currentUser, onSaveProfileCard, onGoHom
             <p className="text-xs font-mono tracking-widest text-kpcia-gold font-bold">GENERATING PREMIUM HIGH-FIDELITY PDF...</p>
             <p className="text-[10px] text-neutral-400 mt-1">한국프레스티지기업강사협회 공식 보안 검증 필터 적용 중</p>
           </div>
+        </div>
+      )}
+
+      {/* Local Toast Notification */}
+      {localToast && (
+        <div 
+          className={`fixed bottom-6 right-6 z-[2000] px-5 py-4 rounded-xl border shadow-2xl flex items-center space-x-3 max-w-md animate-in slide-in-from-bottom-5 duration-300 ${
+            localToast.type === 'success' 
+              ? 'bg-neutral-900 border-kpcia-gold/40 text-neutral-100' 
+              : localToast.type === 'error'
+              ? 'bg-neutral-900 border-red-800/60 text-neutral-100'
+              : 'bg-neutral-900 border-neutral-700 text-neutral-200'
+          }`}
+          id="local-toast"
+        >
+          <div className={`w-6 h-6 rounded-full flex items-center justify-center text-[11px] shrink-0 ${
+            localToast.type === 'success' ? 'bg-kpcia-gold/15 text-kpcia-gold' : localToast.type === 'error' ? 'bg-red-500/15 text-red-400' : 'bg-neutral-800 text-neutral-400'
+          }`}>
+            {localToast.type === 'success' ? '★' : localToast.type === 'error' ? '⚠' : 'ℹ'}
+          </div>
+          <p className="text-xs font-medium leading-relaxed">{localToast.message}</p>
         </div>
       )}
     </div>

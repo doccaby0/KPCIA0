@@ -25,6 +25,7 @@ import {
   Trash2,
   CreditCard,
   FileDown,
+  Edit,
   Edit3
 } from 'lucide-react';
 
@@ -135,6 +136,7 @@ interface AdminPanelProps {
   onRejectUser?: (userId: string) => void;
   onApproveProgram?: (programId: string, updatedProgram: EducationalProgram) => void;
   onAddLecture?: (lecture: any) => void;
+  onUpdateLecture?: (lecture: LectureRequest) => void;
   onUpdateUserPerformance?: (userId: string, lectureCount: number, ratings: number[], bankAccount?: string) => void;
   onUpdateUserProfile?: (userId: string, updatedFields: Partial<UserProfile>) => void;
   onUpdateLectureSettlementStatus?: (lectureId: string, status: 'pending' | 'completed') => void;
@@ -161,6 +163,7 @@ export default function AdminPanel({
   onRejectUser,
   onApproveProgram,
   onAddLecture,
+  onUpdateLecture,
   onUpdateUserPerformance,
   onUpdateUserProfile,
   onUpdateLectureSettlementStatus,
@@ -191,6 +194,87 @@ export default function AdminPanel({
   const [lectAttendees, setLectAttendees] = useState<string>('30');
   const [lectManagerName, setLectManagerName] = useState('');
   const [lectManagerPhone, setLectManagerPhone] = useState('');
+
+  // Lecture Editing States
+  const [editingLecture, setEditingLecture] = useState<LectureRequest | null>(null);
+  const [editLectTitle, setEditLectTitle] = useState('');
+  const [editLectDescription, setEditLectDescription] = useState('');
+  const [editLectTargetTier, setEditLectTargetTier] = useState<InstructorTier>('Prestige Associate');
+  const [editLectMainHours, setEditLectMainHours] = useState<string>('2');
+  const [editLectAssistantHours, setEditLectAssistantHours] = useState<string>('0');
+  const [editLectMaterialCost, setEditLectMaterialCost] = useState<string>('0');
+  const [editLectBudget, setEditLectBudget] = useState<number>(200000);
+  const [editLectMileageRoyalty, setEditLectMileageRoyalty] = useState<number>(5000);
+  const [editLectProgramId, setEditLectProgramId] = useState('');
+  const [editLectDate, setEditLectDate] = useState('');
+  const [editLectTime, setEditLectTime] = useState('');
+  const [editLectDuration, setEditLectDuration] = useState('');
+  const [editLectLocation, setEditLectLocation] = useState('');
+  const [editLectAttendees, setEditLectAttendees] = useState<string>('30');
+  const [editLectManagerName, setEditLectManagerName] = useState('');
+  const [editLectManagerPhone, setEditLectManagerPhone] = useState('');
+
+  // Start Editing Lecture
+  const handleStartEditLecture = (lecture: LectureRequest) => {
+    setEditingLecture(lecture);
+    setEditLectTitle(lecture.title || '');
+    setEditLectDescription(lecture.description || '');
+    setEditLectTargetTier(lecture.targetTier || 'Prestige Associate');
+    setEditLectMainHours((lecture.mainHours || 2).toString());
+    setEditLectAssistantHours((lecture.assistantHours || 0).toString());
+    setEditLectMaterialCost((lecture.materialCost || 0).toString());
+    setEditLectBudget(lecture.budget || 200000);
+    setEditLectMileageRoyalty(lecture.mileageRoyalty || 5000);
+    setEditLectProgramId(lecture.programId || '');
+    setEditLectDate(lecture.date || '');
+    setEditLectTime(lecture.time || '');
+    setEditLectDuration(lecture.duration || '');
+    setEditLectLocation(lecture.location || '');
+    setEditLectAttendees((lecture.attendees || 30).toString());
+    setEditLectManagerName(lecture.managerName || '');
+    setEditLectManagerPhone(lecture.managerPhone || '');
+  };
+
+  // Auto-calculate editLectBudget based on hours
+  useEffect(() => {
+    if (editingLecture) {
+      const mainHrs = parseFloat(editLectMainHours) || 0;
+      const asstHrs = parseFloat(editLectAssistantHours) || 0;
+      const calcBudget = (mainHrs * 100000) + (asstHrs * 50000);
+      setEditLectBudget(calcBudget);
+    }
+  }, [editLectMainHours, editLectAssistantHours, editingLecture]);
+
+  // Save Edited Lecture
+  const handleSaveLectureEdit = () => {
+    if (!editingLecture || !onUpdateLecture) return;
+    
+    const selectedProg = programs.find(p => p.id === editLectProgramId);
+    
+    const updated: LectureRequest = {
+      ...editingLecture,
+      title: editLectTitle,
+      description: editLectDescription,
+      targetTier: editLectTargetTier,
+      budget: Number(editLectBudget),
+      mileageRoyalty: selectedProg ? selectedProg.royaltyRate : Number(editLectMileageRoyalty),
+      programId: editLectProgramId || undefined,
+      programTitle: selectedProg ? selectedProg.title : undefined,
+      date: editLectDate,
+      time: editLectTime,
+      duration: editLectDuration,
+      location: editLectLocation,
+      attendees: editLectAttendees ? Number(editLectAttendees) : undefined,
+      managerName: editLectManagerName || undefined,
+      managerPhone: editLectManagerPhone || undefined,
+      mainHours: Number(editLectMainHours),
+      assistantHours: Number(editLectAssistantHours),
+      materialCost: Number(editLectMaterialCost),
+    };
+    
+    onUpdateLecture(updated);
+    setEditingLecture(null);
+  };
 
   // Auto-calculate lectBudget based on hours
   useEffect(() => {
@@ -1845,6 +1929,17 @@ export default function AdminPanel({
                           <span>강의 요청서</span>
                         </button>
 
+                        <button
+                          type="button"
+                          onClick={() => handleStartEditLecture(lecture)}
+                          className="px-3.5 py-2 border border-neutral-800 bg-neutral-900 hover:bg-neutral-850 hover:border-kpcia-gold/40 text-neutral-200 hover:text-kpcia-gold text-[11px] font-bold rounded-lg transition-all flex items-center justify-center gap-1.5 cursor-pointer shadow-sm w-full sm:w-auto"
+                          title="출강 강의 요청 공고 내용을 수정 및 변경합니다."
+                          id={`admin-edit-lecture-${lecture.id}`}
+                        >
+                          <Edit className="w-3.5 h-3.5 text-neutral-400" />
+                          <span>공고 수정</span>
+                        </button>
+
                         {onDeleteLecture && (
                           <button
                             type="button"
@@ -3302,7 +3397,7 @@ export default function AdminPanel({
                   type="button"
                   onClick={async () => {
                     if (onEvaluateAssistant && evaluatingLecture.assistantId) {
-                      await onEvaluateAssistant(evaluatingLecture.id, evaluatingLecture.assistantId, evalRating, evalComment);
+                       await onEvaluateAssistant(evaluatingLecture.id, evaluatingLecture.assistantId, evalRating, evalComment);
                     }
                     onCompleteLecture(evaluatingLecture.id);
                     setEvaluatingLecture(null);
@@ -3311,6 +3406,239 @@ export default function AdminPanel({
                 >
                   <Check className="w-4 h-4 text-kpcia-dark" />
                   <span>평가 완료 & 출강 최종 승인</span>
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* ==================== LECTURE EDITING MODAL ==================== */}
+        {editingLecture && (
+          <div className="fixed inset-0 bg-neutral-950/85 backdrop-blur-md z-[9999] flex items-center justify-center p-4 overflow-y-auto">
+            <div className="bg-neutral-900 border border-neutral-800 rounded-2xl w-full max-w-2xl max-h-[90vh] flex flex-col shadow-2xl animate-in zoom-in duration-200">
+              {/* Modal Header */}
+              <div className="p-4 border-b border-neutral-800 flex items-center justify-between bg-neutral-950/40">
+                <div className="flex items-center gap-2">
+                  <Edit3 className="w-5 h-5 text-kpcia-gold" />
+                  <div>
+                    <h3 className="text-xs font-bold text-neutral-200">
+                      출강 강의 공고 요청서 수정 및 변경
+                    </h3>
+                    <p className="text-[10px] text-neutral-500 font-mono">
+                      강의 ID: {editingLecture.id}
+                    </p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setEditingLecture(null)}
+                  className="w-7 h-7 rounded-lg bg-neutral-950 border border-neutral-800 text-neutral-400 hover:text-neutral-200 flex items-center justify-center text-xs transition-colors cursor-pointer"
+                >
+                  ✕
+                </button>
+              </div>
+
+              {/* Modal Body */}
+              <div className="p-6 space-y-4 overflow-y-auto text-left text-xs">
+                {/* 1. Basic Info */}
+                <div className="space-y-3">
+                  <h4 className="text-[10px] font-bold text-kpcia-gold uppercase tracking-wider pb-1 border-b border-neutral-800">
+                    기본 강의 정보
+                  </h4>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                    <div className="space-y-1">
+                      <label className="text-[10px] text-neutral-400 font-semibold block">강의 대표 주제명 *</label>
+                      <input
+                        type="text"
+                        value={editLectTitle}
+                        onChange={(e) => setEditLectTitle(e.target.value)}
+                        className="w-full px-3 py-2 rounded-lg bg-neutral-950 border border-neutral-800 text-neutral-100 font-medium focus:border-kpcia-gold focus:outline-none text-xs"
+                        placeholder="예: 인공지능 디지털 혁신 특강"
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <label className="text-[10px] text-neutral-400 font-semibold block">연계 교육 과정 교안</label>
+                      <select
+                        value={editLectProgramId}
+                        onChange={(e) => setEditLectProgramId(e.target.value)}
+                        className="w-full px-3 py-2 rounded-lg bg-neutral-950 border border-neutral-800 text-neutral-150 font-medium focus:border-kpcia-gold focus:outline-none text-xs"
+                      >
+                        <option value="">-- 연계 공인 교안 없음 (순수 개별 위탁 출강) --</option>
+                        {programs.map((p) => (
+                          <option key={p.id} value={p.id}>
+                            {p.title} (저작권료 요율: {p.royaltyRate.toLocaleString()} M/시간)
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-[10px] text-neutral-400 font-semibold block">강의 상세 안내 및 의뢰 시놉시스 *</label>
+                    <textarea
+                      rows={3}
+                      value={editLectDescription}
+                      onChange={(e) => setEditLectDescription(e.target.value)}
+                      className="w-full px-3 py-2 rounded-lg bg-neutral-950 border border-neutral-800 text-neutral-100 font-medium focus:border-kpcia-gold focus:outline-none text-xs resize-none"
+                      placeholder="강의 개요, 수강 대상 및 세부 커리큘럼 아웃라인 기재"
+                    />
+                  </div>
+                </div>
+
+                {/* 2. Schedule & Target */}
+                <div className="space-y-3 pt-2">
+                  <h4 className="text-[10px] font-bold text-kpcia-gold uppercase tracking-wider pb-1 border-b border-neutral-800">
+                    일정 및 지원 자격 조건
+                  </h4>
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                    <div className="space-y-1">
+                      <label className="text-[10px] text-neutral-400 font-semibold block">출강 일자 *</label>
+                      <input
+                        type="date"
+                        value={editLectDate}
+                        onChange={(e) => setEditLectDate(e.target.value)}
+                        className="w-full px-3 py-2 rounded-lg bg-neutral-950 border border-neutral-800 text-neutral-100 font-medium focus:border-kpcia-gold focus:outline-none text-xs"
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <label className="text-[10px] text-neutral-400 font-semibold block">출강 상세 시간대 *</label>
+                      <input
+                        type="text"
+                        value={editLectTime}
+                        onChange={(e) => setEditLectTime(e.target.value)}
+                        className="w-full px-3 py-2 rounded-lg bg-neutral-950 border border-neutral-800 text-neutral-100 font-medium focus:border-kpcia-gold focus:outline-none text-xs"
+                        placeholder="예: 14:00 - 16:00"
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <label className="text-[10px] text-neutral-400 font-semibold block">강의 총 시간 (Duration) *</label>
+                      <input
+                        type="text"
+                        value={editLectDuration}
+                        onChange={(e) => setEditLectDuration(e.target.value)}
+                        className="w-full px-3 py-2 rounded-lg bg-neutral-950 border border-neutral-800 text-neutral-100 font-medium focus:border-kpcia-gold focus:outline-none text-xs"
+                        placeholder="예: 2 hours"
+                      />
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                    <div className="space-y-1">
+                      <label className="text-[10px] text-neutral-400 font-semibold block">출강 장소/기관 정보 *</label>
+                      <input
+                        type="text"
+                        value={editLectLocation}
+                        onChange={(e) => setEditLectLocation(e.target.value)}
+                        className="w-full px-3 py-2 rounded-lg bg-neutral-950 border border-neutral-800 text-neutral-100 font-medium focus:border-kpcia-gold focus:outline-none text-xs"
+                        placeholder="예: 현대자동차 상계 연수원"
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <label className="text-[10px] text-neutral-400 font-semibold block">교육 예상 수강 인원 *</label>
+                      <input
+                        type="number"
+                        value={editLectAttendees}
+                        onChange={(e) => setEditLectAttendees(e.target.value)}
+                        className="w-full px-3 py-2 rounded-lg bg-neutral-950 border border-neutral-800 text-neutral-100 font-medium focus:border-kpcia-gold focus:outline-none text-xs"
+                        placeholder="예: 30"
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <label className="text-[10px] text-neutral-400 font-semibold block">최소 자격 허들 등급 *</label>
+                      <select
+                        value={editLectTargetTier}
+                        onChange={(e) => setEditLectTargetTier(e.target.value as InstructorTier)}
+                        className="w-full px-3 py-2 rounded-lg bg-neutral-950 border border-neutral-800 text-neutral-100 font-medium focus:border-kpcia-gold focus:outline-none text-xs"
+                      >
+                        <option value="Prestige Member">Prestige Member (일반)</option>
+                        <option value="Prestige Associate">Prestige Associate (어소시에이트)</option>
+                        <option value="Prestige Professional">Prestige Professional (프로페셔널)</option>
+                        <option value="Prestige Master">Prestige Master (마스터)</option>
+                        <option value="Prestige Elite">Prestige Elite (엘리트)</option>
+                      </select>
+                    </div>
+                  </div>
+                </div>
+
+                {/* 3. Hours & Expenses & Contact */}
+                <div className="space-y-3 pt-2">
+                  <h4 className="text-[10px] font-bold text-kpcia-gold uppercase tracking-wider pb-1 border-b border-neutral-800">
+                    출강 예산 세무 구성 및 비상 연락처
+                  </h4>
+                  <div className="grid grid-cols-1 sm:grid-cols-4 gap-3">
+                    <div className="space-y-1">
+                      <label className="text-[10px] text-neutral-400 font-semibold block">주강사 강의 시간 *</label>
+                      <input
+                        type="number"
+                        value={editLectMainHours}
+                        onChange={(e) => setEditLectMainHours(e.target.value)}
+                        className="w-full px-3 py-2 rounded-lg bg-neutral-950 border border-neutral-800 text-neutral-100 font-medium focus:border-kpcia-gold focus:outline-none text-xs"
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <label className="text-[10px] text-neutral-400 font-semibold block">보조강사 배정 시간 *</label>
+                      <input
+                        type="number"
+                        value={editLectAssistantHours}
+                        onChange={(e) => setEditLectAssistantHours(e.target.value)}
+                        className="w-full px-3 py-2 rounded-lg bg-neutral-950 border border-neutral-800 text-neutral-100 font-medium focus:border-kpcia-gold focus:outline-none text-xs"
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <label className="text-[10px] text-neutral-400 font-semibold block">교구재/인쇄 실비 부담금</label>
+                      <input
+                        type="number"
+                        value={editLectMaterialCost}
+                        onChange={(e) => setEditLectMaterialCost(e.target.value)}
+                        className="w-full px-3 py-2 rounded-lg bg-neutral-950 border border-neutral-800 text-neutral-100 font-medium focus:border-kpcia-gold focus:outline-none text-xs"
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <label className="text-[10px] text-neutral-400 font-semibold block">총 지급 예산 (자동 계산)</label>
+                      <div className="w-full px-3 py-2 rounded-lg bg-neutral-950 border border-neutral-800 text-kpcia-gold font-bold text-xs flex items-center h-[34px]">
+                        ₩ {editLectBudget.toLocaleString()}
+                      </div>
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div className="space-y-1">
+                      <label className="text-[10px] text-neutral-400 font-semibold block">위탁 기업 담당자명</label>
+                      <input
+                        type="text"
+                        value={editLectManagerName}
+                        onChange={(e) => setEditLectManagerName(e.target.value)}
+                        className="w-full px-3 py-2 rounded-lg bg-neutral-950 border border-neutral-800 text-neutral-100 font-medium focus:border-kpcia-gold focus:outline-none text-xs"
+                        placeholder="예: 김정우 책임연구원"
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <label className="text-[10px] text-neutral-400 font-semibold block">담당자 연락처</label>
+                      <input
+                        type="text"
+                        value={editLectManagerPhone}
+                        onChange={(e) => setEditLectManagerPhone(e.target.value)}
+                        className="w-full px-3 py-2 rounded-lg bg-neutral-950 border border-neutral-800 text-neutral-100 font-medium focus:border-kpcia-gold focus:outline-none text-xs"
+                        placeholder="예: 010-1234-5678"
+                      />
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Modal Footer */}
+              <div className="p-4 border-t border-neutral-800 bg-neutral-950/40 flex items-center justify-end gap-2.5">
+                <button
+                  type="button"
+                  onClick={() => setEditingLecture(null)}
+                  className="px-4 py-2 border border-neutral-800 bg-neutral-950 hover:bg-neutral-900 text-neutral-400 text-xs font-bold rounded-xl cursor-pointer"
+                >
+                  취소
+                </button>
+                <button
+                  type="button"
+                  onClick={handleSaveLectureEdit}
+                  className="px-5 py-2 bg-kpcia-gold hover:bg-kpcia-gold-hover text-kpcia-dark text-xs font-extrabold rounded-xl flex items-center gap-1.5 shadow-md shadow-kpcia-gold/10 cursor-pointer"
+                >
+                  <Check className="w-4 h-4 text-kpcia-dark" />
+                  <span>공고 변경사항 적용</span>
                 </button>
               </div>
             </div>
