@@ -1919,31 +1919,15 @@ export default function AdminPanel({
                       id="admin-lect-time"
                     />
                   </div>
-                  <div className="space-y-3">
-                    <div>
-                      <label className="text-[10px] font-mono text-neutral-400 block mb-1">총 소요 시간</label>
-                      <input
-                        type="text"
-                        value={lectDuration}
-                        onChange={(e) => setLectDuration(e.target.value)}
-                        className="w-full px-3.5 py-2 rounded-lg bg-neutral-900 border border-neutral-800 text-xs font-medium text-neutral-100 focus:border-kpcia-gold"
-                        id="admin-lect-duration"
-                      />
-                    </div>
-                    {/* Royalty Amount Manual Input if no program */}
-                    <div>
-                      <label className="text-[10px] font-mono text-neutral-400 block mb-1">
-                        원작 저작자 지급 프로그램 사용료(로열티) 누적 (M)
-                      </label>
-                      <input
-                        type="number"
-                        value={lectMileageRoyalty}
-                        onChange={(e) => setLectMileageRoyalty(Number(e.target.value))}
-                        disabled={!!lectProgramId}
-                        className="w-full px-3.5 py-2 rounded-lg bg-neutral-900 border border-neutral-800 text-xs font-medium text-neutral-100 focus:border-kpcia-gold disabled:opacity-50"
-                        id="admin-lect-royalty"
-                      />
-                    </div>
+                  <div>
+                    <label className="text-[10px] font-mono text-neutral-400 block mb-1">총 소요 시간</label>
+                    <input
+                      type="text"
+                      value={lectDuration}
+                      onChange={(e) => setLectDuration(e.target.value)}
+                      className="w-full px-3.5 py-2 rounded-lg bg-neutral-900 border border-neutral-800 text-xs font-medium text-neutral-100 focus:border-kpcia-gold"
+                      id="admin-lect-duration"
+                    />
                   </div>
                 </div>
 
