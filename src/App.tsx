@@ -275,18 +275,14 @@ export default function App() {
     }
   };
 
-  const handleInstantApprove = async () => {
-    if (!currentUser) return;
-    const updatedUser = { ...currentUser, isApproved: true };
-    setCurrentUser(updatedUser);
-    setUsers(prev => prev.map(u => u.uid === currentUser.uid ? updatedUser : u));
-    await StorageService.saveUser(updatedUser);
-    triggerToast('테스터 원클릭 자가 승인이 성공적으로 처리되었습니다! 이제 모든 메뉴를 자유롭게 조회하실 수 있습니다.', 'success');
-  };
-
   // 2. Apply for Lecture Request
   const handleApplyLecture = async (lectureId: string) => {
     if (!currentUser) return;
+
+    if (currentUser.uid !== 'guest' && !currentUser.isAdmin && currentUser.isApproved === false) {
+      triggerToast('운영사무국의 가입 승인이 심사 진행 중입니다. 최종 승인이 완료되어야 정식 출강 신청을 할 수 있습니다.', 'info');
+      return;
+    }
 
     const lecture = lectures.find(l => l.id === lectureId);
     if (!lecture) return;
@@ -600,6 +596,11 @@ export default function App() {
   const handleAssignAssistant = async (lectureId: string, assistantId: string, assistantName: string) => {
     const lecture = lectures.find(l => l.id === lectureId);
     if (!lecture) return;
+
+    if (lecture.attendees !== undefined && lecture.attendees <= 20) {
+      triggerToast(`본 강의는 수강 대상 인원이 20명 이하(${lecture.attendees}명)이므로 보조강사를 동행할 수 없습니다.`, 'info');
+      return;
+    }
 
     const updatedLecture: LectureRequest = {
       ...lecture,
@@ -1181,6 +1182,18 @@ export default function App() {
 
   const isPendingApproval = currentUser && currentUser.uid !== 'guest' && !currentUser.isAdmin && currentUser.isApproved === false;
 
+  // Force pending approval users to only see the Corporate Education Lecture Matching Board
+  useEffect(() => {
+    if (isPendingApproval) {
+      if (activeTab !== 'lectures') {
+        setActiveTab('lectures');
+      }
+      if (activeMobileTab !== 'lectures') {
+        setActiveMobileTab('lectures');
+      }
+    }
+  }, [isPendingApproval, activeTab, activeMobileTab]);
+
   if (users.length === 0) {
     return (
       <div className="flex items-center justify-center min-h-screen bg-kpcia-dark text-neutral-400">
@@ -1580,7 +1593,6 @@ export default function App() {
               onApplyLecture={handleApplyLecture}
               onCancelApplyLecture={handleCancelApplyLecture}
               onAssignAssistant={handleAssignAssistant}
-              onInstantApprove={handleInstantApprove}
               onTabChange={(tab) => {
                 setActiveTab(tab);
                 setIsMobileSimulated(false); // Back to homepage / specific portal tab
@@ -1712,30 +1724,26 @@ export default function App() {
 
             {/* Tab 2: Lectures (강의 요청 게시판) */}
             {activeTab === 'lectures' && (
-              isPendingApproval ? (
-                <PendingApprovalView currentUser={currentUser} setActiveTab={setActiveTab} onInstantApprove={handleInstantApprove} />
-              ) : (
-                <LectureBoard
-                  currentUser={currentUser}
-                  lectures={lectures}
-                  onApplyLecture={handleApplyLecture}
-                  onCancelApplyLecture={handleCancelApplyLecture}
-                  onOpenAuthModal={(tab) => {
-                    setAuthModalTab(tab);
-                    setShowAuthModal(true);
-                  }}
-                  allUsers={users}
-                  onAssignAssistant={handleAssignAssistant}
-                  onEvaluateAssistant={handleEvaluateAssistant}
-                  onCompleteLecture={handleCompleteLecture}
-                />
-              )
+              <LectureBoard
+                currentUser={currentUser}
+                lectures={lectures}
+                onApplyLecture={handleApplyLecture}
+                onCancelApplyLecture={handleCancelApplyLecture}
+                onOpenAuthModal={(tab) => {
+                  setAuthModalTab(tab);
+                  setShowAuthModal(true);
+                }}
+                allUsers={users}
+                onAssignAssistant={handleAssignAssistant}
+                onEvaluateAssistant={handleEvaluateAssistant}
+                onCompleteLecture={handleCompleteLecture}
+              />
             )}
 
             {/* Tab 3: Programs (프로그램 공유 게시판) */}
             {activeTab === 'programs' && (
               isPendingApproval ? (
-                <PendingApprovalView currentUser={currentUser} setActiveTab={setActiveTab} onInstantApprove={handleInstantApprove} />
+                <PendingApprovalView currentUser={currentUser} setActiveTab={setActiveTab} />
               ) : (
                 <ProgramBoard
                   currentUser={currentUser}
@@ -1748,7 +1756,7 @@ export default function App() {
             {/* Tab 4: Profile / Resume Card Generator */}
             {activeTab === 'profile' && (
               isPendingApproval ? (
-                <PendingApprovalView currentUser={currentUser} setActiveTab={setActiveTab} onInstantApprove={handleInstantApprove} />
+                <PendingApprovalView currentUser={currentUser} setActiveTab={setActiveTab} />
               ) : (
                 <InstructorCard
                   currentUser={currentUser}

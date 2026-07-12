@@ -57,6 +57,8 @@ export default function LectureBoard({
     return userIndex >= requiredIndex;
   };
 
+  const showBlurred = !currentUser || currentUser.uid === 'guest' || (!currentUser.isAdmin && currentUser.isApproved === false);
+
   const downloadLectureAsExcel = (lecture: LectureRequest) => {
     const isPriceVisible = !currentUser || currentUser.uid === 'guest' 
       ? false 
@@ -422,46 +424,51 @@ export default function LectureBoard({
 
                         {/* Col A: Status */}
                         <td className="px-3 py-3.5 border-r border-neutral-850 text-center">
-                          {lecture.status === 'open' && (
-                            <span className="text-[10px] px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-400 font-bold border border-emerald-500/20 animate-pulse">
-                              신청접수
-                            </span>
-                          )}
-                          {lecture.status === 'assigned' && (
-                            <span className="text-[10px] px-2 py-0.5 rounded-full bg-blue-500/15 text-blue-400 font-bold border border-blue-500/20">
-                              배정완료
-                            </span>
-                          )}
-                          {lecture.status === 'completed' && (
-                            <span className="text-[10px] px-2 py-0.5 rounded-full bg-neutral-800 text-neutral-400 font-bold border border-neutral-700">
-                              출강종료
-                            </span>
-                          )}
+                          <div className={showBlurred ? "blur-[3px] select-none" : ""}>
+                            {lecture.status === 'open' && (
+                              <span className="text-[10px] px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-400 font-bold border border-emerald-500/20 animate-pulse">
+                                신청접수
+                              </span>
+                            )}
+                            {lecture.status === 'assigned' && (
+                              <span className="text-[10px] px-2 py-0.5 rounded-full bg-blue-500/15 text-blue-400 font-bold border border-blue-500/20">
+                                배정완료
+                              </span>
+                            )}
+                            {lecture.status === 'completed' && (
+                              <span className="text-[10px] px-2 py-0.5 rounded-full bg-neutral-800 text-neutral-400 font-bold border border-neutral-700">
+                                출강종료
+                              </span>
+                            )}
+                          </div>
                         </td>
 
                         {/* Col B: Title & Description */}
                         <td className="px-3 py-3.5 border-r border-neutral-850">
                           <div 
-                            className="font-bold text-neutral-200 hover:text-kpcia-gold hover:underline cursor-pointer flex flex-wrap items-center gap-1.5"
+                            className={`font-bold text-neutral-200 flex flex-wrap items-center gap-1.5 ${(!showBlurred && lecture.status === 'open' && isQualified && !hasApplied) ? 'hover:text-kpcia-gold hover:underline cursor-pointer' : ''}`}
                             onClick={() => {
+                              if (showBlurred) return;
                               if (lecture.status === 'open' && isQualified && !hasApplied) {
                                 setApplyingLecture(lecture);
                               }
                             }}
                           >
                             <span className="whitespace-normal break-all leading-snug">{lecture.title}</span>
-                            <button
-                              type="button"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                downloadLectureAsExcel(lecture);
-                              }}
-                              className="text-[9px] bg-neutral-950 border border-neutral-800 text-neutral-400 hover:text-kpcia-gold hover:border-kpcia-gold/30 px-1.5 py-0.5 rounded shrink-0 font-sans flex items-center gap-0.5"
-                              title="출강 파견 안내서 엑셀 변환"
-                            >
-                              <FileDown className="w-2.5 h-2.5" />
-                              <span>출강안내</span>
-                            </button>
+                            {!showBlurred && (
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  downloadLectureAsExcel(lecture);
+                                }}
+                                className="text-[9px] bg-neutral-950 border border-neutral-800 text-neutral-400 hover:text-kpcia-gold hover:border-kpcia-gold/30 px-1.5 py-0.5 rounded shrink-0 font-sans flex items-center gap-0.5"
+                                title="출강 파견 안내서 엑셀 변환"
+                              >
+                                <FileDown className="w-2.5 h-2.5" />
+                                <span>출강안내</span>
+                              </button>
+                            )}
                           </div>
                           <div className="text-[10.5px] text-neutral-400 mt-1.5 leading-relaxed whitespace-normal break-all">
                             {lecture.description}
@@ -470,48 +477,56 @@ export default function LectureBoard({
 
                         {/* Col C: Target Tier */}
                         <td className="px-3 py-3.5 border-r border-neutral-850 text-center">
-                          <span className={`text-[9px] px-2 py-0.5 rounded-full font-mono font-bold border ${tierColors[lecture.targetTier]}`}>
+                          <span className={`text-[9px] px-2 py-0.5 rounded-full font-mono font-bold border ${tierColors[lecture.targetTier]} ${showBlurred ? "blur-[3px] select-none" : ""}`}>
                             {lecture.targetTier} ↑
                           </span>
                         </td>
 
                         {/* Col D: Date & Time */}
                         <td className="px-3 py-3.5 border-r border-neutral-850 font-mono text-[11px] text-neutral-300 leading-relaxed">
-                          <div className="flex items-center gap-1">
-                            <Calendar className="w-3 h-3 text-neutral-500" />
-                            <span>{lecture.date}</span>
-                          </div>
-                          <div className="text-[10px] text-neutral-400 mt-1 flex items-center gap-1">
-                            <Clock className="w-3 h-3 text-neutral-500" />
-                            <span>{lecture.time} ({lecture.duration})</span>
+                          <div className={showBlurred ? "blur-[3px] select-none" : ""}>
+                            <div className="flex items-center gap-1">
+                              <Calendar className="w-3 h-3 text-neutral-500" />
+                              <span>{lecture.date}</span>
+                            </div>
+                            <div className="text-[10px] text-neutral-400 mt-1 flex items-center gap-1">
+                              <Clock className="w-3 h-3 text-neutral-500" />
+                              <span>{lecture.time} ({lecture.duration})</span>
+                            </div>
                           </div>
                         </td>
 
                         {/* Col E: Location */}
                         <td className="px-3 py-3.5 border-r border-neutral-850 text-[11px] text-neutral-300">
                           <div className="flex flex-col gap-1.5">
-                            <span className="whitespace-normal break-all" title={lecture.location}>{lecture.location}</span>
-                            <button
-                              type="button"
-                              onClick={() => {
-                                setSelectedMapLocation(lecture.location);
-                                setSelectedMapTitle(lecture.title);
-                              }}
-                              className="text-[9px] bg-neutral-950 border border-neutral-800 text-kpcia-gold px-1.5 py-0.5 rounded w-max hover:bg-neutral-800 transition-colors cursor-pointer"
-                            >
-                              지도 보기
-                            </button>
+                            <span className={`whitespace-normal break-all ${showBlurred ? "blur-[3px] select-none" : ""}`} title={showBlurred ? undefined : lecture.location}>{lecture.location}</span>
+                            {!showBlurred && (
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setSelectedMapLocation(lecture.location);
+                                  setSelectedMapTitle(lecture.title);
+                                }}
+                                className="text-[9px] bg-neutral-950 border border-neutral-800 text-kpcia-gold px-1.5 py-0.5 rounded w-max hover:bg-neutral-800 transition-colors cursor-pointer"
+                              >
+                                지도 보기
+                              </button>
+                            )}
                           </div>
                         </td>
 
                         {/* Col F: Attendees */}
-                        <td className="px-3 py-3.5 border-r border-neutral-850 text-right font-mono text-neutral-200">
+                        <td className={`px-3 py-3.5 border-r border-neutral-850 text-right font-mono text-neutral-200 ${showBlurred ? "blur-[3px] select-none" : ""}`}>
                           {lecture.attendees ? `${lecture.attendees}명` : '-'}
                         </td>
 
                         {/* Col G: Budget (출강 강사료) */}
                         <td className="px-3 py-3.5 border-r border-neutral-850 text-right font-mono font-bold bg-neutral-900/10">
-                          {!currentUser || currentUser.uid === 'guest' ? (
+                          {showBlurred ? (
+                            <span className="text-neutral-100/50 blur-[3px] select-none font-mono text-[11px]">
+                              ₩{lecture.budget.toLocaleString()}
+                            </span>
+                          ) : !currentUser || currentUser.uid === 'guest' ? (
                             <span className="text-[9px] text-kpcia-gold bg-kpcia-gold/10 px-1.5 py-0.5 rounded border border-kpcia-gold/25">
                               🔒 등급공개
                             </span>
@@ -528,7 +543,11 @@ export default function LectureBoard({
 
                         {/* Col H: Material Cost (재료비 총액) */}
                         <td className="px-3 py-3.5 border-r border-neutral-850 text-right font-mono text-neutral-300 bg-neutral-950/20">
-                          {!currentUser || currentUser.uid === 'guest' ? (
+                          {showBlurred ? (
+                            <span className="text-neutral-300/50 blur-[3px] select-none font-mono text-[11px]">
+                              ₩{(lecture.materialCost || 0).toLocaleString()}
+                            </span>
+                          ) : !currentUser || currentUser.uid === 'guest' ? (
                             <span className="text-[9px] text-neutral-500">
                               비공개
                             </span>
@@ -545,7 +564,11 @@ export default function LectureBoard({
 
                         {/* Col I: Total Outflow (총 출강비) */}
                         <td className="px-3 py-3.5 border-r border-neutral-850 text-right font-mono font-bold text-kpcia-gold bg-kpcia-gold/10">
-                          {!currentUser || currentUser.uid === 'guest' ? (
+                          {showBlurred ? (
+                            <span className="text-kpcia-gold/50 blur-[3px] select-none font-mono text-[11px]">
+                              ₩{appliedTotalCost.toLocaleString()}
+                            </span>
+                          ) : !currentUser || currentUser.uid === 'guest' ? (
                             <span className="text-[9px] text-kpcia-gold bg-kpcia-gold/10 px-1.5 py-0.5 rounded border border-kpcia-gold/25">
                               🔒 등급공개
                             </span>
@@ -569,7 +592,17 @@ export default function LectureBoard({
 
                         {/* Col J: Associated Program */}
                         <td className="px-3 py-3.5 border-r border-neutral-850 text-neutral-300">
-                          {lecture.programId ? (() => {
+                          {showBlurred ? (
+                            <div className="space-y-1 blur-[3px] select-none">
+                              <div className="font-semibold text-neutral-200 text-[11px] flex items-center gap-1 whitespace-normal break-all">
+                                <Sparkles className="w-3 h-3 text-kpcia-gold shrink-0" />
+                                <span>{lecture.programTitle || '연계 프로그램'}</span>
+                              </div>
+                              <div className="text-[10px] text-kpcia-gold font-mono font-bold">
+                                로열티: 15,000 M
+                              </div>
+                            </div>
+                          ) : lecture.programId ? (() => {
                             const originalTotal = lecture.budget + (lecture.materialCost || 0);
                             const calculatedRoyalty = Math.round(originalTotal * 0.05);
                             const royaltyToShow = lecture.mileageRoyalty || calculatedRoyalty;
@@ -591,10 +624,17 @@ export default function LectureBoard({
 
                         {/* Col K: Assistant Partner */}
                         <td className="px-3 py-3.5 border-r border-neutral-850 text-[11px]">
-                          {(() => {
+                          {showBlurred ? (
+                            <span className="text-neutral-500 text-[10px] blur-[3px] select-none">단독 파견 / 보조강사</span>
+                          ) : (() => {
                             const assistantUser = allUsers?.find(u => u.uid === lecture.assistantId);
                             const isViewerHigherTier = currentUser && (currentUser.isAdmin || currentUser.tier !== 'Prestige Member');
                             const canAssignAssistant = currentUser && (currentUser.isAdmin || currentUser.tier !== 'Prestige Member') && isAssignedToMe;
+                            const isAttendeesLow = lecture.attendees !== undefined && lecture.attendees <= 20;
+
+                            if (isAttendeesLow) {
+                              return <span className="text-neutral-500 text-[10px]" title="수강 대상 인원 20명 이하는 보조강사 없이 파견됩니다.">단독 파견 (20명 이하)</span>;
+                            }
 
                             if (!lecture.assistantId) {
                               if (canAssignAssistant && lecture.status === 'assigned') {
@@ -640,7 +680,24 @@ export default function LectureBoard({
 
                         {/* Col L: Action button */}
                         <td className="px-3 py-3.5 text-center">
-                          <div className="flex items-center justify-center">
+                          {showBlurred ? (
+                            currentUser && currentUser.uid !== 'guest' && currentUser.isApproved === false ? (
+                              <button
+                                disabled
+                                className="px-2.5 py-1 bg-neutral-950 border border-neutral-850 text-neutral-500 text-[10px] font-bold rounded cursor-not-allowed whitespace-nowrap"
+                              >
+                                🔒 승인대기
+                              </button>
+                            ) : (
+                              <button
+                                onClick={() => onOpenAuthModal && onOpenAuthModal('login')}
+                                className="px-3 py-1 bg-kpcia-gold hover:bg-kpcia-gold-hover text-kpcia-dark text-[10px] font-bold rounded cursor-pointer whitespace-nowrap"
+                              >
+                                신청
+                              </button>
+                            )
+                          ) : (
+                            <div className="flex items-center justify-center">
                             {lecture.status === 'open' ? (
                               !currentUser || currentUser.uid === 'guest' ? (
                                 <button
@@ -704,6 +761,7 @@ export default function LectureBoard({
                               </span>
                             )}
                           </div>
+                          )}
                         </td>
                       </tr>
                     );
@@ -771,7 +829,7 @@ export default function LectureBoard({
                 <div className="space-y-3">
                   <div className="flex items-center justify-between">
                     {/* Status Badges */}
-                    <div className="flex items-center space-x-1.5">
+                    <div className={`flex items-center space-x-1.5 ${showBlurred ? "blur-[3px] select-none" : ""}`}>
                       {lecture.status === 'open' && (
                         <span className="text-[10px] px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-400 font-bold border border-emerald-500/20 animate-pulse">
                           신청 접수중
@@ -791,7 +849,7 @@ export default function LectureBoard({
 
                     {/* Required Tier Qualification */}
                     <div className="flex items-center space-x-2">
-                      <span className={`text-[9px] px-2.5 py-0.5 rounded-full font-mono font-bold border ${tierColors[lecture.targetTier]}`}>
+                      <span className={`text-[9px] px-2.5 py-0.5 rounded-full font-mono font-bold border ${tierColors[lecture.targetTier]} ${showBlurred ? "blur-[3px] select-none" : ""}`}>
                         {lecture.targetTier} ↑ 지원 가능
                       </span>
                     </div>
@@ -802,15 +860,17 @@ export default function LectureBoard({
                     <h3 className="font-display font-bold text-base text-neutral-100 tracking-tight leading-snug hover:text-kpcia-gold transition-colors">
                       {lecture.title}
                     </h3>
-                    <button
-                      type="button"
-                      onClick={() => downloadLectureAsExcel(lecture)}
-                      className="text-[9px] bg-neutral-950 border border-neutral-800 text-neutral-400 hover:text-kpcia-gold hover:border-kpcia-gold/30 px-2 py-1 rounded shrink-0 font-sans flex items-center gap-1"
-                      title="출강 파견 안내서 엑셀 변환 및 다운로드"
-                    >
-                      <FileDown className="w-3 h-3 text-neutral-400" />
-                      <span>출강표</span>
-                    </button>
+                    {!showBlurred && (
+                      <button
+                        type="button"
+                        onClick={() => downloadLectureAsExcel(lecture)}
+                        className="text-[9px] bg-neutral-950 border border-neutral-800 text-neutral-400 hover:text-kpcia-gold hover:border-kpcia-gold/30 px-2 py-1 rounded shrink-0 font-sans flex items-center gap-1"
+                        title="출강 파견 안내서 엑셀 변환 및 다운로드"
+                      >
+                        <FileDown className="w-3 h-3 text-neutral-400" />
+                        <span>출강표</span>
+                      </button>
+                    )}
                   </div>
 
                   {/* Description */}
@@ -820,41 +880,48 @@ export default function LectureBoard({
 
                   {/* Logistics */}
                   <div className="grid grid-cols-2 gap-y-2.5 pt-3 border-t border-neutral-800/50 text-[11px] text-neutral-400 font-sans">
-                    <div className="flex items-center space-x-2">
+                    <div className={`flex items-center space-x-2 ${showBlurred ? "blur-[3px] select-none" : ""}`}>
                       <Calendar className="w-3.5 h-3.5 text-neutral-500" />
                       <span>{lecture.date} ({lecture.time})</span>
                     </div>
-                    <div className="flex items-center space-x-2">
+                    <div className={`flex items-center space-x-2 ${showBlurred ? "blur-[3px] select-none" : ""}`}>
                       <Clock className="w-3.5 h-3.5 text-neutral-500" />
                       <span>소요시간 {lecture.duration}</span>
                     </div>
                     {lecture.attendees !== undefined && (
-                      <div className="flex items-center space-x-2 col-span-2">
+                      <div className={`flex items-center space-x-2 col-span-2 ${showBlurred ? "blur-[3px] select-none" : ""}`}>
                         <Users className="w-3.5 h-3.5 text-neutral-500 shrink-0" />
                         <span>수강 대상 인원: <strong className="text-neutral-200 font-mono">{lecture.attendees}명</strong></span>
                       </div>
                     )}
                     <div className="col-span-2">
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setSelectedMapLocation(lecture.location);
-                          setSelectedMapTitle(lecture.title);
-                        }}
-                        className="flex items-center justify-between w-full p-2 rounded bg-neutral-950 hover:bg-neutral-800 border border-neutral-850 hover:border-kpcia-gold/30 text-left transition-all duration-200 group/map cursor-pointer text-[10.5px]"
-                        id={`map-trigger-${lecture.id}`}
-                        title="출강 지도 위치 확인하기"
-                      >
-                        <div className="flex items-center space-x-2 truncate">
-                          <MapPin className="w-3.5 h-3.5 text-neutral-500 group-hover/map:text-kpcia-gold group-hover/map:scale-110 transition-all shrink-0" />
-                          <span className="truncate font-medium text-neutral-300 group-hover/map:text-kpcia-gold underline underline-offset-2 decoration-neutral-700">
-                            {lecture.location}
-                          </span>
+                      {showBlurred ? (
+                        <div className="flex items-center space-x-2 p-2 rounded bg-neutral-950 border border-neutral-850 text-neutral-500 text-[10.5px] blur-[3px] select-none">
+                          <MapPin className="w-3.5 h-3.5 text-neutral-500 shrink-0" />
+                          <span>서울시 종로구 세종대로 출강지 정보</span>
                         </div>
-                        <span className="text-[9px] bg-neutral-900 border border-neutral-800 text-neutral-400 group-hover/map:bg-kpcia-gold group-hover/map:border-kpcia-gold group-hover/map:text-kpcia-dark px-2 py-0.5 rounded font-mono font-bold shrink-0 transition-colors">
-                          지도보기
-                        </span>
-                      </button>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setSelectedMapLocation(lecture.location);
+                            setSelectedMapTitle(lecture.title);
+                          }}
+                          className="flex items-center justify-between w-full p-2 rounded bg-neutral-950 hover:bg-neutral-800 border border-neutral-850 hover:border-kpcia-gold/30 text-left transition-all duration-200 group/map cursor-pointer text-[10.5px]"
+                          id={`map-trigger-${lecture.id}`}
+                          title="출강 지도 위치 확인하기"
+                        >
+                          <div className="flex items-center space-x-2 truncate">
+                            <MapPin className="w-3.5 h-3.5 text-neutral-500 group-hover/map:text-kpcia-gold group-hover/map:scale-110 transition-all shrink-0" />
+                            <span className="truncate font-medium text-neutral-300 group-hover/map:text-kpcia-gold underline underline-offset-2 decoration-neutral-700">
+                              {lecture.location}
+                            </span>
+                          </div>
+                          <span className="text-[9px] bg-neutral-900 border border-neutral-800 text-neutral-400 group-hover/map:bg-kpcia-gold group-hover/map:border-kpcia-gold group-hover/map:text-kpcia-dark px-2 py-0.5 rounded font-mono font-bold shrink-0 transition-colors">
+                            지도보기
+                          </span>
+                        </button>
+                      )}
                     </div>
                   </div>
 
@@ -882,6 +949,24 @@ export default function LectureBoard({
                     
                     // Only high tier users (Prestige Associate+) are allowed to assign/bring assistant instructors (Prestige Member)
                     const canAssignAssistant = currentUser && (currentUser.isAdmin || currentUser.tier !== 'Prestige Member') && isAssignedToMe;
+                    const isAttendeesLow = lecture.attendees !== undefined && lecture.attendees <= 20;
+
+                    if (isAttendeesLow) {
+                      if (lecture.status === 'assigned') {
+                        return (
+                          <div className="mt-3.5 p-3 rounded-lg bg-neutral-950/40 border border-neutral-800 space-y-1.5 text-left" id={`asst-match-low-${lecture.id}`}>
+                            <div className="text-[10px] font-bold text-neutral-400 flex items-center gap-1.5 uppercase font-sans tracking-wide">
+                              <Users className="w-3.5 h-3.5 text-neutral-500" />
+                              보조강사 매칭 제한 (단독 파견 대상)
+                            </div>
+                            <p className="text-[9.5px] text-neutral-400 font-sans leading-relaxed">
+                              본 출강은 수강 대상 인원이 <strong>20명 이하(현재: {lecture.attendees}명)</strong>이므로 규정에 따라 보조강사 없이 <strong>단독 파견</strong>으로 진행됩니다.
+                            </p>
+                          </div>
+                        );
+                      }
+                      return null;
+                    }
 
                     if (!lecture.assistantId) {
                       if (canAssignAssistant && lecture.status === 'assigned') {
@@ -1023,7 +1108,11 @@ export default function LectureBoard({
                           <span className="text-[8px] bg-kpcia-gold/10 text-kpcia-gold border border-kpcia-gold/20 px-1 py-0.2 rounded font-normal shrink-0">지정연계 5% 공제됨</span>
                         )}
                       </span>
-                      {!currentUser || currentUser.uid === 'guest' ? (
+                      {showBlurred ? (
+                        <span className="text-sm font-bold text-kpcia-gold/50 blur-[3px] select-none font-mono">
+                          ₩{appliedTotalCost.toLocaleString()} 원
+                        </span>
+                      ) : !currentUser || currentUser.uid === 'guest' ? (
                         <span className="text-sm font-bold text-kpcia-gold/50 blur-[3px] select-none font-mono">
                           ₩{appliedTotalCost.toLocaleString()} 원
                         </span>
@@ -1039,7 +1128,11 @@ export default function LectureBoard({
                     {/* Row 2: 출강 강사료 */}
                     <div className="flex items-center justify-between gap-4 border-t border-neutral-800/60 pt-1.5">
                       <span className="text-[11px] text-neutral-300 font-bold">└ 출강 강사료</span>
-                      {!currentUser || currentUser.uid === 'guest' ? (
+                      {showBlurred ? (
+                        <span className="text-xs font-bold text-neutral-500 blur-[3px] select-none font-mono">
+                          ₩{lecture.budget.toLocaleString()} 원
+                        </span>
+                      ) : !currentUser || currentUser.uid === 'guest' ? (
                         <span className="text-xs font-bold text-neutral-500 blur-[3px] select-none font-mono">
                           ₩{lecture.budget.toLocaleString()} 원
                         </span>
@@ -1055,7 +1148,11 @@ export default function LectureBoard({
                     {/* Row 3: 재료비 총액 */}
                     <div className="flex items-center justify-between gap-4 pt-1">
                       <span className="text-[11px] text-neutral-400 font-medium">└ 재료비 총액</span>
-                      {!currentUser || currentUser.uid === 'guest' ? (
+                      {showBlurred ? (
+                        <span className="text-xs font-bold text-neutral-500 blur-[3px] select-none font-mono">
+                          ₩{(lecture.materialCost || 0).toLocaleString()} 원
+                        </span>
+                      ) : !currentUser || currentUser.uid === 'guest' ? (
                         <span className="text-xs font-bold text-neutral-500 blur-[3px] select-none font-mono">
                           ₩{(lecture.materialCost || 0).toLocaleString()} 원
                         </span>
@@ -1071,7 +1168,23 @@ export default function LectureBoard({
 
                   {/* Apply Actions */}
                   <div id={`apply-actions-${lecture.id}`}>
-                    {lecture.status === 'open' ? (
+                    {showBlurred ? (
+                      currentUser && currentUser.uid !== 'guest' && currentUser.isApproved === false ? (
+                        <button
+                          disabled
+                          className="px-4 py-2 bg-neutral-950 border border-neutral-850 text-neutral-500 text-xs font-bold rounded-lg cursor-not-allowed whitespace-nowrap"
+                        >
+                          🔒 승인대기
+                        </button>
+                      ) : (
+                        <button
+                          onClick={() => onOpenAuthModal && onOpenAuthModal('login')}
+                          className="px-4 py-2 bg-kpcia-gold hover:bg-kpcia-gold-hover text-kpcia-dark text-xs font-bold rounded-lg transition-all shadow-md hover:shadow-kpcia-gold/10 cursor-pointer"
+                        >
+                          등급 달성시 신청
+                        </button>
+                      )
+                    ) : lecture.status === 'open' ? (
                       !currentUser || currentUser.uid === 'guest' ? (
                         <button
                           onClick={() => onOpenAuthModal && onOpenAuthModal('login')}
@@ -1099,54 +1212,21 @@ export default function LectureBoard({
                         ) : (
                           <button
                             onClick={() => setApplyingLecture(lecture)}
-                            className="px-4 py-2 bg-kpcia-gold hover:bg-kpcia-gold-hover text-kpcia-dark text-xs font-bold rounded-lg transition-all shadow-md hover:shadow-kpcia-gold/10 cursor-pointer"
+                            className="px-4 py-2 bg-kpcia-gold hover:bg-kpcia-gold-hover text-kpcia-dark text-xs font-bold rounded-lg transition-all shadow-md hover:shadow-kpcia-gold/10 flex items-center gap-1.5 cursor-pointer"
                             id={`apply-btn-${lecture.id}`}
                           >
-                            출강 신청하기
+                            <CheckCircle2 className="w-3.5 h-3.5" />
+                            <span>출강 신청하기</span>
                           </button>
                         )
                       ) : (
-                        <button
-                          disabled
-                          className="px-4 py-2 bg-neutral-950 border border-neutral-800 text-neutral-500 text-xs font-bold rounded-lg cursor-not-allowed flex items-center gap-1"
-                          id={`restrict-btn-${lecture.id}`}
-                          title="귀하의 등급이 본 강의의 최저 자격 조건보다 낮아 지원할 수 없습니다."
-                        >
+                        <div className="text-xs text-red-500/80 font-sans font-medium flex items-center gap-1">
                           <AlertCircle className="w-3.5 h-3.5" />
-                          <span>등급 제한</span>
-                        </button>
-                      )
-                    ) : lecture.status === 'assigned' ? (
-                      isAssignedToMe ? (
-                        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
-                          <div className="flex items-center space-x-1.5 text-xs text-kpcia-gold font-bold bg-kpcia-gold/5 border border-kpcia-gold/15 px-3 py-1.5 rounded-lg shrink-0 animate-pulse" id={`assigned-to-me-${lecture.id}`}>
-                            <CheckCircle2 className="w-4 h-4 text-kpcia-gold" />
-                            <span>내게 배정된 강의</span>
-                          </div>
-                          {onCompleteLecture && (
-                            <button
-                              type="button"
-                              onClick={() => {
-                                if (window.confirm("본 출강 강의를 완전히 완료(종료) 처리하시겠습니까? 완료 후 동행 보조강사의 실습 평점 및 피드백을 즉시 입력하실 수 있습니다.")) {
-                                  onCompleteLecture(lecture.id);
-                                }
-                              }}
-                              className="px-3.5 py-1.5 bg-kpcia-gold hover:bg-kpcia-gold-hover text-kpcia-dark text-[10.5px] font-extrabold rounded-lg transition-all cursor-pointer shadow-md text-center shrink-0"
-                              id={`lecturer-complete-btn-${lecture.id}`}
-                            >
-                              강의 완료(종료) 처리
-                            </button>
-                          )}
-                        </div>
-                      ) : (
-                        <div className="text-xs text-neutral-500 font-medium" id={`assigned-other-${lecture.id}`}>
-                          출강 배정완료
+                          <span>신청 조건 미달</span>
                         </div>
                       )
                     ) : (
-                      <div className="text-xs text-neutral-500 font-medium flex items-center gap-1" id={`completed-${lecture.id}`}>
-                        <Check className="w-4 h-4 text-neutral-400" /> 출강 완료됨
-                      </div>
+                      <span className="text-neutral-500 text-xs">신청 불가능</span>
                     )}
                   </div>
                 </div>
@@ -1156,7 +1236,7 @@ export default function LectureBoard({
         </div>
       )}
 
-      {/* Map Modal */}
+        {/* Map Modal */}
       {selectedMapLocation && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/85 backdrop-blur-sm animate-in fade-in duration-200">
           <div className="relative w-full max-w-2xl bg-neutral-900 border border-neutral-800 rounded-2xl shadow-2xl shadow-black/80 overflow-hidden flex flex-col max-h-[90vh]">
@@ -1166,7 +1246,7 @@ export default function LectureBoard({
                 <h3 className="text-xs font-bold text-kpcia-gold flex items-center gap-2">
                   <MapPin className="w-4 h-4" /> 출강 장소 상세 지도
                 </h3>
-                <p className="text-[10px] text-neutral-400 font-sans truncate max-w-md">
+                <p className="text-[10px] text-neutral-450 font-sans truncate max-w-md">
                   {selectedMapTitle}
                 </p>
               </div>
@@ -1246,7 +1326,7 @@ export default function LectureBoard({
               </div>
               <button
                 onClick={() => setApplyingLecture(null)}
-                className="p-1.5 rounded-lg bg-neutral-900 hover:bg-neutral-800 text-neutral-400 hover:text-neutral-100 transition-colors cursor-pointer"
+                className="p-1.5 rounded-lg bg-neutral-900 hover:bg-neutral-850 text-neutral-400 hover:text-neutral-100 transition-colors cursor-pointer"
               >
                 <X className="w-4 h-4" />
               </button>
@@ -1254,135 +1334,153 @@ export default function LectureBoard({
 
             {/* Modal Body */}
             <div className="p-5 space-y-4 overflow-y-auto flex-1">
-              <div className="bg-neutral-950/60 p-4 rounded-xl border border-neutral-850 space-y-1 text-xs">
-                <p className="text-neutral-200 font-medium">
-                  💡 <strong>Prestige Member (보조 강사) 등급 동행 매칭 시스템</strong>
-                </p>
-                <p className="text-neutral-400 leading-relaxed mt-1">
-                  KPCIA 주강사 위원님께서 출강하실 때, 실습 성장을 희망하는 Prestige Member 등급의 보조 강사를 지정하여 동행할 수 있습니다. 
-                  동행을 신청할 경우, 출강 완료 후 위원님이 보조강사 평점 및 피드백을 부여하게 되며 해당 보조강사에게는 출강 1회 실적이 적립됩니다.
-                </p>
-              </div>
-
-              <div className="space-y-3">
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-neutral-800 pb-2">
-                  <h4 className="text-xs font-bold text-neutral-300 flex items-center gap-1.5">
-                    <span>👥 매칭 가능한 Prestige Member 보조강사 리스트 ({allUsers?.filter(u => u.tier === 'Prestige Member' && !u.isAdmin && u.isApproved !== false).length || 0}명)</span>
-                  </h4>
-                  <div className="relative w-full sm:w-64">
-                    <input
-                      type="text"
-                      placeholder="🔍 보조강사 이름, 활동 지역, 전문분야 검색..."
-                      value={asstSearchQuery}
-                      onChange={(e) => setAsstSearchQuery(e.target.value)}
-                      className="w-full px-3 py-1.5 rounded-lg bg-neutral-950 border border-neutral-800 text-[11px] font-medium text-neutral-100 focus:border-kpcia-gold focus:outline-none"
-                      id="asst-search-input"
-                    />
+              {applyingLecture.attendees !== undefined && applyingLecture.attendees <= 20 ? (
+                <div className="bg-neutral-950/60 p-5 rounded-xl border border-neutral-850 space-y-2.5 text-xs text-left">
+                  <p className="text-kpcia-gold font-bold flex items-center gap-1.5 text-sm">
+                    <Users className="w-4 h-4 text-kpcia-gold" /> 보조강사 매칭 제한 안내 (단독 파견 대상)
+                  </p>
+                  <p className="text-neutral-300 leading-relaxed mt-1">
+                    본 출강은 수강 대상 인원이 <strong>20명 이하(현재: {applyingLecture.attendees}명)</strong>이므로 규정에 따라 보조강사 없이 <strong>단독 파견</strong>으로 진행됩니다.
+                  </p>
+                  <p className="text-neutral-450 leading-relaxed text-[11px]">
+                    KPCIA 출강 규정상 수강 대상 인원이 20명 미만/이하인 교육은 주강사 1인 단독 파견으로 운영되며, 수강 인원이 20명 이상(초과)일 때만 Prestige Member 보조강사 1명을 지정하여 동행할 수 있습니다.
+                  </p>
+                </div>
+              ) : (
+                <>
+                  <div className="bg-neutral-950/60 p-4 rounded-xl border border-neutral-850 space-y-1 text-xs">
+                    <p className="text-neutral-200 font-medium">
+                      💡 <strong>Prestige Member (보조 강사) 등행 매칭 시스템</strong>
+                    </p>
+                    <p className="text-neutral-400 leading-relaxed mt-1">
+                      KPCIA 주강사 위원님께서 출강하실 때, 실습 성장을 희망하는 Prestige Member 등급의 보조 강사를 지정하여 동행할 수 있습니다. 
+                      동행을 신청할 경우, 출강 완료 후 위원님이 보조강사 평점 및 피드백을 부여하게 되며 해당 보조강사에게는 출강 1회 실적이 적립됩니다.
+                    </p>
                   </div>
-                </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  {(() => {
-                    const filteredList = (allUsers || [])
-                      .filter(u => u.tier === 'Prestige Member' && !u.isAdmin && u.isApproved !== false)
-                      .filter(u => {
-                        if (!asstSearchQuery.trim()) return true;
-                        const query = asstSearchQuery.toLowerCase();
-                        const nameMatch = u.name?.toLowerCase().includes(query);
-                        const regionMatch = u.profileCard?.region?.toLowerCase().includes(query);
-                        const titleMatch = u.profileCard?.title?.toLowerCase().includes(query);
-                        const specMatch = u.profileCard?.specialties?.some(s => s.toLowerCase().includes(query));
-                        return nameMatch || regionMatch || titleMatch || specMatch;
-                      });
-
-                    if (filteredList.length === 0) {
-                      return (
-                        <div className="col-span-2 text-center py-8 text-xs text-neutral-500">
-                          검색 조건에 부합하는 보조강사가 존재하지 않습니다.
-                        </div>
-                      );
-                    }
-
-                    return filteredList.map((asst) => {
-                      return (
-                      <div 
-                        key={asst.uid}
-                        className="p-4 rounded-xl border border-neutral-800 bg-neutral-950/40 hover:border-neutral-750 hover:bg-neutral-950/60 transition-all duration-300 flex flex-col justify-between space-y-3.5"
-                      >
-                        <div className="flex items-start justify-between">
-                          <div className="flex items-center space-x-3">
-                            <div className="w-10 h-10 rounded-lg bg-neutral-900 border border-neutral-800 overflow-hidden shrink-0 flex items-center justify-center">
-                              {asst.profileCard?.imageUrl ? (
-                                <img src={asst.profileCard.imageUrl} alt={asst.name} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
-                              ) : (
-                                <User className="w-5 h-5 text-neutral-500" />
-                              )}
-                            </div>
-                            <div className="text-left">
-                              <div className="flex items-center space-x-1.5">
-                                <span className="text-xs font-bold text-neutral-100">{asst.name}</span>
-                                <span className="text-[8px] px-1.5 py-0.2 rounded bg-neutral-800 text-neutral-400 font-bold border border-neutral-700">Prestige Member</span>
-                              </div>
-                              <span className="text-[10px] text-neutral-400 font-mono block mt-0.5">{asst.profileCard?.title || 'KPCIA 파트너 강사'}</span>
-                            </div>
-                          </div>
-                          
-                          <button
-                            type="button"
-                            onClick={() => setViewingCardForUser(asst)}
-                            className="px-2 py-1 rounded bg-kpcia-gold/10 hover:bg-kpcia-gold/20 border border-kpcia-gold/30 text-kpcia-gold text-[9px] font-bold transition-all cursor-pointer"
-                          >
-                            💳 강사 카드 정보
-                          </button>
-                        </div>
-
-                        {/* Contact & Info fields */}
-                        <div className="grid grid-cols-2 gap-2 text-[10px] bg-neutral-950 p-2.5 rounded border border-neutral-900 font-sans">
-                          <div>
-                            <span className="text-neutral-500 block text-[8.5px] uppercase font-mono">📞 비상 연락처</span>
-                            <strong className="text-neutral-300 font-mono">{asst.profileCard?.contactPhone || '010-5259-7458'}</strong>
-                          </div>
-                          <div>
-                            <span className="text-neutral-500 block text-[8.5px] uppercase font-mono">📧 이메일</span>
-                            <strong className="text-neutral-300 font-mono truncate block">{asst.profileCard?.contactEmail || asst.email}</strong>
-                          </div>
-                          <div className="col-span-2 border-t border-neutral-900/50 pt-1.5 mt-1">
-                            <span className="text-neutral-500 block text-[8.5px] uppercase font-mono">📍 주요 활동 지역</span>
-                            <strong className="text-neutral-300">{asst.profileCard?.region || '서울 및 수도권'}</strong>
-                          </div>
-                        </div>
-
-                        {/* Bio preview */}
-                        <p className="text-[10px] text-neutral-450 leading-relaxed font-sans line-clamp-2">
-                          {asst.profileCard?.bio || '인사이트9교육연구소 및 KPCIA 소속으로 전문 실무진 보조 지도를 성실히 수행합니다.'}
-                        </p>
-
-                        {/* Action select */}
-                        <button
-                          type="button"
-                          onClick={async () => {
-                            onApplyLecture(applyingLecture.id);
-                            if (onAssignAssistant) {
-                              onAssignAssistant(applyingLecture.id, asst.uid, asst.name);
-                            }
-                            setApplyingLecture(null);
-                          }}
-                          className="w-full py-1.5 bg-neutral-900 hover:bg-neutral-850 text-kpcia-gold hover:text-white border border-kpcia-gold/30 text-[10px] font-bold rounded-lg transition-all cursor-pointer"
-                        >
-                          🤝 {asst.name} 보조강사 동행 지정하여 출강 신청
-                        </button>
+                  <div className="space-y-3">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-neutral-800 pb-2">
+                      <h4 className="text-xs font-bold text-neutral-300 flex items-center gap-1.5">
+                        <span>👥 매칭 가능한 Prestige Member 보조강사 리스트 ({allUsers?.filter(u => u.tier === 'Prestige Member' && !u.isAdmin && u.isApproved !== false).length || 0}명)</span>
+                      </h4>
+                      <div className="relative w-full sm:w-64">
+                        <input
+                          type="text"
+                          placeholder="🔍 보조강사 이름, 활동 지역, 전문분야 검색..."
+                          value={asstSearchQuery}
+                          onChange={(e) => setAsstSearchQuery(e.target.value)}
+                          className="w-full px-3 py-1.5 rounded-lg bg-neutral-950 border border-neutral-800 text-[11px] font-medium text-neutral-100 focus:border-kpcia-gold focus:outline-none"
+                          id="asst-search-input"
+                        />
                       </div>
-                    );
-                    });
-                  })()}
-                </div>
-              </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      {(() => {
+                        const filteredList = (allUsers || [])
+                          .filter(u => u.tier === 'Prestige Member' && !u.isAdmin && u.isApproved !== false)
+                          .filter(u => {
+                            if (!asstSearchQuery.trim()) return true;
+                            const query = asstSearchQuery.toLowerCase();
+                            const nameMatch = u.name?.toLowerCase().includes(query);
+                            const regionMatch = u.profileCard?.region?.toLowerCase().includes(query);
+                            const titleMatch = u.profileCard?.title?.toLowerCase().includes(query);
+                            const specMatch = u.profileCard?.specialties?.some(s => s.toLowerCase().includes(query));
+                            return nameMatch || regionMatch || titleMatch || specMatch;
+                          });
+
+                        if (filteredList.length === 0) {
+                          return (
+                            <div className="col-span-2 text-center py-8 text-xs text-neutral-500">
+                              검색 조건에 부합하는 보조강사가 존재하지 않습니다.
+                            </div>
+                          );
+                        }
+
+                        return filteredList.map((asst) => {
+                          return (
+                          <div 
+                            key={asst.uid}
+                            className="p-4 rounded-xl border border-neutral-800 bg-neutral-950/40 hover:border-neutral-750 hover:bg-neutral-950/60 transition-all duration-300 flex flex-col justify-between space-y-3.5"
+                          >
+                            <div className="flex items-start justify-between">
+                              <div className="flex items-center space-x-3">
+                                <div className="w-10 h-10 rounded-lg bg-neutral-900 border border-neutral-800 overflow-hidden shrink-0 flex items-center justify-center">
+                                  {asst.profileCard?.imageUrl ? (
+                                    <img src={asst.profileCard.imageUrl} alt={asst.name} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                                  ) : (
+                                    <User className="w-5 h-5 text-neutral-500" />
+                                  )}
+                                </div>
+                                <div className="text-left">
+                                  <div className="flex items-center space-x-1.5">
+                                    <span className="text-xs font-bold text-neutral-100">{asst.name}</span>
+                                    <span className="text-[8px] px-1.5 py-0.2 rounded bg-neutral-800 text-neutral-400 font-bold border border-neutral-700">Prestige Member</span>
+                                  </div>
+                                  <span className="text-[10px] text-neutral-400 font-mono block mt-0.5">{asst.profileCard?.title || 'KPCIA 파트너 강사'}</span>
+                                </div>
+                              </div>
+                              
+                              <button
+                                type="button"
+                                onClick={() => setViewingCardForUser(asst)}
+                                className="px-2 py-1 rounded bg-kpcia-gold/10 hover:bg-kpcia-gold/20 border border-kpcia-gold/30 text-kpcia-gold text-[9px] font-bold transition-all cursor-pointer"
+                              >
+                                💳 강사 카드 정보
+                              </button>
+                            </div>
+
+                            {/* Contact & Info fields */}
+                            <div className="grid grid-cols-2 gap-2 text-[10px] bg-neutral-950 p-2.5 rounded border border-neutral-900 font-sans">
+                              <div>
+                                <span className="text-neutral-500 block text-[8.5px] uppercase font-mono">📞 비상 연락처</span>
+                                <strong className="text-neutral-300 font-mono">{asst.profileCard?.contactPhone || '010-5259-7458'}</strong>
+                              </div>
+                              <div>
+                                <span className="text-neutral-500 block text-[8.5px] uppercase font-mono">📧 이메일</span>
+                                <strong className="text-neutral-300 font-mono truncate block">{asst.profileCard?.contactEmail || asst.email}</strong>
+                              </div>
+                              <div className="col-span-2 border-t border-neutral-900/50 pt-1.5 mt-1">
+                                <span className="text-neutral-500 block text-[8.5px] uppercase font-mono">📍 주요 활동 지역</span>
+                                <strong className="text-neutral-300">{asst.profileCard?.region || '서울 및 수도권'}</strong>
+                              </div>
+                            </div>
+
+                            {/* Bio preview */}
+                            <p className="text-[10px] text-neutral-450 leading-relaxed font-sans line-clamp-2">
+                              {asst.profileCard?.bio || '인사이트9교육연구소 및 KPCIA 소속으로 전문 실무진 보조 지도를 성실히 수행합니다.'}
+                            </p>
+
+                            {/* Action select */}
+                            <button
+                              type="button"
+                              onClick={async () => {
+                                onApplyLecture(applyingLecture.id);
+                                if (onAssignAssistant) {
+                                  onAssignAssistant(applyingLecture.id, asst.uid, asst.name);
+                                }
+                                setApplyingLecture(null);
+                              }}
+                              className="w-full py-1.5 bg-neutral-900 hover:bg-neutral-850 text-kpcia-gold hover:text-white border border-kpcia-gold/30 text-[10px] font-bold rounded-lg transition-all cursor-pointer"
+                            >
+                              🤝 {asst.name} 보조강사 동행 지정하여 출강 신청
+                            </button>
+                          </div>
+                        );
+                        });
+                      })()}
+                    </div>
+                  </div>
+                </>
+              )}
             </div>
 
             {/* Modal Footer */}
             <div className="flex flex-col sm:flex-row items-center justify-between gap-3 p-4 border-t border-neutral-800 bg-neutral-950">
               <span className="text-[9px] text-neutral-500 font-sans text-left">
-                ※ 보조강사 동행 지정을 원치 않으시면 '단독 출강 신청' 버튼을 통해 단독으로 신청하실 수 있습니다.
+                {applyingLecture.attendees !== undefined && applyingLecture.attendees <= 20
+                  ? "※ 본 강의는 20명 이하 교육이므로 단독 출강만 신청 가능합니다."
+                  : "※ 보조강사 동행 지정을 원치 않으시면 '단독 출강 신청' 버튼을 통해 단독으로 신청하실 수 있습니다."}
               </span>
               <div className="flex items-center gap-2 w-full sm:w-auto shrink-0 justify-end">
                 <button
@@ -1393,7 +1491,9 @@ export default function LectureBoard({
                   }}
                   className="px-4 py-2 bg-kpcia-gold hover:bg-kpcia-gold-hover text-kpcia-dark text-xs font-bold rounded-lg transition-all shadow-md cursor-pointer"
                 >
-                  🚀 보조강사 동행 없이 단독 출강 신청
+                  {applyingLecture.attendees !== undefined && applyingLecture.attendees <= 20
+                    ? "🚀 단독 출강 신청 완료"
+                    : "🚀 보조강사 동행 없이 단독 출강 신청"}
                 </button>
                 <button
                   type="button"
@@ -1407,6 +1507,9 @@ export default function LectureBoard({
           </div>
         </div>
       )}
+
+
+
 
       {/* Viewing Card Full Dialog */}
       {viewingCardForUser && (() => {

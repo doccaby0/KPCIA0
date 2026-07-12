@@ -33,7 +33,6 @@ interface AppSimulatorProps {
   onCancelApplyLecture?: (lectureId: string) => void;
   onAssignAssistant?: (lectureId: string, assistantId: string, assistantName: string) => void;
   onTabChange: (tab: string) => void;
-  onInstantApprove?: () => void;
 }
 
 export default function AppSimulator({
@@ -49,8 +48,7 @@ export default function AppSimulator({
   onApplyLecture,
   onCancelApplyLecture,
   onAssignAssistant,
-  onTabChange,
-  onInstantApprove
+  onTabChange
 }: AppSimulatorProps) {
   const [showUserModal, setShowUserModal] = useState(false);
   const [loginId, setLoginId] = useState('');
@@ -341,39 +339,21 @@ export default function AppSimulator({
 
             {/* Scrollable Mobile Screen Content Area */}
             <div className="flex-1 bg-neutral-950 overflow-y-auto px-4 py-3.5 custom-scrollbar" id="phone-screen-scrollable">
-              {currentUser.uid !== 'guest' && currentUser.isApproved === false ? (
-                <div className="space-y-4 py-6 text-center animate-in fade-in" id="mobile-pending-view">
-                  <div className="w-12 h-12 rounded-full bg-kpcia-gold/15 flex items-center justify-center text-kpcia-gold mx-auto border border-kpcia-gold/20 animate-pulse mt-8">
-                    <Clock className="w-6 h-6" />
-                  </div>
-                  <div className="space-y-1.5 px-2">
-                    <h4 className="text-xs font-bold text-neutral-200">가입 승인 심사 진행 중</h4>
-                    <p className="text-[10px] text-neutral-400 leading-relaxed">
-                      안녕하세요, <strong className="text-kpcia-gold">{currentUser.name}</strong> 강사님! 현재 운영사무국의 출강 자격 승인을 대기하고 있습니다. 승인 완료 후 모바일 앱 서비스가 활성화됩니다.
+              <>
+                {currentUser && currentUser.uid !== 'guest' && currentUser.isApproved === false && (
+                  <div className="p-3 bg-amber-950/40 border border-amber-850/50 rounded-xl text-[10px] text-amber-300 leading-normal space-y-1 my-2">
+                    <p className="font-bold">⚠️ 가입 승인 대기 중 (임시 제한)</p>
+                    <p className="text-[9.5px] text-neutral-400">
+                      현재 운영사무국의 강사 자격 승인 심사 대기 상태입니다. 공고 조회만 가능하며, 승인 완료 후 출강 신청 등 모든 정식 기능이 활성화됩니다.
                     </p>
                   </div>
-                  <div className="p-3 bg-neutral-900 border border-neutral-800 rounded-xl text-left max-w-[280px] mx-auto text-[9px] text-neutral-400 space-y-1.5 mt-4">
-                    <strong className="text-kpcia-gold block">💡 빠른 가입 승인 방법:</strong>
-                    <span>PC 웹 포털로 복귀 후, 우측 상단 프로필에서 <strong>"KPCIA 운영사무국" (관리자 계정)</strong>으로 전환하여, <strong>"협회 관리자실" (Admin)</strong> 메뉴에서 승인을 완료해 주세요.</span>
-                  </div>
-                  {onInstantApprove && (
-                    <button
-                      onClick={onInstantApprove}
-                      className="w-full max-w-[280px] mx-auto py-2.5 bg-kpcia-gold hover:bg-kpcia-gold-hover text-kpcia-dark text-[10px] font-black rounded-lg transition-all flex items-center justify-center gap-1.5 cursor-pointer shadow-lg shadow-kpcia-gold/10 mt-3"
-                    >
-                      <UserCheck className="w-3.5 h-3.5" />
-                      <span>원클릭 자가 임시 승인</span>
-                    </button>
-                  )}
-                </div>
-              ) : (
-                <>
-                  {activeMobileTab === 'lectures' && (
-                    <div className="space-y-3.5 animate-in fade-in duration-300" id="mobile-lectures-view">
-                      <div className="space-y-1">
-                        <h3 className="text-xs font-bold text-neutral-200">출강 가능 강의 목록</h3>
-                        <p className="text-[9px] text-neutral-500">강사님의 {currentUser.tier} 등급에 맞는 공고입니다.</p>
-                      </div>
+                )}
+                {activeMobileTab === 'lectures' && (
+                  <div className="space-y-3.5 animate-in fade-in duration-300" id="mobile-lectures-view">
+                    <div className="space-y-1">
+                      <h3 className="text-xs font-bold text-neutral-200">출강 가능 강의 목록</h3>
+                      <p className="text-[9px] text-neutral-500">강사님의 {currentUser.tier} 등급에 맞는 공고입니다.</p>
+                    </div>
 
                       <div className="space-y-3 pb-4" id="mobile-lectures-list">
                         {lectures.map((l) => {
@@ -555,8 +535,7 @@ export default function AppSimulator({
                     </div>
                   )}
                 </>
-              )}
-            </div>
+              </div>
 
             {/* Mobile Bottom Tab Navigation */}
             <div className="border-t border-neutral-900/60 bg-neutral-950 py-3.5 flex justify-around items-center shrink-0 z-30" id="phone-nav-bar">
@@ -564,7 +543,12 @@ export default function AppSimulator({
                 { id: 'lectures', label: '강의요청', icon: Award },
                 { id: 'programs', label: '저작권', icon: BookOpen },
                 { id: 'profile', label: '내정보', icon: User }
-              ].map((item) => {
+              ].filter(item => {
+                if (currentUser && currentUser.uid !== 'guest' && currentUser.isApproved === false) {
+                  return item.id === 'lectures';
+                }
+                return true;
+              }).map((item) => {
                 const IconComp = item.icon;
                 const isSel = activeMobileTab === item.id;
                 return (

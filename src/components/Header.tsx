@@ -39,6 +39,7 @@ export default function Header({
 
   const isUserAdmin = currentUser ? currentUser.isAdmin : false;
   const isUserGuestOrNull = currentUser ? currentUser.uid === 'guest' : true;
+  const isPendingApproval = currentUser && currentUser.uid !== 'guest' && !currentUser.isAdmin && currentUser.isApproved === false;
 
   // check if user has at least one approved/certified program via "내 교육 프로그램 등재하기"
   const isApprovedAuthor = currentUser && programs && programs.some(p => p.authorId === currentUser.uid && p.isApproved !== false);
@@ -62,6 +63,7 @@ export default function Header({
             { id: 'proposal', label: '제휴 및 협력 제안', icon: <Handshake className="w-4 h-4" /> },
             { id: 'admin', label: '협회 관리자실', icon: <Shield className="w-4 h-4" />, adminOnly: true }
           ].map((tab) => {
+            if (isPendingApproval && tab.id !== 'lectures') return null;
             if (tab.adminOnly && !isUserAdmin) return null;
             if (tab.instructorOnly && isUserGuestOrNull) return null;
             const isActive = activeTab === tab.id;
@@ -194,6 +196,7 @@ export default function Header({
         { id: 'proposal', label: '제휴제안', icon: <Handshake className="w-5 h-5" /> },
         { id: 'admin', label: '관리자', icon: <Shield className="w-5 h-5" />, adminOnly: true }
       ].map((tab) => {
+        if (isPendingApproval && tab.id !== 'lectures') return null;
         if (tab.adminOnly && !isUserAdmin) return null;
         if (tab.instructorOnly && isUserGuestOrNull) return null;
         const isActive = activeTab === tab.id;
