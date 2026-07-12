@@ -2001,7 +2001,7 @@ export default function AdminPanel({
                             {lecture.status === 'open' ? '강사 매칭·접수중' : '출강 수행·교육중'}
                           </span>
                           <span className="text-[10px] text-neutral-500 font-mono">ID: {lecture.id}</span>
-                          <span className="text-[10px] text-neutral-400">예산: <strong className="text-neutral-300 font-mono">{lecture.budget.toLocaleString()} KRW</strong></span>
+                          <span className="text-[10px] text-neutral-400">총 출강비: <strong className="text-neutral-300 font-mono">{(lecture.budget + (lecture.materialCost || 0)).toLocaleString()} KRW</strong></span>
                           {lecture.targetTier && (
                             <span className="text-[9px] px-2 py-0.5 rounded border border-kpcia-gold/30 bg-kpcia-gold/10 text-kpcia-gold font-bold">
                               {lecture.targetTier} ↑ 지원 등급

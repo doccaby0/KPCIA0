@@ -64,13 +64,19 @@ export default function App() {
     }, 5000);
   };
 
-  // Initial Data Sync on startup
+  // Initial Data Sync on startup and Real-time Synchronization
   useEffect(() => {
+    let unsubUsers = () => {};
+    let unsubLectures = () => {};
+    let unsubPrograms = () => {};
+    let unsubTransactions = () => {};
+    let unsubProposals = () => {};
+
     const syncData = async () => {
       // 1. Seed empty database
       await StorageService.seedDatabaseIfEmpty();
 
-      // 2. Fetch all collections
+      // 2. Fetch initial values to guarantee instant rendering
       const loadedUsers = await StorageService.getUsers();
       const loadedLectures = await StorageService.getLectures();
       const loadedPrograms = await StorageService.getPrograms();
@@ -89,15 +95,61 @@ export default function App() {
         const savedUser = loadedUsers.find(u => u.uid === savedUserUid);
         if (savedUser) {
           setCurrentUser(savedUser);
-          return;
+        }
+      } else {
+        setCurrentUser(null);
+      }
+
+      // 4. Activate real-time cloud sync listeners if Firestore is enabled
+      if (useFirestore) {
+        try {
+          unsubUsers = StorageService.subscribeUsers((updatedUsers) => {
+            if (updatedUsers.length > 0) {
+              setUsers(updatedUsers);
+              const loggedInUid = localStorage.getItem('kpcia_logged_in_uid');
+              if (loggedInUid) {
+                const updatedMe = updatedUsers.find(u => u.uid === loggedInUid);
+                if (updatedMe) {
+                  setCurrentUser(updatedMe);
+                }
+              }
+            }
+          });
+
+          unsubLectures = StorageService.subscribeLectures((updatedLectures) => {
+            if (updatedLectures.length > 0) {
+              setLectures(updatedLectures);
+            }
+          });
+
+          unsubPrograms = StorageService.subscribePrograms((updatedPrograms) => {
+            if (updatedPrograms.length > 0) {
+              setPrograms(updatedPrograms);
+            }
+          });
+
+          unsubTransactions = StorageService.subscribeTransactions((updatedTransactions) => {
+            setTransactions(updatedTransactions);
+          });
+
+          unsubProposals = StorageService.subscribeProposals((updatedProposals) => {
+            setProposals(updatedProposals);
+          });
+        } catch (err) {
+          console.error("Failed to register real-time Firestore synchronization:", err);
         }
       }
-      
-      // On fresh start, require login by leaving currentUser as null
-      setCurrentUser(null);
     };
 
     syncData();
+
+    return () => {
+      unsubUsers();
+      unsubLectures();
+      unsubPrograms();
+      unsubTransactions();
+      unsubProposals();
+    };
   }, []);
 
   // 🛡️ AI & Crawler Anti-Scraping / Copyright Protection Shield

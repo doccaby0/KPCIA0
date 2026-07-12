@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { UserProfile, LectureRequest, InstructorTier } from '../types';
 import { Calendar, Clock, MapPin, Award, CheckCircle2, AlertCircle, Users, User, Check, Banknote, Sparkles, X, FileDown, Mail, Phone, LayoutGrid, FileSpreadsheet, Search } from 'lucide-react';
 
@@ -28,6 +28,12 @@ export default function LectureBoard({
   // View mode switcher: default to 'grid' to show the original grid first
   const [viewMode, setViewMode] = useState<'excel' | 'grid'>('grid');
   const [boardSearchQuery, setBoardSearchQuery] = useState('');
+  const [currentPage, setCurrentPage] = useState(1);
+
+  // Reset page to 1 when search query or viewMode changes
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [boardSearchQuery, viewMode]);
 
   // Map popup states
   const [selectedMapLocation, setSelectedMapLocation] = useState<string | null>(null);
@@ -278,6 +284,13 @@ export default function LectureBoard({
       return dateB - dateA;
     });
 
+  // Pagination State
+  const ITEMS_PER_PAGE = 6;
+  const totalPages = Math.ceil(filteredLectures.length / ITEMS_PER_PAGE) || 1;
+  const safeCurrentPage = Math.min(currentPage, totalPages);
+  const startIndex = (safeCurrentPage - 1) * ITEMS_PER_PAGE;
+  const paginatedLectures = filteredLectures.slice(startIndex, startIndex + ITEMS_PER_PAGE);
+
   return (
     <div className="space-y-6" id="lecture-board-section">
       {/* Header and Controls */}
@@ -393,7 +406,7 @@ export default function LectureBoard({
                     </td>
                   </tr>
                 ) : (
-                  filteredLectures.map((lecture, idx) => {
+                  paginatedLectures.map((lecture, idx) => {
                     const isQualified = currentUser ? checkQualification(currentUser.tier, lecture.targetTier) : false;
                     const hasApplied = currentUser ? lecture.applicants.includes(currentUser.uid) : false;
                     const isAssignedToMe = currentUser ? lecture.assignedTo === currentUser.uid : false;
@@ -419,7 +432,7 @@ export default function LectureBoard({
                       >
                         {/* Row Index */}
                         <td className="px-2 py-3.5 border-r border-neutral-850 text-center font-mono text-neutral-500 bg-neutral-950/20 select-none">
-                          {idx + 1}
+                          {startIndex + idx + 1}
                         </td>
 
                         {/* Col A: Status */}
@@ -793,8 +806,8 @@ export default function LectureBoard({
         </div>
       ) : (
         /* ==================== CLASSIC GRID CARD VIEW ==================== */
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6" id="lectures-grid">
-          {filteredLectures.map((lecture) => {
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4" id="lectures-grid">
+          {paginatedLectures.map((lecture) => {
             const isQualified = currentUser ? checkQualification(currentUser.tier, lecture.targetTier) : false;
             const hasApplied = currentUser ? lecture.applicants.includes(currentUser.uid) : false;
             const isAssignedToMe = currentUser ? lecture.assignedTo === currentUser.uid : false;
@@ -815,7 +828,7 @@ export default function LectureBoard({
             return (
               <div
                 key={lecture.id}
-                className={`rounded-xl border bg-neutral-900/50 backdrop-blur p-5 flex flex-col justify-between hover:border-neutral-700 transition-all duration-300 relative overflow-hidden ${
+                className={`rounded-xl border bg-neutral-900/50 backdrop-blur p-4 flex flex-col justify-between hover:border-neutral-750 transition-all duration-300 relative overflow-hidden ${
                   isAssignedToMe ? 'border-kpcia-gold/40 shadow-lg shadow-kpcia-gold/5' : 'border-neutral-800'
                 }`}
                 id={`lecture-card-${lecture.id}`}
@@ -826,79 +839,83 @@ export default function LectureBoard({
                 )}
 
                 {/* Card Top Information */}
-                <div className="space-y-3">
-                  <div className="flex items-center justify-between">
+                <div className="space-y-2.5">
+                  <div className="flex items-center justify-between gap-1">
                     {/* Status Badges */}
-                    <div className={`flex items-center space-x-1.5 ${showBlurred ? "blur-[3px] select-none" : ""}`}>
+                    <div className={`flex items-center space-x-1 shrink-0 ${showBlurred ? "blur-[3px] select-none" : ""}`}>
                       {lecture.status === 'open' && (
-                        <span className="text-[10px] px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-400 font-bold border border-emerald-500/20 animate-pulse">
+                        <span className="text-[9.5px] px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-400 font-bold border border-emerald-500/20 animate-pulse">
                           신청 접수중
                         </span>
                       )}
                       {lecture.status === 'assigned' && (
-                        <span className="text-[10px] px-2 py-0.5 rounded-full bg-blue-500/15 text-blue-400 font-bold border border-blue-500/20">
-                          배정 완료 ({lecture.assignedName})
+                        <span className="text-[9.5px] px-2 py-0.5 rounded-full bg-blue-500/15 text-blue-400 font-bold border border-blue-500/20 truncate max-w-[110px]">
+                          배정됨 ({lecture.assignedName})
                         </span>
                       )}
                       {lecture.status === 'completed' && (
-                        <span className="text-[10px] px-2 py-0.5 rounded-full bg-neutral-800 text-neutral-400 font-bold border border-neutral-700">
+                        <span className="text-[9.5px] px-2 py-0.5 rounded-full bg-neutral-800 text-neutral-400 font-bold border border-neutral-700">
                           출강 종료
                         </span>
                       )}
                     </div>
 
                     {/* Required Tier Qualification */}
-                    <div className="flex items-center space-x-2">
-                      <span className={`text-[9px] px-2.5 py-0.5 rounded-full font-mono font-bold border ${tierColors[lecture.targetTier]} ${showBlurred ? "blur-[3px] select-none" : ""}`}>
-                        {lecture.targetTier} ↑ 지원 가능
+                    <div className="flex items-center">
+                      <span className={`text-[9px] px-1.5 py-0.5 rounded font-mono font-bold border shrink-0 ${tierColors[lecture.targetTier]} ${showBlurred ? "blur-[3px] select-none" : ""}`}>
+                        🛡️ {lecture.targetTier.replace('Prestige ', '')} ↑
                       </span>
                     </div>
                   </div>
 
                   {/* Title & info buttons */}
                   <div className="flex items-start justify-between gap-1.5">
-                    <h3 className="font-display font-bold text-base text-neutral-100 tracking-tight leading-snug hover:text-kpcia-gold transition-colors">
+                    <h3 className="font-display font-bold text-[14px] text-neutral-100 tracking-tight leading-snug hover:text-kpcia-gold transition-colors line-clamp-1" title={lecture.title}>
                       {lecture.title}
                     </h3>
                     {!showBlurred && (
                       <button
                         type="button"
                         onClick={() => downloadLectureAsExcel(lecture)}
-                        className="text-[9px] bg-neutral-950 border border-neutral-800 text-neutral-400 hover:text-kpcia-gold hover:border-kpcia-gold/30 px-2 py-1 rounded shrink-0 font-sans flex items-center gap-1"
+                        className="text-[8.5px] bg-neutral-950 border border-neutral-850 text-neutral-400 hover:text-kpcia-gold hover:border-kpcia-gold/30 px-1.5 py-0.5 rounded shrink-0 font-sans flex items-center gap-0.5 cursor-pointer"
                         title="출강 파견 안내서 엑셀 변환 및 다운로드"
                       >
-                        <FileDown className="w-3 h-3 text-neutral-400" />
+                        <FileDown className="w-2.5 h-2.5 text-neutral-400" />
                         <span>출강표</span>
                       </button>
                     )}
                   </div>
 
                   {/* Description */}
-                  <p className="text-xs text-neutral-400 leading-relaxed font-sans line-clamp-3">
+                  <p className="text-[10.5px] text-neutral-400 leading-relaxed font-sans line-clamp-2 min-h-[32px]" title={lecture.description}>
                     {lecture.description}
                   </p>
 
                   {/* Logistics */}
-                  <div className="grid grid-cols-2 gap-y-2.5 pt-3 border-t border-neutral-800/50 text-[11px] text-neutral-400 font-sans">
-                    <div className={`flex items-center space-x-2 ${showBlurred ? "blur-[3px] select-none" : ""}`}>
-                      <Calendar className="w-3.5 h-3.5 text-neutral-500" />
-                      <span>{lecture.date} ({lecture.time})</span>
+                  <div className="grid grid-cols-2 gap-x-2 gap-y-1.5 pt-2 border-t border-neutral-850/50 text-[10px] text-neutral-400 font-sans">
+                    <div className={`flex items-center space-x-1 ${showBlurred ? "blur-[3px] select-none" : ""}`}>
+                      <Calendar className="w-3 h-3 text-neutral-500 shrink-0" />
+                      <span className="truncate" title={lecture.date}>{lecture.date}</span>
                     </div>
-                    <div className={`flex items-center space-x-2 ${showBlurred ? "blur-[3px] select-none" : ""}`}>
-                      <Clock className="w-3.5 h-3.5 text-neutral-500" />
-                      <span>소요시간 {lecture.duration}</span>
+                    <div className={`flex items-center space-x-1 ${showBlurred ? "blur-[3px] select-none" : ""}`}>
+                      <Clock className="w-3 h-3 text-neutral-500 shrink-0" />
+                      <span className="truncate" title={lecture.time}>{lecture.time}</span>
                     </div>
                     {lecture.attendees !== undefined && (
-                      <div className={`flex items-center space-x-2 col-span-2 ${showBlurred ? "blur-[3px] select-none" : ""}`}>
-                        <Users className="w-3.5 h-3.5 text-neutral-500 shrink-0" />
-                        <span>수강 대상 인원: <strong className="text-neutral-200 font-mono">{lecture.attendees}명</strong></span>
+                      <div className={`flex items-center space-x-1 ${showBlurred ? "blur-[3px] select-none" : ""}`}>
+                        <Users className="w-3 h-3 text-neutral-500 shrink-0" />
+                        <span className="truncate">인원: <strong className="text-neutral-200 font-mono">{lecture.attendees}명</strong></span>
                       </div>
                     )}
-                    <div className="col-span-2">
+                    <div className={`flex items-center space-x-1 ${showBlurred ? "blur-[3px] select-none" : ""}`}>
+                      <Clock className="w-3 h-3 text-neutral-500 shrink-0" />
+                      <span className="truncate">소요: <strong className="text-neutral-200 font-mono">{lecture.duration}</strong></span>
+                    </div>
+                    <div className="col-span-2 mt-0.5">
                       {showBlurred ? (
-                        <div className="flex items-center space-x-2 p-2 rounded bg-neutral-950 border border-neutral-850 text-neutral-500 text-[10.5px] blur-[3px] select-none">
-                          <MapPin className="w-3.5 h-3.5 text-neutral-500 shrink-0" />
-                          <span>서울시 종로구 세종대로 출강지 정보</span>
+                        <div className="flex items-center space-x-1 p-1 rounded bg-neutral-950 border border-neutral-855 text-neutral-500 text-[9.5px] blur-[3px] select-none">
+                          <MapPin className="w-3 h-3 text-neutral-500 shrink-0" />
+                          <span className="truncate">출강지 정보 (등급 이상 열람 가능)</span>
                         </div>
                       ) : (
                         <button
@@ -907,18 +924,17 @@ export default function LectureBoard({
                             setSelectedMapLocation(lecture.location);
                             setSelectedMapTitle(lecture.title);
                           }}
-                          className="flex items-center justify-between w-full p-2 rounded bg-neutral-950 hover:bg-neutral-800 border border-neutral-850 hover:border-kpcia-gold/30 text-left transition-all duration-200 group/map cursor-pointer text-[10.5px]"
+                          className="flex items-center justify-between w-full p-1 rounded bg-neutral-950 hover:bg-neutral-800 border border-neutral-850 hover:border-kpcia-gold/30 text-left transition-all duration-200 group/map cursor-pointer text-[9.5px]"
                           id={`map-trigger-${lecture.id}`}
-                          title="출강 지도 위치 확인하기"
                         >
-                          <div className="flex items-center space-x-2 truncate">
-                            <MapPin className="w-3.5 h-3.5 text-neutral-500 group-hover/map:text-kpcia-gold group-hover/map:scale-110 transition-all shrink-0" />
-                            <span className="truncate font-medium text-neutral-300 group-hover/map:text-kpcia-gold underline underline-offset-2 decoration-neutral-700">
+                          <div className="flex items-center space-x-1 truncate">
+                            <MapPin className="w-3 h-3 text-neutral-500 group-hover/map:text-kpcia-gold group-hover/map:scale-110 transition-all shrink-0" />
+                            <span className="truncate text-neutral-300 group-hover/map:text-kpcia-gold underline underline-offset-2 decoration-neutral-800">
                               {lecture.location}
                             </span>
                           </div>
-                          <span className="text-[9px] bg-neutral-900 border border-neutral-800 text-neutral-400 group-hover/map:bg-kpcia-gold group-hover/map:border-kpcia-gold group-hover/map:text-kpcia-dark px-2 py-0.5 rounded font-mono font-bold shrink-0 transition-colors">
-                            지도보기
+                          <span className="text-[8px] bg-neutral-900 border border-neutral-800 text-neutral-400 group-hover/map:bg-kpcia-gold group-hover/map:border-kpcia-gold group-hover/map:text-kpcia-dark px-1 py-0.2 rounded font-mono font-bold shrink-0 transition-colors">
+                            지도
                           </span>
                         </button>
                       )}
@@ -931,12 +947,12 @@ export default function LectureBoard({
                     const calculatedRoyalty = Math.round(originalTotal * 0.05);
                     const royaltyToShow = lecture.mileageRoyalty || calculatedRoyalty;
                     return (
-                      <div className="bg-kpcia-gold/5 border border-kpcia-gold/15 rounded-lg p-2.5 flex items-center justify-between text-[11px]" id={`lecture-program-royalty-${lecture.id}`}>
-                        <span className="text-neutral-300 font-medium flex items-center gap-1">
-                          <Sparkles className="w-3 h-3 text-kpcia-gold" /> 연계: {lecture.programTitle}
+                      <div className="bg-kpcia-gold/5 border border-kpcia-gold/15 rounded-lg p-1.5 flex items-center justify-between text-[9.5px]" id={`lecture-program-royalty-${lecture.id}`}>
+                        <span className="text-neutral-350 font-medium flex items-center gap-1 truncate max-w-[150px]" title={lecture.programTitle}>
+                          <Sparkles className="w-2.5 h-2.5 text-kpcia-gold shrink-0" /> 연계: {lecture.programTitle}
                         </span>
-                        <span className="text-kpcia-gold font-mono font-bold">
-                          로열티: {royaltyToShow.toLocaleString()} M
+                        <span className="text-kpcia-gold font-mono font-bold shrink-0">
+                          {royaltyToShow.toLocaleString()} M
                         </span>
                       </div>
                     );
@@ -1098,88 +1114,88 @@ export default function LectureBoard({
                 </div>
 
                 {/* Pricing, Applicants & Actions */}
-                <div className="mt-5 pt-3.5 border-t border-neutral-800/80 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                  <div className="flex flex-col gap-2 min-w-[240px] w-full sm:w-auto p-3 rounded-lg bg-neutral-900/40 border border-neutral-800/80">
+                <div className="mt-3.5 pt-2.5 border-t border-neutral-850 flex flex-col gap-2 text-left">
+                  <div className="flex flex-col gap-1 w-full p-2 rounded bg-neutral-950/40 border border-neutral-855 text-[10.5px]">
                     {/* Row 1: 총 출강비 */}
-                    <div className="flex items-center justify-between gap-4">
-                      <span className="text-xs font-extrabold text-kpcia-gold flex items-center gap-1">
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="font-extrabold text-kpcia-gold flex items-center gap-1">
                         <span>총 출강비</span>
                         {isProgramAssociated && (
-                          <span className="text-[8px] bg-kpcia-gold/10 text-kpcia-gold border border-kpcia-gold/20 px-1 py-0.2 rounded font-normal shrink-0">지정연계 5% 공제됨</span>
+                          <span className="text-[7.5px] bg-kpcia-gold/10 text-kpcia-gold border border-kpcia-gold/20 px-0.5 rounded font-normal shrink-0">5%공제</span>
                         )}
                       </span>
                       {showBlurred ? (
-                        <span className="text-sm font-bold text-kpcia-gold/50 blur-[3px] select-none font-mono">
-                          ₩{appliedTotalCost.toLocaleString()} 원
+                        <span className="font-bold text-kpcia-gold/50 blur-[3px] select-none font-mono">
+                          ₩{appliedTotalCost.toLocaleString()}
                         </span>
                       ) : !currentUser || currentUser.uid === 'guest' ? (
-                        <span className="text-sm font-bold text-kpcia-gold/50 blur-[3px] select-none font-mono">
-                          ₩{appliedTotalCost.toLocaleString()} 원
+                        <span className="font-bold text-kpcia-gold/50 blur-[3px] select-none font-mono">
+                          ₩{appliedTotalCost.toLocaleString()}
                         </span>
                       ) : isQualified || currentUser?.isAdmin ? (
-                        <span className="text-base font-black text-kpcia-gold font-mono tracking-tight">
-                          ₩{appliedTotalCost.toLocaleString()} 원
+                        <span className="font-black text-kpcia-gold font-mono text-[11.5px]">
+                          ₩{appliedTotalCost.toLocaleString()}
                         </span>
                       ) : (
-                        <span className="text-xs text-neutral-500 font-medium">🔒 비공개</span>
+                        <span className="text-[9.5px] text-neutral-500 font-medium">🔒 비공개</span>
                       )}
                     </div>
 
-                    {/* Row 2: 출강 강사료 */}
-                    <div className="flex items-center justify-between gap-4 border-t border-neutral-800/60 pt-1.5">
-                      <span className="text-[11px] text-neutral-300 font-bold">└ 출강 강사료</span>
+                    {/* Row 2: 강사료 */}
+                    <div className="flex items-center justify-between gap-2 border-t border-neutral-800/40 pt-1 text-[9.5px]">
+                      <span className="text-neutral-450">└ 강사료</span>
                       {showBlurred ? (
-                        <span className="text-xs font-bold text-neutral-500 blur-[3px] select-none font-mono">
-                          ₩{lecture.budget.toLocaleString()} 원
+                        <span className="text-neutral-500 blur-[3px] select-none font-mono">
+                          ₩{lecture.budget.toLocaleString()}
                         </span>
                       ) : !currentUser || currentUser.uid === 'guest' ? (
-                        <span className="text-xs font-bold text-neutral-500 blur-[3px] select-none font-mono">
-                          ₩{lecture.budget.toLocaleString()} 원
+                        <span className="text-neutral-500 blur-[3px] select-none font-mono">
+                          ₩{lecture.budget.toLocaleString()}
                         </span>
                       ) : isQualified || currentUser?.isAdmin ? (
-                        <span className="text-xs font-bold text-neutral-100 font-mono">
-                          ₩{lecture.budget.toLocaleString()} 원
+                        <span className="font-medium text-neutral-300 font-mono">
+                          ₩{lecture.budget.toLocaleString()}
                         </span>
                       ) : (
-                        <span className="text-xs text-neutral-500">🔒 비공개</span>
+                        <span className="text-neutral-500">🔒 비공개</span>
                       )}
                     </div>
 
-                    {/* Row 3: 재료비 총액 */}
-                    <div className="flex items-center justify-between gap-4 pt-1">
-                      <span className="text-[11px] text-neutral-400 font-medium">└ 재료비 총액</span>
+                    {/* Row 3: 재료비 */}
+                    <div className="flex items-center justify-between gap-2 text-[9.5px]">
+                      <span className="text-neutral-450">└ 재료비</span>
                       {showBlurred ? (
-                        <span className="text-xs font-bold text-neutral-500 blur-[3px] select-none font-mono">
-                          ₩{(lecture.materialCost || 0).toLocaleString()} 원
+                        <span className="text-neutral-500 blur-[3px] select-none font-mono">
+                          ₩{(lecture.materialCost || 0).toLocaleString()}
                         </span>
                       ) : !currentUser || currentUser.uid === 'guest' ? (
-                        <span className="text-xs font-bold text-neutral-500 blur-[3px] select-none font-mono">
-                          ₩{(lecture.materialCost || 0).toLocaleString()} 원
+                        <span className="text-neutral-500 blur-[3px] select-none font-mono">
+                          ₩{(lecture.materialCost || 0).toLocaleString()}
                         </span>
                       ) : isQualified || currentUser?.isAdmin ? (
-                        <span className="text-xs font-semibold text-neutral-300 font-mono">
-                          ₩{(lecture.materialCost || 0).toLocaleString()} 원
+                        <span className="font-medium text-neutral-300 font-mono">
+                          ₩{(lecture.materialCost || 0).toLocaleString()}
                         </span>
                       ) : (
-                        <span className="text-xs text-neutral-500">🔒 비공개</span>
+                        <span className="text-neutral-500">🔒 비공개</span>
                       )}
                     </div>
                   </div>
 
                   {/* Apply Actions */}
-                  <div id={`apply-actions-${lecture.id}`}>
+                  <div className="w-full" id={`apply-actions-${lecture.id}`}>
                     {showBlurred ? (
                       currentUser && currentUser.uid !== 'guest' && currentUser.isApproved === false ? (
                         <button
                           disabled
-                          className="px-4 py-2 bg-neutral-950 border border-neutral-850 text-neutral-500 text-xs font-bold rounded-lg cursor-not-allowed whitespace-nowrap"
+                          className="w-full py-1.5 bg-neutral-950 border border-neutral-850 text-neutral-500 text-[10.5px] font-bold rounded-lg cursor-not-allowed text-center"
                         >
                           🔒 승인대기
                         </button>
                       ) : (
                         <button
                           onClick={() => onOpenAuthModal && onOpenAuthModal('login')}
-                          className="px-4 py-2 bg-kpcia-gold hover:bg-kpcia-gold-hover text-kpcia-dark text-xs font-bold rounded-lg transition-all shadow-md hover:shadow-kpcia-gold/10 cursor-pointer"
+                          className="w-full py-1.5 bg-kpcia-gold hover:bg-kpcia-gold-hover text-kpcia-dark text-[10.5px] font-bold rounded-lg transition-all shadow-md text-center cursor-pointer"
                         >
                           등급 달성시 신청
                         </button>
@@ -1188,45 +1204,47 @@ export default function LectureBoard({
                       !currentUser || currentUser.uid === 'guest' ? (
                         <button
                           onClick={() => onOpenAuthModal && onOpenAuthModal('login')}
-                          className="px-4 py-2 bg-kpcia-gold hover:bg-kpcia-gold-hover text-kpcia-dark text-xs font-bold rounded-lg transition-all shadow-md hover:shadow-kpcia-gold/10 cursor-pointer"
+                          className="w-full py-1.5 bg-kpcia-gold hover:bg-kpcia-gold-hover text-kpcia-dark text-[10.5px] font-bold rounded-lg transition-all shadow-md text-center cursor-pointer"
                           id={`login-to-apply-${lecture.id}`}
                         >
                           등급 달성시 신청
                         </button>
                       ) : currentUser?.isAdmin ? (
-                        <div className="text-xs text-neutral-500 font-mono flex items-center gap-1">
-                          <Users className="w-3.5 h-3.5" />
+                        <div className="w-full py-1.5 bg-neutral-950 border border-neutral-850 rounded-lg text-[10px] text-neutral-500 font-mono flex items-center justify-center gap-1">
+                          <Users className="w-3 h-3" />
                           <span>신청 강사 {lecture.applicants.length}명 대기중</span>
                         </div>
                       ) : isQualified ? (
                         hasApplied ? (
                           <button
                             onClick={() => onCancelApplyLecture && onCancelApplyLecture(lecture.id)}
-                            className="px-4 py-2 bg-red-950/40 hover:bg-red-950/60 text-red-400 border border-red-900/40 text-xs font-bold rounded-lg transition-all flex items-center gap-1.5 cursor-pointer"
+                            className="w-full py-1.5 bg-red-950/40 hover:bg-red-950/60 text-red-400 border border-red-900/40 text-[10.5px] font-bold rounded-lg transition-all flex items-center justify-center gap-1 cursor-pointer"
                             id={`applied-btn-${lecture.id}`}
                             title="신청 취소하기"
                           >
-                            <X className="w-3.5 h-3.5 text-red-400" />
+                            <X className="w-3 h-3 text-red-400" />
                             <span>신청 취소</span>
                           </button>
                         ) : (
                           <button
                             onClick={() => setApplyingLecture(lecture)}
-                            className="px-4 py-2 bg-kpcia-gold hover:bg-kpcia-gold-hover text-kpcia-dark text-xs font-bold rounded-lg transition-all shadow-md hover:shadow-kpcia-gold/10 flex items-center gap-1.5 cursor-pointer"
+                            className="w-full py-1.5 bg-kpcia-gold hover:bg-kpcia-gold-hover text-kpcia-dark text-[10.5px] font-bold rounded-lg transition-all shadow-md flex items-center justify-center gap-1 cursor-pointer"
                             id={`apply-btn-${lecture.id}`}
                           >
-                            <CheckCircle2 className="w-3.5 h-3.5" />
+                            <CheckCircle2 className="w-3 h-3" />
                             <span>출강 신청하기</span>
                           </button>
                         )
                       ) : (
-                        <div className="text-xs text-red-500/80 font-sans font-medium flex items-center gap-1">
-                          <AlertCircle className="w-3.5 h-3.5" />
+                        <div className="w-full py-1.5 bg-neutral-950 border border-neutral-850 rounded-lg text-red-500/80 font-sans font-medium flex items-center justify-center gap-1 text-[10.5px]">
+                          <AlertCircle className="w-3 h-3" />
                           <span>신청 조건 미달</span>
                         </div>
                       )
                     ) : (
-                      <span className="text-neutral-500 text-xs">신청 불가능</span>
+                      <div className="w-full py-1.5 bg-neutral-950 border border-neutral-850 rounded-lg text-neutral-500 text-[10.5px] flex items-center gap-1 justify-center font-medium">
+                        <Check className="w-3 h-3" /> 완료된 출강
+                      </div>
                     )}
                   </div>
                 </div>

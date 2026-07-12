@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { UserProfile, InstructorTier, EducationalProgram } from '../types';
 import { Shield, Sparkles, User, LogIn, ChevronDown, Award, X, Plus, Home, Briefcase, BookOpen, Handshake, Smartphone } from 'lucide-react';
 import KPCIALogo from './KPCIALogo';
+import { useFirestore } from '../lib/firebase';
 
 interface HeaderProps {
   currentUser: UserProfile | null;
@@ -50,8 +51,14 @@ export default function Header({
       {/* Association Top Bar */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-20 flex items-center justify-between" id="header-container">
         {/* Logo and Brand with KPCIALogo component */}
-        <div className="flex items-center cursor-pointer select-none shrink-0 animate-in fade-in duration-300" onClick={() => onTabChange('home')} id="logo-section">
+        <div className="flex items-center gap-3 cursor-pointer select-none shrink-0 animate-in fade-in duration-300" onClick={() => onTabChange('home')} id="logo-section">
           <KPCIALogo variant="header" theme="dark" />
+          {useFirestore && (
+            <div className="hidden lg:flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-emerald-950/35 border border-emerald-500/20 text-[10px] text-emerald-400 font-bold select-none" id="cloud-sync-badge">
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
+              <span>실시간 클라우드 연동 중</span>
+            </div>
+          )}
         </div>
 
         {/* Navigation Tabs (Desktop Website View) - Clean Icons with tooltips */}

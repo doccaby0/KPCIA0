@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { UserProfile, LectureRequest, EducationalProgram } from '../types';
+import { useFirestore } from '../lib/firebase';
 import { 
   Award, 
   BookOpen, 
@@ -291,6 +292,12 @@ export default function AppSimulator({
         <div className="h-10 bg-neutral-950 px-6 pt-3 flex justify-between items-center text-[10px] text-neutral-400 font-mono select-none relative z-40 shrink-0">
           <span>09:41</span>
           <div className="flex items-center space-x-1.5">
+            {useFirestore && (
+              <span className="text-[7.5px] bg-emerald-500/10 text-emerald-400 px-1.5 py-0.5 rounded font-black border border-emerald-500/20 flex items-center gap-0.5" id="mobile-sync-status">
+                <span className="w-1 h-1 rounded-full bg-emerald-500 animate-pulse"></span>
+                SYNC
+              </span>
+            )}
             <span className="text-[8px] bg-emerald-500/10 text-emerald-400 px-1 rounded font-bold border border-emerald-500/20">LTE</span>
             <div className="w-5 h-2.5 border border-neutral-700 rounded-sm p-0.5 flex">
               <div className="w-full h-full bg-neutral-300 rounded-xs"></div>

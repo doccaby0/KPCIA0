@@ -479,6 +479,74 @@ export class StorageService {
     }, null);
   }
 
+  // Subscription Listeners for Real-time Sync
+  static subscribeUsers(callback: (users: UserProfile[]) => void): () => void {
+    if (!useFirestore || !db) return () => {};
+    return onSnapshot(collection(db, 'users'), (snap) => {
+      const list: UserProfile[] = [];
+      snap.forEach(d => list.push(d.data() as UserProfile));
+      const formatted = list.map(u => ({
+        ...u,
+        isApproved: u.isApproved !== undefined ? u.isApproved : true,
+        emailVerified: u.emailVerified !== undefined ? u.emailVerified : true,
+        lectureCount: u.lectureCount !== undefined ? u.lectureCount : 0,
+        lectureRatings: u.lectureRatings || [],
+        averageRating: u.averageRating !== undefined ? u.averageRating : 0,
+      }));
+      callback(formatted);
+    }, (error) => {
+      console.error("subscribeUsers error:", error);
+    });
+  }
+
+  static subscribeLectures(callback: (lectures: LectureRequest[]) => void): () => void {
+    if (!useFirestore || !db) return () => {};
+    return onSnapshot(collection(db, 'lectures'), (snap) => {
+      const list: LectureRequest[] = [];
+      snap.forEach(d => list.push(d.data() as LectureRequest));
+      callback(list);
+    }, (error) => {
+      console.error("subscribeLectures error:", error);
+    });
+  }
+
+  static subscribePrograms(callback: (programs: EducationalProgram[]) => void): () => void {
+    if (!useFirestore || !db) return () => {};
+    return onSnapshot(collection(db, 'programs'), (snap) => {
+      const list: EducationalProgram[] = [];
+      snap.forEach(d => list.push(d.data() as EducationalProgram));
+      const formatted = list.map(p => ({
+        ...p,
+        isApproved: p.isApproved !== undefined ? p.isApproved : true
+      }));
+      callback(formatted);
+    }, (error) => {
+      console.error("subscribePrograms error:", error);
+    });
+  }
+
+  static subscribeTransactions(callback: (transactions: MileageTransaction[]) => void): () => void {
+    if (!useFirestore || !db) return () => {};
+    return onSnapshot(collection(db, 'transactions'), (snap) => {
+      const list: MileageTransaction[] = [];
+      snap.forEach(d => list.push(d.data() as MileageTransaction));
+      callback(list);
+    }, (error) => {
+      console.error("subscribeTransactions error:", error);
+    });
+  }
+
+  static subscribeProposals(callback: (proposals: PartnershipProposal[]) => void): () => void {
+    if (!useFirestore || !db) return () => {};
+    return onSnapshot(collection(db, 'proposals'), (snap) => {
+      const list: PartnershipProposal[] = [];
+      snap.forEach(d => list.push(d.data() as PartnershipProposal));
+      callback(list);
+    }, (error) => {
+      console.error("subscribeProposals error:", error);
+    });
+  }
+
   // Clear local storage and Firestore data and restore default state
   static async resetDatabase(): Promise<void> {
     localStorage.removeItem('kpcia_users');
