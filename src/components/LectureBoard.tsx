@@ -25,8 +25,8 @@ export default function LectureBoard({
   onEvaluateAssistant,
   onCompleteLecture
 }: LectureBoardProps) {
-  // View mode switcher: default to 'excel' as requested
-  const [viewMode, setViewMode] = useState<'excel' | 'grid'>('excel');
+  // View mode switcher: default to 'grid' to show the original grid first
+  const [viewMode, setViewMode] = useState<'excel' | 'grid'>('grid');
   const [boardSearchQuery, setBoardSearchQuery] = useState('');
 
   // Map popup states
@@ -67,7 +67,12 @@ export default function LectureBoard({
     const materialFee = lecture.materialCost || 0;
     const mainFee = mainHrs * 100000;
     const asstFee = asstHrs * 50000;
-    const totalCost = lecture.budget + materialFee;
+    
+    const isProgramAssociated = !!lecture.programId;
+    const originalTotal = lecture.budget + materialFee;
+    const totalCost = isProgramAssociated 
+      ? (originalTotal - Math.round(originalTotal * 0.05)) 
+      : originalTotal;
 
     const htmlContent = `
 <html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel" xmlns="http://www.w3.org/TR/REC-html40">
@@ -173,7 +178,7 @@ export default function LectureBoard({
   <tr class="total-row">
     <td colspan="2" class="align-center">총 정산 금액</td>
     <td class="align-right">${isPriceVisible ? `${totalCost.toLocaleString()}원` : '[등급 달성시 공개]'}</td>
-    <td colspan="2" class="align-center">강사료 합계 + 재료 실비</td>
+    <td colspan="2" class="align-center">${isProgramAssociated ? '강사료 합계 + 재료 실비 (지정 프로그램 5% 공제)' : '강사료 합계 + 재료 실비'}</td>
     <td>지급 완료시 마일리지 전환 가능</td>
   </tr>
   <tr style="height: 10px;"><td colspan="6" style="border: none; height: 10px;"></td></tr>
@@ -252,18 +257,24 @@ export default function LectureBoard({
     document.body.removeChild(element);
   };
 
-  // Filter lectures based on search query
-  const filteredLectures = lectures.filter((lecture) => {
-    if (!boardSearchQuery.trim()) return true;
-    const query = boardSearchQuery.toLowerCase();
-    return (
-      lecture.title.toLowerCase().includes(query) ||
-      (lecture.description && lecture.description.toLowerCase().includes(query)) ||
-      lecture.location.toLowerCase().includes(query) ||
-      (lecture.programTitle && lecture.programTitle.toLowerCase().includes(query)) ||
-      (lecture.assignedName && lecture.assignedName.toLowerCase().includes(query))
-    );
-  });
+  // Filter and sort lectures (newest first, so newly posted/announced lectures appear at the top-left)
+  const filteredLectures = lectures
+    .filter((lecture) => {
+      if (!boardSearchQuery.trim()) return true;
+      const query = boardSearchQuery.toLowerCase();
+      return (
+        lecture.title.toLowerCase().includes(query) ||
+        (lecture.description && lecture.description.toLowerCase().includes(query)) ||
+        lecture.location.toLowerCase().includes(query) ||
+        (lecture.programTitle && lecture.programTitle.toLowerCase().includes(query)) ||
+        (lecture.assignedName && lecture.assignedName.toLowerCase().includes(query))
+      );
+    })
+    .sort((a, b) => {
+      const dateA = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+      const dateB = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+      return dateB - dateA;
+    });
 
   return (
     <div className="space-y-6" id="lecture-board-section">
@@ -364,16 +375,18 @@ export default function LectureBoard({
                   <th className="w-48 px-3 py-2 border-r border-neutral-850 uppercase bg-neutral-950/40">D (출강 일시 및 소요시간)</th>
                   <th className="w-48 px-3 py-2 border-r border-neutral-850 uppercase bg-neutral-950/40">E (출강 장소/기관)</th>
                   <th className="w-20 px-3 py-2 border-r border-neutral-850 text-right uppercase bg-neutral-950/40 font-semibold">F (인원)</th>
-                  <th className="w-36 px-3 py-2 border-r border-neutral-850 text-right uppercase bg-neutral-950/40 font-semibold">G (출강료)</th>
-                  <th className="w-48 px-3 py-2 border-r border-neutral-850 uppercase bg-neutral-950/40">H (연계 교안)</th>
-                  <th className="w-48 px-3 py-2 border-r border-neutral-850 uppercase bg-neutral-950/40">I (보조 파트너)</th>
-                  <th className="w-44 px-3 py-2 text-center uppercase bg-neutral-950/40">J (행동/출강 제어)</th>
+                  <th className="w-36 px-3 py-2 border-r border-neutral-850 text-right uppercase bg-neutral-950/40 font-semibold">G (출강 강사료)</th>
+                  <th className="w-32 px-3 py-2 border-r border-neutral-850 text-right uppercase bg-neutral-950/40 font-semibold">H (재료비 총액)</th>
+                  <th className="w-36 px-3 py-2 border-r border-neutral-850 text-right uppercase bg-neutral-950/40 font-semibold">I (총 출강비)</th>
+                  <th className="w-48 px-3 py-2 border-r border-neutral-850 uppercase bg-neutral-950/40">J (연계 교안)</th>
+                  <th className="w-48 px-3 py-2 border-r border-neutral-850 uppercase bg-neutral-950/40">K (보조 파트너)</th>
+                  <th className="w-44 px-3 py-2 text-center uppercase bg-neutral-950/40">L (행동/출강 제어)</th>
                 </tr>
               </thead>
               <tbody>
                 {filteredLectures.length === 0 ? (
                   <tr>
-                    <td colSpan={11} className="p-12 text-center text-neutral-500 italic bg-neutral-950/10 font-sans">
+                    <td colSpan={13} className="p-12 text-center text-neutral-500 italic bg-neutral-950/10 font-sans">
                       검색어 또는 필터 조건에 부합하는 대용량 출강 강의가 장부에 존재하지 않습니다.
                     </td>
                   </tr>
@@ -382,6 +395,10 @@ export default function LectureBoard({
                     const isQualified = currentUser ? checkQualification(currentUser.tier, lecture.targetTier) : false;
                     const hasApplied = currentUser ? lecture.applicants.includes(currentUser.uid) : false;
                     const isAssignedToMe = currentUser ? lecture.assignedTo === currentUser.uid : false;
+
+                    const isProgramAssociated = !!lecture.programId;
+                    const originalTotal = lecture.budget + (lecture.materialCost || 0);
+                    const appliedTotalCost = isProgramAssociated ? (originalTotal - Math.round(originalTotal * 0.05)) : originalTotal;
 
                     const tierColors = {
                       'Prestige Member': 'border-neutral-700 bg-neutral-950 text-neutral-400',
@@ -425,14 +442,14 @@ export default function LectureBoard({
                         {/* Col B: Title & Description */}
                         <td className="px-3 py-3.5 border-r border-neutral-850">
                           <div 
-                            className="font-bold text-neutral-200 line-clamp-1 hover:text-kpcia-gold hover:underline cursor-pointer flex items-center gap-1.5"
+                            className="font-bold text-neutral-200 hover:text-kpcia-gold hover:underline cursor-pointer flex flex-wrap items-center gap-1.5"
                             onClick={() => {
                               if (lecture.status === 'open' && isQualified && !hasApplied) {
                                 setApplyingLecture(lecture);
                               }
                             }}
                           >
-                            <span>{lecture.title}</span>
+                            <span className="whitespace-normal break-all leading-snug">{lecture.title}</span>
                             <button
                               type="button"
                               onClick={(e) => {
@@ -446,7 +463,7 @@ export default function LectureBoard({
                               <span>출강안내</span>
                             </button>
                           </div>
-                          <div className="text-[10.5px] text-neutral-400 line-clamp-1 mt-1 leading-relaxed">
+                          <div className="text-[10.5px] text-neutral-400 mt-1.5 leading-relaxed whitespace-normal break-all">
                             {lecture.description}
                           </div>
                         </td>
@@ -472,17 +489,17 @@ export default function LectureBoard({
 
                         {/* Col E: Location */}
                         <td className="px-3 py-3.5 border-r border-neutral-850 text-[11px] text-neutral-300">
-                          <div className="flex items-center justify-between gap-1.5">
-                            <span className="truncate max-w-[120px]" title={lecture.location}>{lecture.location}</span>
+                          <div className="flex flex-col gap-1.5">
+                            <span className="whitespace-normal break-all" title={lecture.location}>{lecture.location}</span>
                             <button
                               type="button"
                               onClick={() => {
                                 setSelectedMapLocation(lecture.location);
                                 setSelectedMapTitle(lecture.title);
                               }}
-                              className="text-[9px] bg-neutral-950 border border-neutral-800 text-kpcia-gold px-1.5 py-0.5 rounded shrink-0 hover:bg-neutral-800 transition-colors cursor-pointer"
+                              className="text-[9px] bg-neutral-950 border border-neutral-800 text-kpcia-gold px-1.5 py-0.5 rounded w-max hover:bg-neutral-800 transition-colors cursor-pointer"
                             >
-                              지도
+                              지도 보기
                             </button>
                           </div>
                         </td>
@@ -492,14 +509,14 @@ export default function LectureBoard({
                           {lecture.attendees ? `${lecture.attendees}명` : '-'}
                         </td>
 
-                        {/* Col G: Budget */}
-                        <td className="px-3 py-3.5 border-r border-neutral-850 text-right font-mono font-bold">
+                        {/* Col G: Budget (출강 강사료) */}
+                        <td className="px-3 py-3.5 border-r border-neutral-850 text-right font-mono font-bold bg-neutral-900/10">
                           {!currentUser || currentUser.uid === 'guest' ? (
                             <span className="text-[9px] text-kpcia-gold bg-kpcia-gold/10 px-1.5 py-0.5 rounded border border-kpcia-gold/25">
                               🔒 등급공개
                             </span>
                           ) : isQualified || currentUser?.isAdmin ? (
-                            <span className="text-neutral-200">
+                            <span className="text-neutral-100">
                               ₩{lecture.budget.toLocaleString()}
                             </span>
                           ) : (
@@ -509,24 +526,70 @@ export default function LectureBoard({
                           )}
                         </td>
 
-                        {/* Col H: Associated Program */}
-                        <td className="px-3 py-3.5 border-r border-neutral-850 text-neutral-300">
-                          {lecture.programId ? (
-                            <div className="space-y-0.5">
-                              <div className="font-semibold text-neutral-200 text-[11px] flex items-center gap-1 truncate max-w-[150px]" title={lecture.programTitle}>
-                                <Sparkles className="w-3 h-3 text-kpcia-gold shrink-0" />
-                                <span className="truncate">{lecture.programTitle}</span>
-                              </div>
-                              <div className="text-[10px] text-kpcia-gold font-mono font-bold">
-                                로열티: {lecture.mileageRoyalty.toLocaleString()} M
-                              </div>
+                        {/* Col H: Material Cost (재료비 총액) */}
+                        <td className="px-3 py-3.5 border-r border-neutral-850 text-right font-mono text-neutral-300 bg-neutral-950/20">
+                          {!currentUser || currentUser.uid === 'guest' ? (
+                            <span className="text-[9px] text-neutral-500">
+                              비공개
+                            </span>
+                          ) : isQualified || currentUser?.isAdmin ? (
+                            <span className="text-neutral-300">
+                              ₩{(lecture.materialCost || 0).toLocaleString()}
+                            </span>
+                          ) : (
+                            <span className="text-[10px] text-neutral-500">
+                              🔒 비공개
+                            </span>
+                          )}
+                        </td>
+
+                        {/* Col I: Total Outflow (총 출강비) */}
+                        <td className="px-3 py-3.5 border-r border-neutral-850 text-right font-mono font-bold text-kpcia-gold bg-kpcia-gold/10">
+                          {!currentUser || currentUser.uid === 'guest' ? (
+                            <span className="text-[9px] text-kpcia-gold bg-kpcia-gold/10 px-1.5 py-0.5 rounded border border-kpcia-gold/25">
+                              🔒 등급공개
+                            </span>
+                          ) : isQualified || currentUser?.isAdmin ? (
+                            <div className="flex flex-col items-end">
+                              <span>
+                                ₩{appliedTotalCost.toLocaleString()}
+                              </span>
+                              {isProgramAssociated && (
+                                <span className="text-[8px] text-neutral-400 font-normal mt-0.5">
+                                  (5% 공제 적용)
+                                </span>
+                              )}
                             </div>
                           ) : (
+                            <span className="text-[10px] text-neutral-500">
+                              🔒 제한 (비공개)
+                            </span>
+                          )}
+                        </td>
+
+                        {/* Col J: Associated Program */}
+                        <td className="px-3 py-3.5 border-r border-neutral-850 text-neutral-300">
+                          {lecture.programId ? (() => {
+                            const originalTotal = lecture.budget + (lecture.materialCost || 0);
+                            const calculatedRoyalty = Math.round(originalTotal * 0.05);
+                            const royaltyToShow = lecture.mileageRoyalty || calculatedRoyalty;
+                            return (
+                              <div className="space-y-1">
+                                <div className="font-semibold text-neutral-200 text-[11px] flex items-center gap-1 whitespace-normal break-all" title={lecture.programTitle}>
+                                  <Sparkles className="w-3 h-3 text-kpcia-gold shrink-0" />
+                                  <span>{lecture.programTitle}</span>
+                                </div>
+                                <div className="text-[10px] text-kpcia-gold font-mono font-bold">
+                                  로열티: {royaltyToShow.toLocaleString()} M
+                                </div>
+                              </div>
+                            );
+                          })() : (
                             <span className="text-neutral-500 italic text-[10px]">개별 위탁</span>
                           )}
                         </td>
 
-                        {/* Col I: Assistant Partner */}
+                        {/* Col K: Assistant Partner */}
                         <td className="px-3 py-3.5 border-r border-neutral-850 text-[11px]">
                           {(() => {
                             const assistantUser = allUsers?.find(u => u.uid === lecture.assistantId);
@@ -575,7 +638,7 @@ export default function LectureBoard({
                           })()}
                         </td>
 
-                        {/* Col J: Action button */}
+                        {/* Col L: Action button */}
                         <td className="px-3 py-3.5 text-center">
                           <div className="flex items-center justify-center">
                             {lecture.status === 'open' ? (
@@ -677,6 +740,10 @@ export default function LectureBoard({
             const isQualified = currentUser ? checkQualification(currentUser.tier, lecture.targetTier) : false;
             const hasApplied = currentUser ? lecture.applicants.includes(currentUser.uid) : false;
             const isAssignedToMe = currentUser ? lecture.assignedTo === currentUser.uid : false;
+
+            const isProgramAssociated = !!lecture.programId;
+            const originalTotal = lecture.budget + (lecture.materialCost || 0);
+            const appliedTotalCost = isProgramAssociated ? (originalTotal - Math.round(originalTotal * 0.05)) : originalTotal;
 
             // Badges rendering or labels
             const tierColors = {
@@ -792,16 +859,21 @@ export default function LectureBoard({
                   </div>
 
                   {/* Associated Program Royalty Info */}
-                  {lecture.programId && (
-                    <div className="bg-kpcia-gold/5 border border-kpcia-gold/15 rounded-lg p-2.5 flex items-center justify-between text-[11px]" id={`lecture-program-royalty-${lecture.id}`}>
-                      <span className="text-neutral-300 font-medium flex items-center gap-1">
-                        <Sparkles className="w-3 h-3 text-kpcia-gold" /> 연계: {lecture.programTitle}
-                      </span>
-                      <span className="text-kpcia-gold font-mono font-bold">
-                        마일리지 누적 지급: {lecture.mileageRoyalty.toLocaleString()} M
-                      </span>
-                    </div>
-                  )}
+                  {lecture.programId && (() => {
+                    const originalTotal = lecture.budget + (lecture.materialCost || 0);
+                    const calculatedRoyalty = Math.round(originalTotal * 0.05);
+                    const royaltyToShow = lecture.mileageRoyalty || calculatedRoyalty;
+                    return (
+                      <div className="bg-kpcia-gold/5 border border-kpcia-gold/15 rounded-lg p-2.5 flex items-center justify-between text-[11px]" id={`lecture-program-royalty-${lecture.id}`}>
+                        <span className="text-neutral-300 font-medium flex items-center gap-1">
+                          <Sparkles className="w-3 h-3 text-kpcia-gold" /> 연계: {lecture.programTitle}
+                        </span>
+                        <span className="text-kpcia-gold font-mono font-bold">
+                          마일리지 누적 지급: {royaltyToShow.toLocaleString()} M
+                        </span>
+                      </div>
+                    );
+                  })()}
 
                   {/* Assistant Instructor Matching & Feedback Panel */}
                   {(lecture.status === 'assigned' || lecture.status === 'completed') && (() => {
@@ -941,31 +1013,60 @@ export default function LectureBoard({
                 </div>
 
                 {/* Pricing, Applicants & Actions */}
-                <div className="mt-5 pt-3.5 border-t border-neutral-800/80 flex items-center justify-between">
-                  <div>
-                    <div className="text-[10px] text-neutral-500 uppercase font-mono">출강 강사료</div>
-                    {!currentUser || currentUser.uid === 'guest' ? (
-                      <div className="relative group/price mt-1" title="등급 달성시 확인 가능합니다.">
-                        <div className="text-sm font-bold text-neutral-450/40 flex items-center gap-1 font-mono select-none pointer-events-none filter blur-[4.5px]">
-                          <Banknote className="w-4 h-4 text-neutral-600 shrink-0" />
-                          {lecture.budget.toLocaleString()} KRW
-                        </div>
-                        <div className="absolute inset-y-0 left-0 flex items-center">
-                          <span className="text-[9px] text-kpcia-gold/90 font-bold bg-kpcia-gold/10 border border-kpcia-gold/25 px-1.5 py-0.5 rounded shadow-sm">
-                            등급 달성시 공개
-                          </span>
-                        </div>
-                      </div>
-                    ) : isQualified || currentUser?.isAdmin ? (
-                      <div className="text-sm font-bold text-neutral-200 flex items-center gap-1 font-mono">
-                         <Banknote className="w-4 h-4 text-neutral-400" />
-                         {lecture.budget.toLocaleString()} KRW
-                      </div>
-                    ) : (
-                      <div className="text-xs font-semibold text-neutral-500 flex items-center gap-1 mt-1 font-sans" title="귀하의 등급이 자격 요건에 달하지 않아 강사료가 비공개 처리되었습니다.">
-                        <span className="text-[10px]">🔒 등급제한 (비공개)</span>
-                      </div>
-                    )}
+                <div className="mt-5 pt-3.5 border-t border-neutral-800/80 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                  <div className="flex flex-col gap-2 min-w-[240px] w-full sm:w-auto p-3 rounded-lg bg-neutral-900/40 border border-neutral-800/80">
+                    {/* Row 1: 총 출강비 */}
+                    <div className="flex items-center justify-between gap-4">
+                      <span className="text-xs font-extrabold text-kpcia-gold flex items-center gap-1">
+                        <span>총 출강비</span>
+                        {isProgramAssociated && (
+                          <span className="text-[8px] bg-kpcia-gold/10 text-kpcia-gold border border-kpcia-gold/20 px-1 py-0.2 rounded font-normal shrink-0">지정연계 5% 공제됨</span>
+                        )}
+                      </span>
+                      {!currentUser || currentUser.uid === 'guest' ? (
+                        <span className="text-sm font-bold text-kpcia-gold/50 blur-[3px] select-none font-mono">
+                          ₩{appliedTotalCost.toLocaleString()} 원
+                        </span>
+                      ) : isQualified || currentUser?.isAdmin ? (
+                        <span className="text-base font-black text-kpcia-gold font-mono tracking-tight">
+                          ₩{appliedTotalCost.toLocaleString()} 원
+                        </span>
+                      ) : (
+                        <span className="text-xs text-neutral-500 font-medium">🔒 비공개</span>
+                      )}
+                    </div>
+
+                    {/* Row 2: 출강 강사료 */}
+                    <div className="flex items-center justify-between gap-4 border-t border-neutral-800/60 pt-1.5">
+                      <span className="text-[11px] text-neutral-300 font-bold">└ 출강 강사료</span>
+                      {!currentUser || currentUser.uid === 'guest' ? (
+                        <span className="text-xs font-bold text-neutral-500 blur-[3px] select-none font-mono">
+                          ₩{lecture.budget.toLocaleString()} 원
+                        </span>
+                      ) : isQualified || currentUser?.isAdmin ? (
+                        <span className="text-xs font-bold text-neutral-100 font-mono">
+                          ₩{lecture.budget.toLocaleString()} 원
+                        </span>
+                      ) : (
+                        <span className="text-xs text-neutral-500">🔒 비공개</span>
+                      )}
+                    </div>
+
+                    {/* Row 3: 재료비 총액 */}
+                    <div className="flex items-center justify-between gap-4 pt-1">
+                      <span className="text-[11px] text-neutral-400 font-medium">└ 재료비 총액</span>
+                      {!currentUser || currentUser.uid === 'guest' ? (
+                        <span className="text-xs font-bold text-neutral-500 blur-[3px] select-none font-mono">
+                          ₩{(lecture.materialCost || 0).toLocaleString()} 원
+                        </span>
+                      ) : isQualified || currentUser?.isAdmin ? (
+                        <span className="text-xs font-semibold text-neutral-300 font-mono">
+                          ₩{(lecture.materialCost || 0).toLocaleString()} 원
+                        </span>
+                      ) : (
+                        <span className="text-xs text-neutral-500">🔒 비공개</span>
+                      )}
+                    </div>
                   </div>
 
                   {/* Apply Actions */}

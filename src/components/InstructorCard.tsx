@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { UserProfile, InstructorCardInfo } from '../types';
-import { Mail, Phone, MapPin, Award, Download, Save, RefreshCw, Plus, Trash2, Printer, X, User, FileUp, FileText, CheckCircle2, AlertCircle, Sparkles, Building, Loader2, CreditCard } from 'lucide-react';
+import { Mail, Phone, MapPin, Award, Download, Save, RefreshCw, Plus, Trash2, Printer, X, User, FileUp, FileText, CheckCircle2, AlertCircle, Sparkles, Building, Loader2, CreditCard, Globe } from 'lucide-react';
 import html2canvas from 'html2canvas';
 import { jsPDF } from 'jspdf';
 
@@ -51,6 +51,7 @@ export default function InstructorCard({ currentUser, onSaveProfileCard, onGoHom
   const [contactPhone, setContactPhone] = useState(currentUser.profileCard?.contactPhone || '');
   const [bankAccount, setBankAccount] = useState(currentUser.profileCard?.bankAccount || '');
   const [region, setRegion] = useState(currentUser.profileCard?.region || '서울');
+  const [websiteUrl, setWebsiteUrl] = useState(currentUser.profileCard?.websiteUrl || '');
   const [cardTheme, setCardTheme] = useState<'classic' | 'gold_luxury' | 'midnight_sapphire' | 'elite_emerald'>(
     currentUser.profileCard?.cardTheme || 'classic'
   );
@@ -85,6 +86,7 @@ export default function InstructorCard({ currentUser, onSaveProfileCard, onGoHom
     setContactPhone(currentUser.profileCard?.contactPhone || '');
     setBankAccount(currentUser.profileCard?.bankAccount || '');
     setRegion(currentUser.profileCard?.region || '서울');
+    setWebsiteUrl(currentUser.profileCard?.websiteUrl || '');
     setCardTheme(currentUser.profileCard?.cardTheme || 'classic');
     setImageUrl(currentUser.profileCard?.imageUrl || '');
   }, [currentUser]);
@@ -138,7 +140,8 @@ export default function InstructorCard({ currentUser, onSaveProfileCard, onGoHom
       cardTheme,
       imageUrl,
       bankAccount,
-      region
+      region,
+      websiteUrl
     };
     onSaveProfileCard(updatedCard);
     setIsEditing(false);
@@ -164,24 +167,44 @@ export default function InstructorCard({ currentUser, onSaveProfileCard, onGoHom
     
     setIsDownloadSimulating(true);
     
+    // Save original styles
+    const originalWidth = element.style.width;
+    const originalHeight = element.style.height;
+    const originalMaxWidth = element.style.maxWidth;
+    const originalMaxHeight = element.style.maxHeight;
+    const originalBorderRadius = element.style.borderRadius;
+
+    // Force perfect A4 desktop dimensions for high-fidelity canvas capture
+    // This guarantees the layout is identical on mobile, tablet, and desktop!
+    element.style.width = '794px';
+    element.style.height = '1123px';
+    element.style.maxWidth = 'none';
+    element.style.maxHeight = 'none';
+    element.style.borderRadius = '0px'; // Clean sharp edges for printed/A4 look
+
     try {
-      // Create high-res canvas (scale 3 for ultra-crisp output)
+      // Create high-res canvas (scale 2.5 for pristine vector-like quality)
       const canvas = await html2canvas(element, {
-        scale: 3,
+        scale: 2.5,
         useCORS: true,
         logging: false,
         backgroundColor: null
       });
       
+      // Restore original styling immediately after capturing
+      element.style.width = originalWidth;
+      element.style.height = originalHeight;
+      element.style.maxWidth = originalMaxWidth;
+      element.style.maxHeight = originalMaxHeight;
+      element.style.borderRadius = originalBorderRadius;
+      
       const imgData = canvas.toDataURL('image/png');
       
       const pdf = new jsPDF('p', 'mm', 'a4');
       const imgWidth = 210;
-      const imgHeight = (canvas.height * imgWidth) / canvas.width;
+      const imgHeight = 297; // exact A4 aspect ratio!
       
-      const yOffset = (297 - imgHeight) / 2;
-      
-      pdf.addImage(imgData, 'PNG', 0, yOffset > 0 ? yOffset : 0, imgWidth, imgHeight);
+      pdf.addImage(imgData, 'PNG', 0, 0, imgWidth, imgHeight);
       
       const fileName = `KPCIA_인증서_${currentUser.name || '강사'}.pdf`;
       
@@ -203,6 +226,13 @@ export default function InstructorCard({ currentUser, onSaveProfileCard, onGoHom
       }
     } catch (error) {
       console.error("PDF generation failed:", error);
+      // Ensure styles are restored on error too
+      element.style.width = originalWidth;
+      element.style.height = originalHeight;
+      element.style.maxWidth = originalMaxWidth;
+      element.style.maxHeight = originalMaxHeight;
+      element.style.borderRadius = originalBorderRadius;
+
       triggerLocalToast("PDF 다운로드 기독 엔진 오류로 문제가 발생했습니다. 브라우저 장치 인쇄를 통해 고품질 PDF 파일로 직접 저장 및 출력해 주시기 바랍니다.", "error");
       document.body.classList.add('certificate-printing');
       window.print();
@@ -516,6 +546,21 @@ export default function InstructorCard({ currentUser, onSaveProfileCard, onGoHom
                 <MapPin className="w-3 h-3 text-kpcia-gold/60" />
                 <span className="font-semibold">활동 지역: {region || '미정 (서울)'}</span>
               </div>
+              {websiteUrl && (
+                <div className="flex items-center space-x-1 text-neutral-300">
+                  <Globe className="w-3 h-3 text-kpcia-gold/60" />
+                  <a 
+                    href={websiteUrl.startsWith('http') ? websiteUrl : `https://${websiteUrl}`} 
+                    target="_blank" 
+                    rel="noopener noreferrer" 
+                    className="hover:underline text-sky-400 font-semibold truncate max-w-[150px]"
+                    onClick={(e) => e.stopPropagation()}
+                    title={websiteUrl}
+                  >
+                    {websiteUrl.replace(/https?:\/\/(www\.)?/, '')}
+                  </a>
+                </div>
+              )}
             </div>
 
             {/* Digital Badge Icons in Bottom Right */}
@@ -905,6 +950,19 @@ export default function InstructorCard({ currentUser, onSaveProfileCard, onGoHom
                 onChange={(e) => setRegion(e.target.value)} 
                 className="w-full px-3.5 py-2 rounded-lg bg-neutral-950 border border-neutral-800 text-xs font-medium text-neutral-100 focus:border-kpcia-gold focus:outline-none"
                 id="form-region"
+              />
+            </div>
+
+            {/* Homepage / Blog URL */}
+            <div>
+              <label className="text-[10px] font-mono text-neutral-400 uppercase block mb-1">홈페이지 또는 블로그 링크</label>
+              <input 
+                type="text" 
+                placeholder="예: blog.naver.com/myblog 또는 www.myhomepage.com" 
+                value={websiteUrl} 
+                onChange={(e) => setWebsiteUrl(e.target.value)} 
+                className="w-full px-3.5 py-2 rounded-lg bg-neutral-950 border border-neutral-800 text-xs font-medium text-neutral-100 focus:border-kpcia-gold focus:outline-none"
+                id="form-website-url"
               />
             </div>
 

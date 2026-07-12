@@ -490,7 +490,7 @@ export default function AppSimulator({
                           <div key={p.id} className="p-3 rounded-xl border border-neutral-900 bg-neutral-900/60 space-y-1.5" id={`mobile-prog-${p.id}`}>
                             <div className="flex justify-between items-center">
                               <h4 className="text-[11px] font-bold text-neutral-200 truncate max-w-[180px]">{p.title}</h4>
-                              <span className="text-[8px] text-kpcia-gold font-mono font-bold">+{p.royaltyRate.toLocaleString()} M</span>
+                              <span className="text-[8px] text-kpcia-gold font-mono font-bold">총 출강비의 5%</span>
                             </div>
                             <p className="text-[9px] text-neutral-400 line-clamp-2 leading-relaxed">{p.description}</p>
                             <div className="flex justify-between items-center text-[8px] text-neutral-500 pt-1.5 border-t border-neutral-950">

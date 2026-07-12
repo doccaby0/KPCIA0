@@ -27,6 +27,7 @@ export interface InstructorCardInfo {
   cardTheme: 'classic' | 'gold_luxury' | 'midnight_sapphire' | 'elite_emerald';
   bankAccount?: string;
   region?: string; // Active main region (e.g. 서울, 경기, 부산)
+  websiteUrl?: string; // Homepage or Blog link
 }
 
 export interface UserProfile {

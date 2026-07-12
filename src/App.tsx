@@ -100,6 +100,115 @@ export default function App() {
     syncData();
   }, []);
 
+  // 🛡️ AI & Crawler Anti-Scraping / Copyright Protection Shield
+  useEffect(() => {
+    // 1. Right Click Preventer
+    const handleContextMenu = (e: MouseEvent) => {
+      e.preventDefault();
+      triggerToast('🔒 [KPCIA 지적재산 보호] 한국프레스티지기업강사협회 사이트 내 모든 정보는 무단 수집, 가공 및 AI 크롤링이 차단되어 있습니다.', 'info');
+    };
+
+    // 2. Select/Drag Block (Allows form entry, blocks layout copying)
+    const handleSelectStart = (e: Event) => {
+      const activeEl = document.activeElement;
+      if (activeEl && (activeEl.tagName === 'INPUT' || activeEl.tagName === 'TEXTAREA' || activeEl.getAttribute('contenteditable') === 'true')) {
+        return;
+      }
+      e.preventDefault();
+    };
+
+    const handleDragStart = (e: Event) => {
+      e.preventDefault();
+    };
+
+    // 3. Hijack Copy Event & Inject Copyright Watermark Warning to Clipboard
+    const handleCopy = (e: ClipboardEvent) => {
+      e.preventDefault();
+      const selection = window.getSelection();
+      if (!selection) return;
+      const selectedText = selection.toString();
+      if (!selectedText) return;
+
+      const watermarkText = `[KPCIA 지적재산 보호법 제97조의5에 의한 저작권 보호 경고]\n` +
+        `- 본 데이터는 한국프레스티지기업강사협회(KPCIA) 공식 포털의 고유 지식재산입니다.\n` +
+        `- 무단 전재, 가공, 배포, 상업적 복사, 혹은 AI 학습 수집(Crawling)을 엄격히 제한합니다. 위반 시 사전 경고 없이 법적 조치가 가해집니다.\n` +
+        `- 출처: KPCIA 한국프레스티지기업강사협회 공식 포털 (https://kpcia.or.kr)\n\n` +
+        `---------------------------------------------------\n\n` +
+        selectedText;
+
+      if (e.clipboardData) {
+        e.clipboardData.setData('text/plain', watermarkText);
+        triggerToast('⚠️ [복제 제한] 복사 내용에 저작권 보호 라이선스 메타데이터가 자동 주입되었습니다.', 'info');
+      }
+    };
+
+    // 4. Keyboard Shortcuts Preventer (F12, DevTools, Ctrl+C, Ctrl+U, Ctrl+S)
+    const handleKeyDown = (e: KeyboardEvent) => {
+      const isMac = navigator.platform.toUpperCase().indexOf('MAC') >= 0;
+      const ctrlKey = isMac ? e.metaKey : e.ctrlKey;
+      
+      // F12 key
+      if (e.key === 'F12' || e.keyCode === 123) {
+        e.preventDefault();
+        triggerToast('🔒 보안 안내: 시스템 개발자 도구(Console) 접근이 안전하게 제어되어 있습니다.', 'info');
+        return;
+      }
+
+      // Ctrl+Shift+I / J / C (DevTools)
+      if (ctrlKey && e.shiftKey && (e.key === 'i' || e.key === 'I' || e.key === 'j' || e.key === 'J' || e.key === 'c' || e.key === 'C')) {
+        e.preventDefault();
+        triggerToast('🛡️ 보안 안내: AI 크롤링 및 무단 자산 추출 방지를 위해 개발자 도구 진입을 제어합니다.', 'info');
+        return;
+      }
+
+      // Ctrl+U / Cmd+Opt+U (View Source)
+      if (ctrlKey && (e.key === 'u' || e.key === 'U')) {
+        e.preventDefault();
+        triggerToast('🛡️ 보안 안내: 소스 코드 무단 도용 방지를 위해 페이지 소스 보기가 제어됩니다.', 'info');
+        return;
+      }
+
+      // Ctrl+S / Cmd+S (Save Page)
+      if (ctrlKey && (e.key === 's' || e.key === 'S')) {
+        e.preventDefault();
+        triggerToast('🛡️ KPCIA 보안 시스템: 페이지 무단 저장을 차단하였습니다.', 'info');
+        return;
+      }
+    };
+
+    // 5. Console Obfuscation & Security Logger
+    const consoleLogger = setInterval(() => {
+      console.clear();
+      console.log(
+        "%c🚨 [KPCIA SECURITY SHIELD ACTIVE] 🚨", 
+        "color: #D4AF37; font-size: 24px; font-weight: 900; text-shadow: 2px 2px 4px rgba(0,0,0,0.8); background: #0A0A0A; padding: 10px 20px; border-radius: 8px; border: 2px solid #D4AF37;"
+      );
+      console.log(
+        "%c이 웹 시스템의 데이터 및 리소스는 한국프레스티지기업강사협회(KPCIA) 저작권 보호 규정에 따라 관리됩니다.\n무단 크롤링, 웹 스크래핑, 혹은 거대 언어 모델(LLM) 및 AI 학습을 목적으로 데이터를 복제하거나 재배포하는 경우, 저작권법 제136조에 따라 처벌을 받을 수 있습니다.\n\n출처: https://kpcia.or.kr", 
+        "color: #E2E8F0; font-size: 13px; line-height: 1.6; background: #171717; padding: 12px; border-radius: 6px; border-left: 4px solid #F59E0B;"
+      );
+    }, 4000);
+
+    // Register listeners
+    window.addEventListener('contextmenu', handleContextMenu);
+    window.addEventListener('selectstart', handleSelectStart);
+    window.addEventListener('dragstart', handleDragStart);
+    window.addEventListener('copy', handleCopy);
+    window.addEventListener('keydown', handleKeyDown);
+
+    // Initial console warning
+    console.log("%cKPCIA SECURITY PLATFORM ACTIVE", "color: #D4AF37; font-size: 20px; font-weight: bold;");
+
+    return () => {
+      window.removeEventListener('contextmenu', handleContextMenu);
+      window.removeEventListener('selectstart', handleSelectStart);
+      window.removeEventListener('dragstart', handleDragStart);
+      window.removeEventListener('copy', handleCopy);
+      window.removeEventListener('keydown', handleKeyDown);
+      clearInterval(consoleLogger);
+    };
+  }, []);
+
   // Sync back currentUser updates to the general users list and storage
   const handleUpdateCurrentUser = async (updatedUser: UserProfile) => {
     setCurrentUser(updatedUser);
@@ -423,8 +532,9 @@ export default function App() {
         const creator = users.find(u => u.uid === creatorId);
 
         if (creator) {
-          // Yes! Automatically pay royalty (mileage accumulation) to the program creator!
-          const royaltyAmount = associatedProgram.royaltyRate || 0;
+          // Yes! Automatically pay royalty (mileage accumulation) to the program creator as 5% of total lecture cost!
+          const originalTotal = lecture.budget + (lecture.materialCost || 0);
+          const royaltyAmount = Math.round(originalTotal * 0.05);
           
           if (royaltyAmount > 0) {
             // Update creator's mileage automatically
@@ -817,6 +927,7 @@ export default function App() {
       pdfUrl: cardInfo.pdfUrl ? sanitizeString(cardInfo.pdfUrl) : undefined,
       bankAccount: cardInfo.bankAccount ? sanitizeString(cardInfo.bankAccount) : undefined,
       region: cardInfo.region ? sanitizeString(cardInfo.region) : undefined,
+      websiteUrl: cardInfo.websiteUrl ? sanitizeString(cardInfo.websiteUrl) : undefined,
       specialties: Array.isArray(cardInfo.specialties) 
         ? cardInfo.specialties.map((s: string) => sanitizeString(s)) 
         : [],
@@ -1704,6 +1815,10 @@ export default function App() {
           </div>
           <div className="flex flex-wrap items-center justify-center gap-4 text-[10px] font-mono text-neutral-400" id="footer-specs">
             <span>© 2026 KPCIA. All Rights Reserved.</span>
+            <span className="w-1.5 h-1.5 rounded-full bg-kpcia-gold" />
+            <span className="flex items-center gap-1.5 text-kpcia-gold bg-kpcia-gold/10 px-2 py-0.5 rounded border border-kpcia-gold/20 text-[9px] font-sans">
+              <ShieldAlert className="w-3.5 h-3.5 text-kpcia-gold" /> AI 수집·복제 방지 가동중
+            </span>
             <span className="w-1.5 h-1.5 rounded-full bg-kpcia-gold" />
             <span>v1.0</span>
           </div>

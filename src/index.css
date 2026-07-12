@@ -29,45 +29,51 @@
     margin: 0;
   }
 
-  body {
+  /* Force white background for printing and clear screen dark styles */
+  html, body {
+    background-color: #ffffff !important;
     background: #ffffff !important;
+    color: #000000 !important;
     margin: 0 !important;
     padding: 0 !important;
+    height: auto !important;
+    min-height: 0 !important;
+    overflow: visible !important;
     -webkit-print-color-adjust: exact !important;
     print-color-adjust: exact !important;
   }
 
-  /* Hide everything except the certificate modal */
-  #app-root > *:not(#certificate-modal),
-  #main-content,
-  #footer,
-  #header,
-  .no-print {
-    display: none !important;
+  /* Standard bulletproof visibility hiding */
+  body * {
     visibility: hidden !important;
   }
-  
-  /* Make only the certificate container, printable area, and its child nodes visible */
-  #certificate-modal {
+
+  /* Force only the certificate modal wrapper and its content to be visible */
+  #certificate-modal,
+  #certificate-modal * {
     visibility: visible !important;
+  }
+
+  /* Style our certificate modal to be positioned at the top-left of the printed page */
+  #certificate-modal {
     display: flex !important;
     align-items: center !important;
     justify-content: center !important;
+    background-color: #ffffff !important;
     background: #ffffff !important;
-    position: absolute !important;
+    position: fixed !important;
     left: 0 !important;
     top: 0 !important;
     width: 210mm !important;
     height: 297mm !important;
     padding: 0 !important;
     margin: 0 !important;
-    z-index: 9999999 !important;
+    z-index: 99999999 !important;
     overflow: hidden !important;
   }
   
-  /* Sizing and positioning the certificate for exact A4 rendering */
+  /* Sizing and positioning the certificate card for perfect A4 border coverage */
   #print-certificate {
-    visibility: visible !important;
     position: absolute !important;
     left: 0 !important;
     top: 0 !important;
@@ -88,9 +94,8 @@
     justify-content: space-between !important;
   }
 
-  /* Watermark and decorative background print support */
+  /* Ensure text colors inside print certificate are rendered correctly */
   #print-certificate * {
-    visibility: visible !important;
     -webkit-print-color-adjust: exact !important;
     print-color-adjust: exact !important;
   }

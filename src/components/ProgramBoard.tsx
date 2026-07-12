@@ -237,7 +237,7 @@ export default function ProgramBoard({ currentUser, programs, onRegisterProgram 
                 <div>
                   <span className="text-[9px] text-neutral-500 block font-mono">건당 지급 마일리지 누적</span>
                   <span className="text-sm font-mono font-bold text-kpcia-gold">
-                    +{program.royaltyRate.toLocaleString()} M
+                    총 출강비의 5%
                   </span>
                 </div>
                 <div className="text-[9px] text-neutral-400 font-sans">

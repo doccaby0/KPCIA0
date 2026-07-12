@@ -183,6 +183,7 @@ export default function AdminPanel({
   const [lectTargetTier, setLectTargetTier] = useState<InstructorTier>('Prestige Associate');
   const [lectMainHours, setLectMainHours] = useState<string>('2');
   const [lectAssistantHours, setLectAssistantHours] = useState<string>('0');
+  const [lectMaterialCostPerPerson, setLectMaterialCostPerPerson] = useState<string>('0');
   const [lectMaterialCost, setLectMaterialCost] = useState<string>('0');
   const [lectBudget, setLectBudget] = useState<number>(200000);
   const [lectMileageRoyalty, setLectMileageRoyalty] = useState<number>(5000);
@@ -202,6 +203,7 @@ export default function AdminPanel({
   const [editLectTargetTier, setEditLectTargetTier] = useState<InstructorTier>('Prestige Associate');
   const [editLectMainHours, setEditLectMainHours] = useState<string>('2');
   const [editLectAssistantHours, setEditLectAssistantHours] = useState<string>('0');
+  const [editLectMaterialCostPerPerson, setEditLectMaterialCostPerPerson] = useState<string>('0');
   const [editLectMaterialCost, setEditLectMaterialCost] = useState<string>('0');
   const [editLectBudget, setEditLectBudget] = useState<number>(200000);
   const [editLectMileageRoyalty, setEditLectMileageRoyalty] = useState<number>(5000);
@@ -223,6 +225,9 @@ export default function AdminPanel({
     setEditLectMainHours((lecture.mainHours || 2).toString());
     setEditLectAssistantHours((lecture.assistantHours || 0).toString());
     setEditLectMaterialCost((lecture.materialCost || 0).toString());
+    const initialMaterial = lecture.materialCost || 0;
+    const initialAttendeesCount = lecture.attendees || 30;
+    setEditLectMaterialCostPerPerson(Math.round(initialMaterial / (initialAttendeesCount || 1)).toString());
     setEditLectBudget(lecture.budget || 200000);
     setEditLectMileageRoyalty(lecture.mileageRoyalty || 5000);
     setEditLectProgramId(lecture.programId || '');
@@ -245,19 +250,33 @@ export default function AdminPanel({
     }
   }, [editLectMainHours, editLectAssistantHours, editingLecture]);
 
+  // Auto-calculate editLectMaterialCost based on per person cost and attendees
+  useEffect(() => {
+    if (editingLecture) {
+      const perPerson = parseFloat(editLectMaterialCostPerPerson) || 0;
+      const attendees = parseFloat(editLectAttendees) || 0;
+      setEditLectMaterialCost(Math.round(perPerson * attendees).toString());
+    }
+  }, [editLectMaterialCostPerPerson, editLectAttendees, editingLecture]);
+
   // Save Edited Lecture
   const handleSaveLectureEdit = () => {
     if (!editingLecture || !onUpdateLecture) return;
     
     const selectedProg = programs.find(p => p.id === editLectProgramId);
+    const finalBudget = Number(editLectBudget);
+    const finalMaterial = Number(editLectMaterialCost);
+    const originalTotal = finalBudget + finalMaterial;
     
     const updated: LectureRequest = {
       ...editingLecture,
       title: editLectTitle,
       description: editLectDescription,
       targetTier: editLectTargetTier,
-      budget: Number(editLectBudget),
-      mileageRoyalty: selectedProg ? selectedProg.royaltyRate : Number(editLectMileageRoyalty),
+      budget: finalBudget,
+      mileageRoyalty: selectedProg 
+        ? Math.round(originalTotal * 0.05) 
+        : Number(editLectMileageRoyalty),
       programId: editLectProgramId || undefined,
       programTitle: selectedProg ? selectedProg.title : undefined,
       date: editLectDate,
@@ -269,7 +288,7 @@ export default function AdminPanel({
       managerPhone: editLectManagerPhone || undefined,
       mainHours: Number(editLectMainHours),
       assistantHours: Number(editLectAssistantHours),
-      materialCost: Number(editLectMaterialCost),
+      materialCost: finalMaterial,
     };
     
     onUpdateLecture(updated);
@@ -283,6 +302,31 @@ export default function AdminPanel({
     const calcBudget = (mainHrs * 100000) + (asstHrs * 50000);
     setLectBudget(calcBudget);
   }, [lectMainHours, lectAssistantHours]);
+
+  // Auto-calculate lectMaterialCost based on per person cost and attendees
+  useEffect(() => {
+    const perPerson = parseFloat(lectMaterialCostPerPerson) || 0;
+    const attendees = parseFloat(lectAttendees) || 0;
+    setLectMaterialCost(Math.round(perPerson * attendees).toString());
+  }, [lectMaterialCostPerPerson, lectAttendees]);
+
+  // Auto-calculate lectMileageRoyalty as 5% of total cost if designated program is selected
+  useEffect(() => {
+    if (lectProgramId) {
+      const originalTotal = lectBudget + Number(lectMaterialCost);
+      const calculatedMileage = Math.round(originalTotal * 0.05);
+      setLectMileageRoyalty(calculatedMileage);
+    }
+  }, [lectProgramId, lectBudget, lectMaterialCost]);
+
+  // Auto-calculate editLectMileageRoyalty as 5% of total cost if designated program is selected in edit form
+  useEffect(() => {
+    if (editLectProgramId) {
+      const originalTotal = editLectBudget + Number(editLectMaterialCost);
+      const calculatedMileage = Math.round(originalTotal * 0.05);
+      setEditLectMileageRoyalty(calculatedMileage);
+    }
+  }, [editLectProgramId, editLectBudget, editLectMaterialCost]);
   
   // Search States
   const [memberSearch, setMemberSearch] = useState('');
@@ -437,13 +481,18 @@ export default function AdminPanel({
     if (!lectTitle || !lectLocation || !onAddLecture) return;
 
     const selectedProg = programs.find(p => p.id === lectProgramId);
+    const finalBudget = Number(lectBudget);
+    const finalMaterial = Number(lectMaterialCost);
+    const originalTotal = finalBudget + finalMaterial;
 
     const newLect = {
       title: lectTitle,
       description: lectDescription,
       targetTier: lectTargetTier,
-      budget: Number(lectBudget),
-      mileageRoyalty: selectedProg ? selectedProg.royaltyRate : Number(lectMileageRoyalty),
+      budget: finalBudget,
+      mileageRoyalty: selectedProg 
+        ? Math.round(originalTotal * 0.05) 
+        : Number(lectMileageRoyalty),
       programId: lectProgramId || undefined,
       programTitle: selectedProg ? selectedProg.title : undefined,
       date: lectDate,
@@ -455,7 +504,7 @@ export default function AdminPanel({
       managerPhone: lectManagerPhone || undefined,
       mainHours: Number(lectMainHours),
       assistantHours: Number(lectAssistantHours),
-      materialCost: Number(lectMaterialCost),
+      materialCost: finalMaterial,
     };
 
     onAddLecture(newLect);
@@ -1531,19 +1580,10 @@ export default function AdminPanel({
 
                               <div className="grid grid-cols-1 md:grid-cols-2 gap-4 items-end pt-2 border-t border-neutral-850">
                                 <div>
-                                  <label className="text-[9px] font-mono text-amber-500 block mb-1">★ 승인 지급 마일리지 누적 비율 (M)</label>
-                                  <input
-                                    type="number"
-                                    value={editRoyaltyRate}
-                                    onChange={(e) => setEditRoyaltyRate(Number(e.target.value))}
-                                    onKeyDown={(e) => {
-                                      if (e.key === 'Enter') {
-                                        handleSaveAndApproveProgram(program.id);
-                                      }
-                                    }}
-                                    min={0}
-                                    className="w-full px-3 py-1.5 rounded-lg bg-neutral-950 border border-amber-500/40 text-xs font-bold font-mono text-kpcia-gold focus:border-kpcia-gold focus:outline-none"
-                                  />
+                                  <label className="text-[9px] font-mono text-amber-500 block mb-1">★ 승인 저작권 마일리지 적립율</label>
+                                  <div className="w-full px-3 py-1.5 rounded-lg bg-neutral-950 border border-amber-500/20 text-xs font-bold font-mono text-kpcia-gold">
+                                    총 출강비의 5% (자동 적립)
+                                  </div>
                                 </div>
                                 <div className="flex justify-end space-x-2">
                                   <button
@@ -1670,13 +1710,7 @@ export default function AdminPanel({
                     <label className="text-[10px] font-mono text-neutral-400 block mb-1">지정 교육 프로그램 연계</label>
                     <select
                       value={lectProgramId}
-                      onChange={(e) => {
-                        setLectProgramId(e.target.value);
-                        const selected = programs.find(p => p.id === e.target.value);
-                        if (selected) {
-                          setLectMileageRoyalty(selected.royaltyRate);
-                        }
-                      }}
+                      onChange={(e) => setLectProgramId(e.target.value)}
                       className="w-full px-3.5 py-2 rounded-lg bg-neutral-900 border border-neutral-800 text-xs font-medium text-neutral-100 focus:border-kpcia-gold focus:outline-none"
                       id="admin-lect-program"
                     >
@@ -1704,10 +1738,10 @@ export default function AdminPanel({
                 </div>
 
                 {/* Hours & Fees & Materials Calculation Grid */}
-                <div className="grid grid-cols-1 md:grid-cols-4 gap-4 p-4 rounded-xl bg-neutral-900/40 border border-neutral-800/80">
-                  <div>
-                    <label className="text-[10px] font-mono font-bold text-neutral-400 block mb-1">
-                      주강사 배정 시간 (단가: 100,000원/h)
+                <div className="grid grid-cols-1 md:grid-cols-5 gap-3.5 p-4 rounded-xl bg-neutral-900/40 border border-neutral-800/80">
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-mono font-bold text-neutral-400 block">
+                      주강사 강의 시간 (단가: 100,000원)
                     </label>
                     <div className="relative">
                       <input
@@ -1717,17 +1751,17 @@ export default function AdminPanel({
                         placeholder="예: 2"
                         value={lectMainHours}
                         onChange={(e) => setLectMainHours(e.target.value)}
-                        className="w-full pl-3.5 pr-8 py-2 rounded-lg bg-neutral-950 border border-neutral-800 text-xs font-semibold text-neutral-100 focus:border-kpcia-gold focus:outline-none"
+                        className="w-full pl-3 pr-8 py-2 rounded-lg bg-neutral-950 border border-neutral-800 text-xs font-semibold text-neutral-100 focus:border-kpcia-gold focus:outline-none transition-colors"
                         id="admin-lect-main-hours"
                       />
-                      <span className="absolute right-3.5 top-2 text-[10px] text-neutral-500 font-bold">시간</span>
+                      <span className="absolute right-2.5 top-2 text-[9px] text-neutral-500 font-bold">시간</span>
                     </div>
-                    <p className="text-[9px] text-neutral-500 mt-1">※ 강사료: {(parseFloat(lectMainHours || '0') * 100000).toLocaleString()}원</p>
+                    <p className="text-[8.5px] text-neutral-500">※ 기본료: {(parseFloat(lectMainHours || '0') * 100000).toLocaleString()}원</p>
                   </div>
 
-                  <div>
-                    <label className="text-[10px] font-mono font-bold text-neutral-400 block mb-1">
-                      보조강사 배정 시간 (단가: 50,000원/h)
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-mono font-bold text-neutral-400 block">
+                      보조강사 강의 시간 (단가: 50,000원)
                     </label>
                     <div className="relative">
                       <input
@@ -1737,52 +1771,122 @@ export default function AdminPanel({
                         placeholder="예: 0"
                         value={lectAssistantHours}
                         onChange={(e) => setLectAssistantHours(e.target.value)}
-                        className="w-full pl-3.5 pr-8 py-2 rounded-lg bg-neutral-950 border border-neutral-800 text-xs font-semibold text-neutral-100 focus:border-kpcia-gold focus:outline-none"
+                        className="w-full pl-3 pr-8 py-2 rounded-lg bg-neutral-950 border border-neutral-800 text-xs font-semibold text-neutral-100 focus:border-kpcia-gold focus:outline-none transition-colors"
                         id="admin-lect-assistant-hours"
                       />
-                      <span className="absolute right-3.5 top-2 text-[10px] text-neutral-500 font-bold">시간</span>
+                      <span className="absolute right-2.5 top-2 text-[9px] text-neutral-500 font-bold">시간</span>
                     </div>
-                    <p className="text-[9px] text-neutral-500 mt-1">※ 보조비: {(parseFloat(lectAssistantHours || '0') * 50000).toLocaleString()}원</p>
+                    <p className="text-[8.5px] text-neutral-500">※ 보조료: {(parseFloat(lectAssistantHours || '0') * 50000).toLocaleString()}원</p>
                   </div>
 
-                  <div>
-                    <label className="text-[10px] font-mono font-bold text-neutral-400 block mb-1">
-                      소모 재료비 / 키트 비용 (KRW)
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-mono font-bold text-neutral-400 block">
+                      1인당 재료비 (KRW) *
                     </label>
                     <div className="relative">
                       <input
                         type="number"
                         min="0"
-                        placeholder="예: 400000"
-                        value={lectMaterialCost}
-                        onChange={(e) => setLectMaterialCost(e.target.value)}
-                        className="w-full pl-3.5 pr-8 py-2 rounded-lg bg-neutral-950 border border-neutral-800 text-xs font-semibold text-neutral-100 focus:border-kpcia-gold focus:outline-none"
-                        id="admin-lect-material-cost"
+                        placeholder="예: 10000"
+                        value={lectMaterialCostPerPerson}
+                        onChange={(e) => setLectMaterialCostPerPerson(e.target.value)}
+                        className="w-full pl-3 pr-8 py-2 rounded-lg bg-neutral-950 border border-neutral-800 text-xs font-semibold text-neutral-100 focus:border-kpcia-gold focus:outline-none transition-colors"
+                        id="admin-lect-material-cost-per-person"
                       />
-                      <span className="absolute right-3.5 top-2 text-[10px] text-neutral-500 font-bold">원</span>
+                      <span className="absolute right-2.5 top-2 text-[9px] text-neutral-500 font-bold">원</span>
                     </div>
-                    <p className="text-[9px] text-neutral-500 mt-1">※ 실비 정산 및 지급용</p>
+                    <p className="text-[8.5px] text-neutral-500">※ 인원({lectAttendees || '0'}명) 자동 곱산</p>
                   </div>
 
-                  <div>
-                    <label className="text-[10px] font-mono font-bold text-kpcia-gold block mb-1">
-                      총 출강 강사료 (자동 합산 계산)
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-mono font-bold text-neutral-400 block">
+                      재료비 총액 (자동 계산)
+                    </label>
+                    <div className="relative">
+                      <div className="w-full pl-3 pr-8 py-2 rounded-lg bg-neutral-950/60 border border-neutral-850 text-xs font-semibold text-neutral-400 flex items-center h-[34px]">
+                        ₩{Number(lectMaterialCost).toLocaleString()}
+                      </div>
+                      <span className="absolute right-2.5 top-2.5 text-[9px] text-neutral-500 font-bold">원</span>
+                    </div>
+                    <p className="text-[8.5px] text-neutral-500">※ 실비 정산 및 청구 금액</p>
+                  </div>
+
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-mono font-bold text-kpcia-gold block">
+                      출강 강사료 (자동 계산)
                     </label>
                     <div className="relative">
                       <input
                         type="number"
                         value={lectBudget}
                         onChange={(e) => setLectBudget(Number(e.target.value))}
-                        className="w-full pl-3.5 pr-8 py-2 rounded-lg bg-neutral-950 border border-kpcia-gold/40 text-xs font-mono font-bold text-kpcia-gold focus:border-kpcia-gold focus:outline-none"
+                        className="w-full pl-3 pr-8 py-2 rounded-lg bg-neutral-950 border border-kpcia-gold/30 text-xs font-mono font-bold text-kpcia-gold focus:border-kpcia-gold focus:outline-none transition-colors"
                         id="admin-lect-budget"
                       />
-                      <span className="absolute right-3.5 top-2 text-[10px] text-kpcia-gold font-bold">원</span>
+                      <span className="absolute right-2.5 top-2 text-[9px] text-kpcia-gold font-bold">원</span>
                     </div>
-                    <p className="text-[9px] text-neutral-400 mt-1">※ (주강사시간*10만) + (보조시간*5만)</p>
+                    <p className="text-[8.5px] text-neutral-400">※ 임의 금액 입력/수정 가능</p>
                   </div>
                 </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                {/* Total Lecture Cost Summary Display Dashboard */}
+                {(() => {
+                  const isProgramSelected = !!lectProgramId;
+                  const originalTotal = lectBudget + Number(lectMaterialCost);
+                  const finalTotal = isProgramSelected ? (originalTotal - Math.round(originalTotal * 0.05)) : originalTotal;
+                  return (
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-3 p-3.5 rounded-xl bg-neutral-950/40 border border-neutral-850">
+                      <div className="p-3 rounded-lg bg-neutral-900/50 border border-neutral-800 flex items-center justify-between">
+                        <div>
+                          <div className="text-[10px] text-neutral-400 font-semibold">① 출강 강사료</div>
+                          <div className="text-sm font-bold text-neutral-100 mt-1 font-mono">
+                            ₩{lectBudget.toLocaleString()} <span className="text-[10px] font-normal text-neutral-400">원</span>
+                          </div>
+                        </div>
+                        <div className="text-[10px] text-neutral-500 font-mono text-right leading-tight">
+                          주강사 + 보조강사<br/>수당 합계액
+                        </div>
+                      </div>
+
+                      <div className="p-3 rounded-lg bg-neutral-900/50 border border-neutral-800 flex items-center justify-between">
+                        <div>
+                          <div className="text-[10px] text-neutral-400 font-semibold">② 재료비 총액</div>
+                          <div className="text-sm font-bold text-neutral-200 mt-1 font-mono">
+                            ₩{Number(lectMaterialCost).toLocaleString()} <span className="text-[10px] font-normal text-neutral-400">원</span>
+                          </div>
+                        </div>
+                        <div className="text-[10px] text-neutral-500 font-mono text-right leading-tight">
+                          1인당 재료비<br/>× {lectAttendees || 0}명
+                        </div>
+                      </div>
+
+                      <div className="p-3 rounded-lg bg-gradient-to-r from-kpcia-gold/15 to-amber-500/5 border border-kpcia-gold/25 flex items-center justify-between">
+                        <div>
+                          <div className="text-[10px] text-kpcia-gold font-bold flex items-center gap-1.5">
+                            <span>③ 총 출강비 청구액</span>
+                            {isProgramSelected && <span className="text-[8px] bg-kpcia-gold/20 text-kpcia-gold px-1 py-0.2 rounded font-normal">지정프로그램 5% 공제</span>}
+                          </div>
+                          <div className="text-base font-extrabold text-kpcia-gold mt-1 font-mono">
+                            ₩{finalTotal.toLocaleString()} <span className="text-xs font-semibold">원</span>
+                          </div>
+                        </div>
+                        <div className="text-[10px] text-kpcia-gold/70 font-mono text-right leading-tight">
+                          {isProgramSelected ? (
+                            <>
+                              강사료+재료비에서<br/>마일리지 5% 차감
+                            </>
+                          ) : (
+                            <>
+                              강사료 + 재료비<br/>최종 실청구액
+                            </>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })()}
+
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                   <div>
                     <label className="text-[10px] font-mono text-neutral-400 block mb-1">출강 일정</label>
                     <input
@@ -1803,29 +1907,31 @@ export default function AdminPanel({
                       id="admin-lect-time"
                     />
                   </div>
-                  <div>
-                    <label className="text-[10px] font-mono text-neutral-400 block mb-1">총 소요 시간</label>
-                    <input
-                      type="text"
-                      value={lectDuration}
-                      onChange={(e) => setLectDuration(e.target.value)}
-                      className="w-full px-3.5 py-2 rounded-lg bg-neutral-900 border border-neutral-800 text-xs font-medium text-neutral-100 focus:border-kpcia-gold"
-                      id="admin-lect-duration"
-                    />
-                  </div>
-                  {/* Royalty Amount Manual Input if no program */}
-                  <div>
-                    <label className="text-[10px] font-mono text-neutral-400 block mb-1">
-                      원작 저작자 지급 마일리지 누적 (M)
-                    </label>
-                    <input
-                      type="number"
-                      value={lectMileageRoyalty}
-                      onChange={(e) => setLectMileageRoyalty(Number(e.target.value))}
-                      disabled={!!lectProgramId}
-                      className="w-full px-3.5 py-2 rounded-lg bg-neutral-900 border border-neutral-800 text-xs font-medium text-neutral-100 focus:border-kpcia-gold disabled:opacity-50"
-                      id="admin-lect-royalty"
-                    />
+                  <div className="space-y-3">
+                    <div>
+                      <label className="text-[10px] font-mono text-neutral-400 block mb-1">총 소요 시간</label>
+                      <input
+                        type="text"
+                        value={lectDuration}
+                        onChange={(e) => setLectDuration(e.target.value)}
+                        className="w-full px-3.5 py-2 rounded-lg bg-neutral-900 border border-neutral-800 text-xs font-medium text-neutral-100 focus:border-kpcia-gold"
+                        id="admin-lect-duration"
+                      />
+                    </div>
+                    {/* Royalty Amount Manual Input if no program */}
+                    <div>
+                      <label className="text-[10px] font-mono text-neutral-400 block mb-1">
+                        원작 저작자 지급 마일리지 누적 (M)
+                      </label>
+                      <input
+                        type="number"
+                        value={lectMileageRoyalty}
+                        onChange={(e) => setLectMileageRoyalty(Number(e.target.value))}
+                        disabled={!!lectProgramId}
+                        className="w-full px-3.5 py-2 rounded-lg bg-neutral-900 border border-neutral-800 text-xs font-medium text-neutral-100 focus:border-kpcia-gold disabled:opacity-50"
+                        id="admin-lect-royalty"
+                      />
+                    </div>
                   </div>
                 </div>
 
@@ -2758,7 +2864,7 @@ export default function AdminPanel({
                     <BookOpen className="w-4 h-4 text-kpcia-gold" /> 등재 교육 콘텐츠별 정산 마일리지 조율
                   </h3>
                   <p className="text-[10px] text-neutral-400 mb-3">
-                    강사가 기획 등재한 콘텐츠가 다른 강사에 의해 출강 완료 시, 해당 원작자 강사에게 지급될 지적 로열티 마일리지(M)의 수량을 프로그램별로 관리합니다.
+                    강사가 기획 등재한 콘텐츠가 다른 강사에 의해 출강 완료 시, 해당 원작자 강사에게 총 출강비의 5% 마일리지가 지적재산 로열티로 즉시 자동 정산 누적됩니다.
                   </p>
                   <div className="space-y-2.5 overflow-y-auto flex-1 pr-1">
                     {programs.filter(p => p.isApproved !== false).map((program) => (
@@ -2801,27 +2907,9 @@ export default function AdminPanel({
                             </button>
                           )}
 
-                          <input
-                            type="number"
-                            title="로열티 마일리지 변경"
-                            value={royaltyInputs[program.id] !== undefined ? royaltyInputs[program.id] : program.royaltyRate}
-                            onChange={(e) => handleRoyaltyChange(program.id, e.target.value)}
-                            onKeyDown={(e) => {
-                              if (e.key === 'Enter') {
-                                handleApplyRoyalty(program.id, program.royaltyRate);
-                              }
-                            }}
-                            className="w-16 px-1.5 py-0.5 rounded bg-neutral-900 border border-neutral-700 text-[10px] text-center font-mono text-kpcia-gold focus:border-kpcia-gold focus:outline-none"
-                          />
-                          <span className="text-[9px] text-neutral-500 font-mono">M</span>
-                          {royaltyInputs[program.id] !== undefined && royaltyInputs[program.id] !== program.royaltyRate.toString() && (
-                            <button
-                              onClick={() => handleApplyRoyalty(program.id, program.royaltyRate)}
-                              className="p-1 px-2 rounded bg-kpcia-gold hover:bg-kpcia-gold-hover text-kpcia-dark text-[9px] font-extrabold transition-all cursor-pointer"
-                            >
-                              저장
-                            </button>
-                          )}
+                          <span className="text-[10px] text-kpcia-gold font-bold font-mono bg-kpcia-gold/10 px-2.5 py-1 rounded border border-kpcia-gold/20">
+                            총 출강비의 5%
+                          </span>
                         </div>
                       </div>
                     ))}
@@ -3466,7 +3554,7 @@ export default function AdminPanel({
                         <option value="">-- 연계 공인 교안 없음 (순수 개별 위탁 출강) --</option>
                         {programs.map((p) => (
                           <option key={p.id} value={p.id}>
-                            {p.title} (저작권료 요율: {p.royaltyRate.toLocaleString()} M/시간)
+                            {p.title} (저작권료 요율: 총 출강비의 5%)
                           </option>
                         ))}
                       </select>
@@ -3563,11 +3651,12 @@ export default function AdminPanel({
                   <h4 className="text-[10px] font-bold text-kpcia-gold uppercase tracking-wider pb-1 border-b border-neutral-800">
                     출강 예산 세무 구성 및 비상 연락처
                   </h4>
-                  <div className="grid grid-cols-1 sm:grid-cols-4 gap-3">
+                  <div className="grid grid-cols-1 sm:grid-cols-5 gap-3">
                     <div className="space-y-1">
                       <label className="text-[10px] text-neutral-400 font-semibold block">주강사 강의 시간 *</label>
                       <input
                         type="number"
+                        step="0.5"
                         value={editLectMainHours}
                         onChange={(e) => setEditLectMainHours(e.target.value)}
                         className="w-full px-3 py-2 rounded-lg bg-neutral-950 border border-neutral-800 text-neutral-100 font-medium focus:border-kpcia-gold focus:outline-none text-xs"
@@ -3577,27 +3666,80 @@ export default function AdminPanel({
                       <label className="text-[10px] text-neutral-400 font-semibold block">보조강사 배정 시간 *</label>
                       <input
                         type="number"
+                        step="0.5"
                         value={editLectAssistantHours}
                         onChange={(e) => setEditLectAssistantHours(e.target.value)}
                         className="w-full px-3 py-2 rounded-lg bg-neutral-950 border border-neutral-800 text-neutral-100 font-medium focus:border-kpcia-gold focus:outline-none text-xs"
                       />
                     </div>
                     <div className="space-y-1">
-                      <label className="text-[10px] text-neutral-400 font-semibold block">교구재/인쇄 실비 부담금</label>
+                      <label className="text-[10px] text-neutral-400 font-semibold block">1인당 재료비 *</label>
                       <input
                         type="number"
-                        value={editLectMaterialCost}
-                        onChange={(e) => setEditLectMaterialCost(e.target.value)}
+                        value={editLectMaterialCostPerPerson}
+                        onChange={(e) => setEditLectMaterialCostPerPerson(e.target.value)}
                         className="w-full px-3 py-2 rounded-lg bg-neutral-950 border border-neutral-800 text-neutral-100 font-medium focus:border-kpcia-gold focus:outline-none text-xs"
                       />
                     </div>
                     <div className="space-y-1">
-                      <label className="text-[10px] text-neutral-400 font-semibold block">총 지급 예산 (자동 계산)</label>
-                      <div className="w-full px-3 py-2 rounded-lg bg-neutral-950 border border-neutral-800 text-kpcia-gold font-bold text-xs flex items-center h-[34px]">
-                        ₩ {editLectBudget.toLocaleString()}
+                      <label className="text-[10px] text-neutral-400 font-semibold block">재료비 총액 (자동 계산)</label>
+                      <div className="w-full px-3 py-2 rounded-lg bg-neutral-950/60 border border-neutral-850 text-neutral-400 font-semibold text-xs flex items-center h-[34px]">
+                        ₩{Number(editLectMaterialCost).toLocaleString()}
                       </div>
                     </div>
+                    <div className="space-y-1">
+                      <label className="text-[10px] text-kpcia-gold font-semibold block">출강 강사료 (자동 계산)</label>
+                      <input
+                        type="number"
+                        value={editLectBudget}
+                        onChange={(e) => setEditLectBudget(Number(e.target.value))}
+                        className="w-full px-3 py-2 rounded-lg bg-neutral-950 border border-kpcia-gold/30 text-kpcia-gold font-bold focus:border-kpcia-gold focus:outline-none text-xs"
+                      />
+                    </div>
                   </div>
+
+                  {/* Edit Form Total Lecture Cost Summary Display Dashboard */}
+                  {(() => {
+                    const isProgramSelected = !!editLectProgramId;
+                    const originalTotal = editLectBudget + Number(editLectMaterialCost);
+                    const finalTotal = isProgramSelected ? (originalTotal - Math.round(originalTotal * 0.05)) : originalTotal;
+                    return (
+                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 p-3 rounded-xl bg-neutral-950/40 border border-neutral-850 mt-1">
+                        <div className="p-2.5 rounded-lg bg-neutral-900/50 border border-neutral-800 flex items-center justify-between text-xs">
+                          <div>
+                            <div className="text-[9px] text-neutral-400 font-semibold">① 출강 강사료</div>
+                            <div className="text-xs font-bold text-neutral-100 mt-0.5 font-mono">
+                              ₩{editLectBudget.toLocaleString()} <span className="text-[9px] font-normal text-neutral-400">원</span>
+                            </div>
+                          </div>
+                        </div>
+
+                        <div className="p-2.5 rounded-lg bg-neutral-900/50 border border-neutral-800 flex items-center justify-between text-xs">
+                          <div>
+                            <div className="text-[9px] text-neutral-400 font-semibold">② 재료비 총액</div>
+                            <div className="text-xs font-bold text-neutral-200 mt-0.5 font-mono">
+                              ₩{Number(editLectMaterialCost).toLocaleString()} <span className="text-[9px] font-normal text-neutral-400">원</span>
+                            </div>
+                          </div>
+                          <div className="text-[9px] text-neutral-500 font-mono text-right">
+                            {editLectAttendees || 0}명 대상
+                          </div>
+                        </div>
+
+                        <div className="p-2.5 rounded-lg bg-gradient-to-r from-kpcia-gold/15 to-amber-500/5 border border-kpcia-gold/25 flex items-center justify-between text-xs">
+                          <div>
+                            <div className="text-[9px] text-kpcia-gold font-bold flex items-center gap-1.5">
+                              <span>③ 총 출강비 청구액</span>
+                              {isProgramSelected && <span className="text-[8px] bg-kpcia-gold/20 text-kpcia-gold px-1 py-0.2 rounded font-normal">5% 공제</span>}
+                            </div>
+                            <div className="text-sm font-extrabold text-kpcia-gold mt-0.5 font-mono">
+                              ₩{finalTotal.toLocaleString()} <span className="text-[10px] font-semibold">원</span>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })()}
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     <div className="space-y-1">
                       <label className="text-[10px] text-neutral-400 font-semibold block">위탁 기업 담당자명</label>
