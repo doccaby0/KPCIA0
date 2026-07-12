@@ -415,13 +415,13 @@ export default function App() {
       userName: currentUser.name,
       type: 'program_register',
       amount: 1000,
-      description: `'${newProgram.title}' 독창적 명품 교육 프로그램 신규 등재 완료 (마일리지 수동 지급 승인 대기: +1,000 M)`,
+      description: `'${newProgram.title}' 독창적 명품 교육 프로그램 신규 등재 완료 (사용료(로열티) 수동 지급 승인 대기: +1,000 M)`,
       createdAt: new Date().toISOString()
     };
     setTransactions(prev => [...prev, newTx]);
     await StorageService.addTransaction(newTx);
 
-    triggerToast(`'${newProgram.title}' 과정 등재 성공! 등재 마일리지는 협회 관리자가 검토 후 수동 지급합니다.`);
+    triggerToast(`'${newProgram.title}' 과정 등재 성공! 등재 사용료(로열티)는 협회 관리자가 검토 후 수동 지급합니다.`);
   };
 
   // 5. Upgrade User Grade / Tier (Admin Only)
@@ -554,8 +554,8 @@ export default function App() {
             // Add royalty transaction log
             const isSelf = creatorId === lecturerId;
             const descriptionStr = isSelf
-              ? `본인의 '${associatedProgram.title}' 저작권 교안으로 직접 출강 완료하여 저작권 마일리지 자동 적립 (+${royaltyAmount.toLocaleString()} M)`
-              : `타 강사(${lecturer?.name || '협회강사'})가 '${associatedProgram.title}' 교안으로 출강 완료함에 따른 저작권 마일리지 자동 적립 (+${royaltyAmount.toLocaleString()} M)`;
+              ? `본인의 '${associatedProgram.title}' 저작권 교안으로 직접 출강 완료하여 저작권 사용료(로열티) 자동 적립 (+${royaltyAmount.toLocaleString()} M)`
+              : `타 강사(${lecturer?.name || '협회강사'})가 '${associatedProgram.title}' 교안으로 출강 완료함에 따른 저작권 사용료(로열티) 자동 적립 (+${royaltyAmount.toLocaleString()} M)`;
 
             const royaltyTx: MileageTransaction = {
               id: `tx_royalty_${Date.now()}`,
@@ -570,14 +570,14 @@ export default function App() {
             setTransactions(prev => [...prev, royaltyTx]);
             await StorageService.addTransaction(royaltyTx);
 
-            triggerToast(`출강 종료 승인 완료! '${associatedProgram.title}'의 저작권 강사(${creator.name})에게 저작권 마일리지 ${royaltyAmount.toLocaleString()} M이 자동으로 정밀 누적 처리되었습니다.`, 'success');
+            triggerToast(`출강 종료 승인 완료! '${associatedProgram.title}'의 저작권 강사(${creator.name})에게 프로그램 사용료(로열티) ${royaltyAmount.toLocaleString()} M이 자동으로 정밀 누적 처리되었습니다.`, 'success');
             return;
           }
         }
       }
     }
 
-    triggerToast(`'${lecture.title}' 출강 종료 승인이 완료되었습니다. 마일리지 명세가 트랜잭션 원장에 기록되었습니다. (관리자 수동 정산 대기)`);
+    triggerToast(`'${lecture.title}' 출강 종료 승인이 완료되었습니다. 사용료(로열티) 명세가 트랜잭션 원장에 기록되었습니다. (관리자 수동 정산 대기)`);
   };
 
   // 7.5. Update Lecture Settlement Status (Admin Only)
@@ -714,7 +714,7 @@ export default function App() {
     setTransactions(prev => [...prev, newTx]);
     await StorageService.addTransaction(newTx);
 
-    triggerToast(`${targetUser.name} 강사님의 마일리지가 수동으로 ${amount >= 0 ? `+${amount}` : amount} M 조정 완료되었습니다.`);
+    triggerToast(`${targetUser.name} 강사님의 사용료(로열티)가 수동으로 ${amount >= 0 ? `+${amount}` : amount} M 조정 완료되었습니다.`);
   };
 
   // 8.05. Update Instructor Lecture Count & Satisfaction Ratings (Admin Only)
@@ -818,7 +818,7 @@ export default function App() {
     const updatedProg: EducationalProgram = { ...targetProg, royaltyRate: newRoyalty };
     setPrograms(prev => prev.map(p => p.id === programId ? updatedProg : p));
     await StorageService.saveProgram(updatedProg);
-    triggerToast(`'${targetProg.title}' 교육 과정의 저작권 마일리지 누적이 ${newRoyalty.toLocaleString()} M 으로 조정되었습니다.`);
+    triggerToast(`'${targetProg.title}' 교육 과정의 저작권 사용료(로열티) 누적이 ${newRoyalty.toLocaleString()} M 으로 조정되었습니다.`);
   };
 
   // 8.4. Approve Registered User (Admin Only)
@@ -903,7 +903,7 @@ export default function App() {
         userName: authorUser.name,
         type: 'program_register',
         amount: 1000,
-        description: `'${updatedProgram.title}' 교육 콘텐츠 독창적 저작권 최종 공인 승격 축하 마일리지 지급 (+1,000 M)`,
+        description: `'${updatedProgram.title}' 교육 콘텐츠 독창적 저작권 최종 공인 승격 축하 사용료(로열티) 지급 (+1,000 M)`,
         createdAt: new Date().toISOString()
       };
       setTransactions(prev => [...prev, bonusTx]);
@@ -1558,6 +1558,7 @@ export default function App() {
             setShowAuthModal(true);
           }}
           onLogout={handleLogout}
+          programs={programs}
         />
       )}
 
@@ -1613,9 +1614,9 @@ export default function App() {
                     KOREA PRESTIGE CORPORATE INSTRUCTOR ASSOCIATION
                   </p>
                   <p className="text-sm sm:text-base text-neutral-400 font-sans max-w-2xl mx-auto leading-relaxed">
-                    KPCIA는 검증된 교육 설계 역량과 독창적 마일리지 저작권 공유 모델을 결합하여, 최고 권위의 기업 출강을 리드하는 기업 파견 전문 강사 공식 인증 협회입니다.
+                    KPCIA는 검증된 교육 설계 역량과 독창적 프로그램 사용료(로열티) 저작권 공유 모델을 결합하여, 최고 권위의 기업 출강을 리드하는 기업 파견 전문 강사 공식 인증 협회입니다.
                   </p>
-
+                  
                   <div className="flex flex-wrap items-center justify-center gap-3 pt-4">
                     <button
                       onClick={() => setActiveTab('lectures')}
@@ -1654,11 +1655,11 @@ export default function App() {
                       <BookOpen className="w-5 h-5" />
                     </div>
                     <h3 className="font-display font-bold text-sm text-neutral-200 flex items-center gap-1.5 group-hover:text-kpcia-gold transition-colors">
-                      <span>기획 교안 저작권 마일리지 누적</span>
+                      <span>기획 교안 저작권 사용료(로열티) 누적</span>
                       <span className="text-[9px] font-sans text-neutral-500 font-normal group-hover:translate-x-0.5 transition-transform">→</span>
                     </h3>
                     <p className="text-xs text-neutral-200 leading-relaxed font-sans font-medium">
-                      자신만의 시그니처 프로그램을 협회에 등재하고, 타 강사가 해당 교안으로 외부 강의 완료 시 기획 저작자에게 자동으로 마일리지가 분배 보장됩니다.
+                      자신만의 시그니처 프로그램을 협회에 등재하고, 타 강사가 해당 교안으로 외부 강의 완료 시 기획 저작자에게 자동으로 프로그램 사용료(로열티)가 분배 보장됩니다.
                     </p>
                   </div>
 
@@ -1753,6 +1754,7 @@ export default function App() {
                   currentUser={currentUser}
                   onSaveProfileCard={handleSaveProfileCard}
                   onGoHome={() => setActiveTab('home')}
+                  programs={programs}
                 />
               )
             )}

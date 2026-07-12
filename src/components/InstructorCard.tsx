@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { UserProfile, InstructorCardInfo } from '../types';
+import { UserProfile, InstructorCardInfo, EducationalProgram } from '../types';
 import { Mail, Phone, MapPin, Award, Download, Save, RefreshCw, Plus, Trash2, Printer, X, User, FileUp, FileText, CheckCircle2, AlertCircle, Sparkles, Building, Loader2, CreditCard, Globe } from 'lucide-react';
 import html2canvas from 'html2canvas';
 import { jsPDF } from 'jspdf';
@@ -23,6 +23,7 @@ interface InstructorCardProps {
   currentUser: UserProfile;
   onSaveProfileCard: (cardInfo: InstructorCardInfo) => void;
   onGoHome?: () => void;
+  programs: EducationalProgram[];
 }
 
 const PROFILE_IMAGES = [
@@ -34,7 +35,7 @@ const PROFILE_IMAGES = [
   'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?auto=format&fit=crop&q=80&w=400', // Men Professional 3
 ];
 
-export default function InstructorCard({ currentUser, onSaveProfileCard, onGoHome }: InstructorCardProps) {
+export default function InstructorCard({ currentUser, onSaveProfileCard, onGoHome, programs }: InstructorCardProps) {
   const [showCertificate, setShowCertificate] = useState(false);
   const [cardTitle, setCardTitle] = useState(currentUser.profileCard?.title || '');
   const [bio, setBio] = useState(currentUser.profileCard?.bio || '');
@@ -449,7 +450,13 @@ export default function InstructorCard({ currentUser, onSaveProfileCard, onGoHom
                   {currentUser.tier.toUpperCase()}
                 </span>
               </div>
-              <div className="text-[9px] font-mono text-neutral-400 mt-1">마일리지 {currentUser.mileage.toLocaleString()} M</div>
+              {(() => {
+                const isApprovedAuthor = currentUser && programs && programs.some(p => p.authorId === currentUser.uid && p.isApproved !== false);
+                if (!isApprovedAuthor) return null;
+                return (
+                  <div className="text-[9px] font-mono text-neutral-400 mt-1">프로그램 사용료(로열티) {currentUser.mileage.toLocaleString()} M</div>
+                );
+              })()}
               {currentUser.lectureCount !== undefined && currentUser.lectureCount > 0 && (
                 <div className="text-[9px] font-mono text-neutral-400 font-bold">출강 {currentUser.lectureCount}회 | 평점 {currentUser.averageRating !== undefined ? currentUser.averageRating.toFixed(1) : '0.0'}점</div>
               )}

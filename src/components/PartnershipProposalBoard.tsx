@@ -223,7 +223,7 @@ export default function PartnershipProposalBoard({
                     </p>
                   </div>
                   <div className="p-3 bg-neutral-950 rounded-lg border border-neutral-800/60 space-y-1.5">
-                    <h4 className="font-bold text-kpcia-gold">투명한 마일리지 누적 정산</h4>
+                    <h4 className="font-bold text-kpcia-gold">투명한 프로그램 사용료(로열티) 누적 정산</h4>
                     <p className="text-[11px] text-neutral-400 leading-normal">
                       협회 전용 디지털 원장 및 에스크로 제도를 적용하여 출강 성료 시 강사와 콘텐츠 원작자에게 정확히 정산 지급됩니다.
                     </p>
@@ -250,7 +250,7 @@ export default function PartnershipProposalBoard({
                   <div className="relative">
                     <span className="absolute -left-[21px] top-0.5 w-2 h-2 rounded-full bg-neutral-700" />
                     <strong className="text-neutral-200">2단계: 등급 위원회 적합성 검토</strong>
-                    <p className="text-[11px] text-neutral-400 mt-0.5">요청한 강사 요건과 등급(Prestige), 교안 마일리지 누적 등을 고려해 실무 담당자가 매칭 후보군을 필터링합니다.</p>
+                    <p className="text-[11px] text-neutral-400 mt-0.5">요청한 강사 요건과 등급(Prestige), 교안 프로그램 사용료(로열티) 누적 등을 고려해 실무 담당자가 매칭 후보군을 필터링합니다.</p>
                   </div>
                   <div className="relative">
                     <span className="absolute -left-[21px] top-0.5 w-2 h-2 rounded-full bg-neutral-700" />

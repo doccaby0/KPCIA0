@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { UserProfile, InstructorTier } from '../types';
+import { UserProfile, InstructorTier, EducationalProgram } from '../types';
 import { Shield, Sparkles, User, LogIn, ChevronDown, Award, X, Plus, Home, Briefcase, BookOpen, Handshake, Smartphone } from 'lucide-react';
 import KPCIALogo from './KPCIALogo';
 
@@ -14,6 +14,7 @@ interface HeaderProps {
   onOpenRegister: () => void;
   onLogout: () => void;
   onOpenAuthModal?: (tab: 'login' | 'register') => void;
+  programs: EducationalProgram[];
 }
 
 export default function Header({
@@ -26,7 +27,8 @@ export default function Header({
   onToggleSimulator,
   onOpenRegister,
   onLogout,
-  onOpenAuthModal
+  onOpenAuthModal,
+  programs
 }: HeaderProps) {
   const [dropdownOpen, setDropdownOpen] = useState(false);
 
@@ -37,6 +39,9 @@ export default function Header({
 
   const isUserAdmin = currentUser ? currentUser.isAdmin : false;
   const isUserGuestOrNull = currentUser ? currentUser.uid === 'guest' : true;
+
+  // check if user has at least one approved/certified program via "내 교육 프로그램 등재하기"
+  const isApprovedAuthor = currentUser && programs && programs.some(p => p.authorId === currentUser.uid && p.isApproved !== false);
 
   return (
     <>
@@ -108,10 +113,10 @@ export default function Header({
                 <div className="hidden sm:block">
                   <div className="text-xs font-semibold text-neutral-200 flex items-center gap-1.5">
                     {currentUser.name}
-                    {/* Mileage explicitly displayed next to name! */}
-                    {currentUser.uid !== 'guest' && (
-                      <span className="text-kpcia-gold font-mono font-bold bg-kpcia-gold/5 px-1.5 py-0.5 rounded border border-kpcia-gold/10">
-                        [{formatMileage(currentUser.mileage)} M]
+                    {/* Program Usage Fee (Royalty) displayed next to name ONLY for approved program creators! */}
+                    {isApprovedAuthor && (
+                      <span className="text-kpcia-gold font-mono font-bold bg-kpcia-gold/5 px-1.5 py-0.5 rounded border border-kpcia-gold/10" title="프로그램 사용료(로열티)">
+                        [사용료(로열티): {formatMileage(currentUser.mileage)} M]
                       </span>
                     )}
                   </div>

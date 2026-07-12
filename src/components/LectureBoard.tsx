@@ -179,7 +179,7 @@ export default function LectureBoard({
     <td colspan="2" class="align-center">총 정산 금액</td>
     <td class="align-right">${isPriceVisible ? `${totalCost.toLocaleString()}원` : '[등급 달성시 공개]'}</td>
     <td colspan="2" class="align-center">${isProgramAssociated ? '강사료 합계 + 재료 실비 (지정 프로그램 5% 공제)' : '강사료 합계 + 재료 실비'}</td>
-    <td>지급 완료시 마일리지 전환 가능</td>
+    <td>지급 완료시 프로그램 사용료(로열티) 전환 가능</td>
   </tr>
   <tr style="height: 10px;"><td colspan="6" style="border: none; height: 10px;"></td></tr>
   <tr>
@@ -869,7 +869,7 @@ export default function LectureBoard({
                           <Sparkles className="w-3 h-3 text-kpcia-gold" /> 연계: {lecture.programTitle}
                         </span>
                         <span className="text-kpcia-gold font-mono font-bold">
-                          마일리지 누적 지급: {royaltyToShow.toLocaleString()} M
+                          로열티: {royaltyToShow.toLocaleString()} M
                         </span>
                       </div>
                     );

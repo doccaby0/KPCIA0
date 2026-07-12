@@ -340,7 +340,7 @@ export default function AdminPanel({
   const [newTier, setNewTier] = useState<InstructorTier>('Prestige Associate');
   const [adjustAmount, setAdjustAmount] = useState<number>(1000);
   const [adjustType, setAdjustType] = useState<'add' | 'subtract'>('add');
-  const [adjustReason, setAdjustReason] = useState('특별 우수 교안 가산 마일리지 지급');
+  const [adjustReason, setAdjustReason] = useState('특별 우수 교안 가산 프로그램 사용료(로열티) 지급');
   const [mileageInputs, setMileageInputs] = useState<Record<string, string>>({});
   const [royaltyInputs, setRoyaltyInputs] = useState<Record<string, string>>({});
 
@@ -615,7 +615,7 @@ export default function AdminPanel({
     if (isNaN(targetVal) || targetVal < 0) return;
     
     const diff = targetVal - currentMileage;
-    onAdjustMileage(userId, diff, `관리자 마일리지 수동 직접 변경 (최종: ${targetVal.toLocaleString()} M)`);
+    onAdjustMileage(userId, diff, `관리자 프로그램 사용료(로열티) 수동 직접 변경 (최종: ${targetVal.toLocaleString()} M)`);
     // Clear input
     setMileageInputs(prev => {
       const copy = { ...prev };
@@ -630,7 +630,7 @@ export default function AdminPanel({
     const finalAmount = adjustType === 'add' ? Math.abs(adjustAmount) : -Math.abs(adjustAmount);
     onAdjustMileage(selectedUser, finalAmount, adjustReason);
     setAdjustAmount(1000);
-    setAdjustReason(adjustType === 'add' ? '특별 우수 교안 가산 마일리지 지급' : '특별 규정 위반 또는 취소 사유 마일리지 회수');
+    setAdjustReason(adjustType === 'add' ? '특별 우수 교안 가산 프로그램 사용료(로열티) 지급' : '특별 규정 위반 또는 취소 사유 프로그램 사용료(로열티) 회수');
   };
 
   const downloadLectureAsExcel = (lecture: LectureRequest) => {
@@ -746,7 +746,7 @@ export default function AdminPanel({
     <td colspan="2" class="align-center">총 정산 금액</td>
     <td class="align-right">${totalCost.toLocaleString()}원</td>
     <td colspan="2" class="align-center">강사료 합계 + 재료 실비</td>
-    <td>지급 완료시 마일리지 전환 가능</td>
+    <td>지급 완료시 프로그램 사용료(로열티) 전환 가능</td>
   </tr>
   <tr style="height: 10px;"><td colspan="6" style="border: none; height: 10px;"></td></tr>
   <tr>
@@ -911,7 +911,7 @@ export default function AdminPanel({
               협회 총괄 운영사무국 통제실
             </h2>
             <p className="text-xs text-neutral-400 font-sans leading-relaxed">
-              가입 승인, 저작권 심사, 강의 매칭 배정, 특별 기여 마일리지 수동 정산 및 실시간 거래 장부를 실시간 원격 통제합니다.
+              가입 승인, 저작권 심사, 강의 매칭 배정, 특별 기여 프로그램 사용료(로열티) 수동 정산 및 실시간 거래 장부를 실시간 원격 통제합니다.
             </p>
           </div>
           <div className="flex items-center gap-3 bg-neutral-950 border border-neutral-800/80 rounded-xl px-4 py-3 z-10 text-left shrink-0">
@@ -1117,7 +1117,7 @@ export default function AdminPanel({
           id="tab-btn-mileage"
         >
           <Coins className="w-4 h-4" />
-          <span>마일리지 조정 및 원장</span>
+          <span>사용료(로열티) 조정 및 원장</span>
         </button>
 
         <button
@@ -1305,7 +1305,7 @@ export default function AdminPanel({
             <div className="bg-neutral-900/50 border border-neutral-800 rounded-xl p-5" id="ledger-panel">
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-neutral-800/80 pb-3 mb-4">
                 <h3 className="text-xs font-bold font-display uppercase tracking-wider text-neutral-300 flex items-center gap-1.5">
-                  <History className="w-4 h-4 text-kpcia-gold" /> KPCIA 마일리지 누적 트랜잭션 원장 (실시간 감사 장부)
+                  <History className="w-4 h-4 text-kpcia-gold" /> KPCIA 프로그램 사용료(로열티) 누적 트랜잭션 원장 (실시간 감사 장부)
                 </h3>
                 <div className="relative max-w-xs w-full sm:w-64">
                   <Search className="absolute left-3 top-2.5 w-3.5 h-3.5 text-neutral-500" />
@@ -1321,7 +1321,7 @@ export default function AdminPanel({
 
               {filteredTransactions.length === 0 ? (
                 <div className="text-center py-12 text-xs text-neutral-500">
-                  {txSearch ? '검색어와 일치하는 트랜잭션 기록이 없습니다.' : '기록된 마일리지 거래가 존재하지 않습니다.'}
+                  {txSearch ? '검색어와 일치하는 트랜잭션 기록이 없습니다.' : '기록된 사용료(로열티) 거래가 존재하지 않습니다.'}
                 </div>
               ) : (
                 <div className="space-y-2 max-h-[350px] overflow-y-auto pr-1" id="ledger-logs">
@@ -1359,7 +1359,7 @@ export default function AdminPanel({
                     KPCIA 플랫폼 전체 마스터 데이터 초기화
                   </h4>
                   <p className="text-[10px] text-neutral-400 font-sans leading-relaxed">
-                    KPCIA에 등록된 모든 강사 가입 이력, 출강 실적, 교육 프로그램 저작권, 마일리지 원장 거래 내역 및 제휴 제안 전체 데이터를 공고 초기 상태로 완전히 포맷합니다.
+                    KPCIA에 등록된 모든 강사 가입 이력, 출강 실적, 교육 프로그램 저작권, 프로그램 사용료(로열티) 원장 거래 내역 및 제휴 제안 전체 데이터를 공고 초기 상태로 완전히 포맷합니다.
                   </p>
                 </div>
                 <button
@@ -1524,7 +1524,7 @@ export default function AdminPanel({
                             <div className="bg-neutral-900/30 border border-neutral-800 p-4 rounded-lg space-y-4 animate-in fade-in duration-200">
                               <div className="border-b border-neutral-800 pb-2">
                                 <span className="text-xs font-bold text-kpcia-gold">운영사무국 프로그램 수정보완 편집기</span>
-                                <p className="text-[10px] text-neutral-400 mt-0.5">강사의 오리지널 기획을 정교화하고 승인 시 지급될 마일리지를 책정합니다.</p>
+                                <p className="text-[10px] text-neutral-400 mt-0.5">강사의 오리지널 기획을 정교화하고 승인 시 지급될 프로그램 사용료(로열티)를 책정합니다.</p>
                               </div>
 
                               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -1580,7 +1580,7 @@ export default function AdminPanel({
 
                               <div className="grid grid-cols-1 md:grid-cols-2 gap-4 items-end pt-2 border-t border-neutral-850">
                                 <div>
-                                  <label className="text-[9px] font-mono text-amber-500 block mb-1">★ 승인 저작권 마일리지 적립율</label>
+                                  <label className="text-[9px] font-mono text-amber-500 block mb-1">★ 승인 저작권 프로그램 사용료(로열티) 적립율</label>
                                   <div className="w-full px-3 py-1.5 rounded-lg bg-neutral-950 border border-amber-500/20 text-xs font-bold font-mono text-kpcia-gold">
                                     총 출강비의 5% (자동 적립)
                                   </div>
@@ -1873,7 +1873,7 @@ export default function AdminPanel({
                         <div className="text-[10px] text-kpcia-gold/70 font-mono text-right leading-tight">
                           {isProgramSelected ? (
                             <>
-                              강사료+재료비에서<br/>마일리지 5% 차감
+                              강사료+재료비에서<br/>프로그램 사용료(로열티) 5% 차감
                             </>
                           ) : (
                             <>
@@ -1921,7 +1921,7 @@ export default function AdminPanel({
                     {/* Royalty Amount Manual Input if no program */}
                     <div>
                       <label className="text-[10px] font-mono text-neutral-400 block mb-1">
-                        원작 저작자 지급 마일리지 누적 (M)
+                        원작 저작자 지급 프로그램 사용료(로열티) 누적 (M)
                       </label>
                       <input
                         type="number"
@@ -2098,7 +2098,7 @@ export default function AdminPanel({
                               id={`complete-btn-${lecture.id}`}
                             >
                               <CheckCircle className="w-4 h-4 text-kpcia-dark" />
-                              <span>출강 완료 승인 & 마일리지 즉시 정산</span>
+                              <span>출강 완료 승인 & 사용료(로열티) 즉시 정산</span>
                             </button>
                           </div>
                         )}
@@ -2781,7 +2781,7 @@ export default function AdminPanel({
           </div>
         )}
 
-        {/* ==================== TAB 4-2: MILEAGE (마일리지 조정 및 원장) ==================== */}
+        {/* ==================== TAB 4-2: MILEAGE (사용료(로열티) 조정 및 원장) ==================== */}
         {activeTab === 'mileage' && (
           <div className="space-y-6 animate-in fade-in duration-200" id="pane-mileage">
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-6" id="mileage-grid">
@@ -2793,7 +2793,7 @@ export default function AdminPanel({
                 <div className="bg-neutral-900/50 border border-neutral-800 rounded-xl p-5 text-left flex flex-col h-[350px]" id="mileage-direct-adjust-panel">
                   <div className="flex items-center justify-between gap-3 border-b border-neutral-800/80 pb-3 mb-3">
                     <h3 className="text-xs font-bold font-display uppercase tracking-wider text-neutral-300 flex items-center gap-1.5">
-                      <Coins className="w-4 h-4 text-kpcia-gold" /> 강사별 마일리지 정밀 개별 조정
+                      <Coins className="w-4 h-4 text-kpcia-gold" /> 강사별 사용료(로열티) 정밀 개별 조정
                     </h3>
                     <div className="relative w-40">
                       <Search className="absolute left-2 top-1.5 w-3 h-3 text-neutral-500" />
@@ -2814,7 +2814,7 @@ export default function AdminPanel({
                         <tr className="border-b border-neutral-850 text-neutral-500 text-[9px] font-mono text-left">
                           <th className="pb-2 font-normal">성명</th>
                           <th className="pb-2 font-normal">등급 권한</th>
-                          <th className="pb-2 font-normal text-right">현재 마일리지</th>
+                          <th className="pb-2 font-normal text-right">현재 사용료(로열티)</th>
                           <th className="pb-2 font-normal text-center w-36">수동 변경</th>
                         </tr>
                       </thead>
@@ -2828,7 +2828,7 @@ export default function AdminPanel({
                               <div className="flex items-center justify-center space-x-1" onClick={(e) => e.stopPropagation()}>
                                 <input
                                   type="number"
-                                  title="마일리지 조정"
+                                  title="사용료(로열티) 조정"
                                   value={mileageInputs[user.uid] !== undefined ? mileageInputs[user.uid] : user.mileage}
                                   onChange={(e) => handleMileageChange(user.uid, e.target.value)}
                                   onKeyDown={(e) => {
@@ -2861,10 +2861,10 @@ export default function AdminPanel({
                 {/* Educational Program Mileage Adjustments */}
                 <div className="bg-neutral-900/50 border border-neutral-800 rounded-xl p-5 text-left h-[274px] flex flex-col" id="program-royalty-management">
                   <h3 className="text-xs font-bold font-display uppercase tracking-wider text-neutral-300 flex items-center gap-1.5 mb-2 border-b border-neutral-800/80 pb-2.5">
-                    <BookOpen className="w-4 h-4 text-kpcia-gold" /> 등재 교육 콘텐츠별 정산 마일리지 조율
+                    <BookOpen className="w-4 h-4 text-kpcia-gold" /> 등재 교육 콘텐츠별 정산 사용료(로열티) 조율
                   </h3>
                   <p className="text-[10px] text-neutral-400 mb-3">
-                    강사가 기획 등재한 콘텐츠가 다른 강사에 의해 출강 완료 시, 해당 원작자 강사에게 총 출강비의 5% 마일리지가 지적재산 로열티로 즉시 자동 정산 누적됩니다.
+                    강사가 기획 등재한 콘텐츠가 다른 강사에 의해 출강 완료 시, 해당 원작자 강사에게 총 출강비의 5% 프로그램 사용료(로열티)가 지적재산 로열티로 즉시 자동 정산 누적됩니다.
                   </p>
                   <div className="space-y-2.5 overflow-y-auto flex-1 pr-1">
                     {programs.filter(p => p.isApproved !== false).map((program) => (
@@ -2924,7 +2924,7 @@ export default function AdminPanel({
                 {/* Special Hand Adjustment Form */}
                 <div className="bg-neutral-900/50 border border-neutral-800 rounded-xl p-5 text-left" id="mileage-adjust-panel">
                   <h3 className="text-xs font-bold font-display uppercase tracking-wider text-neutral-300 flex items-center gap-1.5 mb-3 border-b border-neutral-800/80 pb-2.5">
-                    <DollarSign className="w-4 h-4 text-kpcia-gold" /> 특별 공로 마일리지 직접 수동 변동 처리
+                    <DollarSign className="w-4 h-4 text-kpcia-gold" /> 특별 공로 사용료(로열티) 직접 수동 변동 처리
                   </h3>
                   <form onSubmit={handleAdjustSubmit} className="space-y-3.5" id="mileage-adjust-form">
                     <div>
@@ -2943,13 +2943,13 @@ export default function AdminPanel({
                     </div>
 
                     <div>
-                      <label className="text-[10px] font-bold text-neutral-400 block mb-1">마일리지 조정 구분</label>
+                      <label className="text-[10px] font-bold text-neutral-400 block mb-1">사용료(로열티) 조정 구분</label>
                       <div className="grid grid-cols-2 gap-2 mb-3">
                         <button
                           type="button"
                           onClick={() => {
                             setAdjustType('add');
-                            setAdjustReason('특별 우수 교안 가산 마일리지 지급');
+                            setAdjustReason('특별 우수 교안 가산 프로그램 사용료(로열티) 지급');
                           }}
                           className={`py-1.5 rounded-lg text-xs font-bold transition-all border cursor-pointer ${
                             adjustType === 'add'
@@ -2957,13 +2957,13 @@ export default function AdminPanel({
                               : 'bg-neutral-950 border-neutral-800 text-neutral-400 hover:text-neutral-300'
                           }`}
                         >
-                          ➕ 마일리지 지급 (넣기)
+                          ➕ 사용료(로열티) 지급 (넣기)
                         </button>
                         <button
                           type="button"
                           onClick={() => {
                             setAdjustType('subtract');
-                            setAdjustReason('특별 규정 위반 또는 취소 사유 마일리지 회수');
+                            setAdjustReason('특별 규정 위반 또는 취소 사유 프로그램 사용료(로열티) 회수');
                           }}
                           className={`py-1.5 rounded-lg text-xs font-bold transition-all border cursor-pointer ${
                             adjustType === 'subtract'
@@ -2971,14 +2971,14 @@ export default function AdminPanel({
                               : 'bg-neutral-950 border-neutral-800 text-neutral-400 hover:text-neutral-300'
                           }`}
                         >
-                          ➖ 마일리지 차감 (빼기)
+                          ➖ 사용료(로열티) 차감 (빼기)
                         </button>
                       </div>
                     </div>
 
                     <div className="grid grid-cols-2 gap-3">
                       <div>
-                        <label className="text-[10px] font-bold text-neutral-400 block mb-1">변동 마일리지 값</label>
+                        <label className="text-[10px] font-bold text-neutral-400 block mb-1">변동 사용료(로열티) 값</label>
                         <input
                           type="number"
                           placeholder="예: 3000"
@@ -3017,7 +3017,7 @@ export default function AdminPanel({
                       disabled={!selectedUser}
                       className="w-full py-2 bg-neutral-950 hover:bg-neutral-900 border border-kpcia-gold text-kpcia-gold font-bold text-xs rounded-lg transition-all disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
                     >
-                      {adjustType === 'add' ? '🎁 마일리지 지급 실행' : '⚠️ 마일리지 차감/회수 실행'}
+                      {adjustType === 'add' ? '🎁 사용료(로열티) 지급 실행' : '⚠️ 사용료(로열티) 차감/회수 실행'}
                     </button>
                   </form>
                 </div>
@@ -3026,7 +3026,7 @@ export default function AdminPanel({
                 <div className="bg-neutral-900/50 border border-neutral-800 rounded-xl p-5 text-left h-[300px] flex flex-col" id="mileage-ledger-panel">
                   <div className="flex items-center justify-between border-b border-neutral-800/80 pb-3 mb-3">
                     <h3 className="text-xs font-bold font-display uppercase tracking-wider text-neutral-300 flex items-center gap-1.5">
-                      <FileText className="w-4 h-4 text-kpcia-gold" /> 협회 마일리지 거래 종합 원장 (Ledger)
+                      <FileText className="w-4 h-4 text-kpcia-gold" /> 협회 사용료(로열티) 거래 종합 원장 (Ledger)
                     </h3>
                     <span className="text-[9px] font-mono font-bold text-neutral-500 bg-neutral-950 px-2 py-0.5 rounded border border-neutral-800">
                       총 {transactions.length}건 기록됨

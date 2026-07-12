@@ -51,7 +51,7 @@ export const INITIAL_USERS: UserProfile[] = [
     emailVerified: true,
     profileCard: {
       title: "KPCIA 협회 운영사무국장",
-      bio: "한국 프레스티지 기업 강사 협회 공식 운영 계정입니다. 강의 공고 및 마일리지 누적 정산을 담당합니다.",
+      bio: "한국 프레스티지 기업 강사 협회 공식 운영 계정입니다. 강의 공고 및 프로그램 사용료(로열티) 누적 정산을 담당합니다.",
       specialties: ["협회 운영", "강사 매칭", "기업 교육 설계"],
       career: ["한국 프레스티지 기업 강사 협회 설립자", "대기업 HRD 연수원 총괄 자문"],
       education: ["서울대학교 교육공학 석사"],

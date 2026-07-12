@@ -52,7 +52,7 @@ export default function ProgramBoard({ currentUser, programs, onRegisterProgram 
             <BookOpen className="w-5 h-5 text-kpcia-gold" /> KPCIA 공인 명품 교육 프로그램 설계처
           </h2>
           <p className="text-xs text-neutral-400 mt-1">
-            협회 강사들이 직접 기획 및 개발한 정예 교육 프로그램입니다. 타 강사가 해당 프로그램을 활용해 출강 시 저작자에게 마일리지가 누적 지급됩니다.
+            협회 강사들이 직접 기획 및 개발한 정예 교육 프로그램입니다. 타 강사가 해당 프로그램을 활용해 출강 시 저작자에게 로열티가 지급됩니다.
           </p>
         </div>
 
@@ -72,10 +72,10 @@ export default function ProgramBoard({ currentUser, programs, onRegisterProgram 
         <form onSubmit={handleSubmit} className="bg-neutral-900 border border-kpcia-gold/30 rounded-xl p-6 space-y-4 animate-in fade-in slide-in-from-top-4 duration-300" id="program-register-form">
           <div className="flex items-center justify-between border-b border-neutral-800 pb-3">
             <h3 className="font-display font-bold text-sm text-kpcia-gold flex items-center gap-1.5">
-              <Sparkles className="w-4 h-4" /> 신규 교육 콘텐츠 저작권(마일리지 누적) 등록 요청
+              <Sparkles className="w-4 h-4" /> 신규 교육 콘텐츠 저작권(프로그램 사용료(로열티) 누적) 등록 요청
             </h3>
             <span className="text-[10px] text-kpcia-gold bg-kpcia-gold/5 px-2 py-0.5 rounded border border-kpcia-gold/10">
-              등재 완료 시 +1,000 M 특별 축하 지원금
+              등재 완료 시 +1,000 M 특별 축하 사용료(로열티)
             </span>
           </div>
 
@@ -155,10 +155,10 @@ export default function ProgramBoard({ currentUser, programs, onRegisterProgram 
       <div className="bg-neutral-950 border border-neutral-800 p-5 rounded-xl flex flex-col md:flex-row items-start md:items-center justify-between gap-4" id="loyalty-structure-panel">
         <div className="space-y-1">
           <h4 className="text-xs font-bold text-kpcia-gold font-display uppercase tracking-wider flex items-center gap-1.5">
-            <Award className="w-4 h-4" /> KPCIA 마일리지 누적 지급 구조
+            <Award className="w-4 h-4" /> KPCIA 로열티 구조
           </h4>
           <p className="text-xs text-neutral-400 leading-relaxed max-w-2xl font-sans">
-            협회 정식 프로그램 등재 후, 다른 회원이 해당 라이선스로 출강을 마쳤을 때, <strong>누적 마일리지(M)</strong>가 원작 설계자의 마일리지로 즉각 자동 지급되는 특허 제도를 운영하고 있습니다.
+            협회 정식 프로그램 등재 후, 다른 회원이 해당 라이선스로 출강을 마쳤을 때, <strong>누적 프로그램 사용료(로열티)(M)</strong>가 원작 설계자의 프로그램 사용료(로열티)로 즉각 자동 지급되는 특허 제도를 운영하고 있습니다.
           </p>
         </div>
         <div className="bg-neutral-900 border border-neutral-800 rounded-lg px-4 py-3 text-center min-w-44" id="stat-support">
@@ -235,7 +235,7 @@ export default function ProgramBoard({ currentUser, programs, onRegisterProgram 
               {/* Royalty Amount display */}
               <div className="mt-5 pt-3.5 border-t border-neutral-800/80 flex items-center justify-between" id={`program-footer-${program.id}`}>
                 <div>
-                  <span className="text-[9px] text-neutral-500 block font-mono">건당 지급 마일리지 누적</span>
+                  <span className="text-[9px] text-neutral-500 block font-mono">건당 지급 프로그램 사용료(로열티) 누적</span>
                   <span className="text-sm font-mono font-bold text-kpcia-gold">
                     총 출강비의 5%
                   </span>
@@ -256,7 +256,7 @@ export default function ProgramBoard({ currentUser, programs, onRegisterProgram 
             <span className="w-2 h-2 rounded-full bg-amber-500 animate-pulse" /> 저작권 등록 심사 대기 중인 내 프로그램
           </h3>
           <p className="text-[11px] text-neutral-400">
-            운영사무국에서 프로그램 구성을 수정/보완 및 검토한 후, 일괄 마일리지를 측정하여 최종 확정(승인)하게 됩니다.
+            운영사무국에서 프로그램 구성을 수정/보완 및 검토한 후, 일괄 프로그램 사용료(로열티) 요율을 측정하여 최종 확정(승인)하게 됩니다.
           </p>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {programs.filter(p => p.isApproved === false && p.authorId === currentUser.uid).map((program) => (

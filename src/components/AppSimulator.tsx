@@ -62,6 +62,8 @@ export default function AppSimulator({
   const [viewingCardForUser, setViewingCardForUser] = useState<UserProfile | null>(null);
   const [asstSearchQuery, setAsstSearchQuery] = useState('');
 
+  const isApprovedAuthor = currentUser && programs && programs.some(p => p.authorId === currentUser.uid && p.isApproved !== false);
+
   const formatMileage = (num: number) => {
     return new Intl.NumberFormat().format(num);
   };
@@ -524,7 +526,9 @@ export default function AppSimulator({
 
                         <div className="flex justify-between items-center pt-2 text-[8px] text-neutral-500 font-mono">
                           <span>{currentUser.email}</span>
-                          <span>마일리지: {formatMileage(currentUser.mileage)} M</span>
+                          {isApprovedAuthor && (
+                            <span>사용료(로열티): {formatMileage(currentUser.mileage)} M</span>
+                          )}
                         </div>
                       </div>
 
@@ -712,10 +716,12 @@ export default function AppSimulator({
                   </span>
                 </div>
                 
-                <div className="flex justify-between items-center pt-2 border-t border-neutral-900 text-[8px] text-neutral-400 font-mono">
-                  <span>보유 마일리지</span>
-                  <span className="font-bold text-kpcia-gold">{formatMileage(currentUser.mileage)} M</span>
-                </div>
+                {isApprovedAuthor && (
+                  <div className="flex justify-between items-center pt-2 border-t border-neutral-900 text-[8px] text-neutral-400 font-mono">
+                    <span>보유 프로그램 사용료(로열티)</span>
+                    <span className="font-bold text-kpcia-gold">{formatMileage(currentUser.mileage)} M</span>
+                  </div>
+                )}
               </div>
 
 
