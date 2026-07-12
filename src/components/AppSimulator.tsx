@@ -759,9 +759,14 @@ export default function AppSimulator({
                 <h3 className="text-xs font-bold text-kpcia-gold flex items-center gap-1.5">
                   <Users className="w-3.5 h-3.5 text-kpcia-gold" /> 보조강사 동행 매칭
                 </h3>
-                <span className="text-[9px] text-neutral-400 block truncate max-w-[240px]">
-                  {applyingLecture.title}
-                </span>
+                <div className="flex flex-col gap-0.5 mt-1">
+                  <span className="text-[9px] text-neutral-450 block truncate max-w-[240px]">
+                    신청 강의: {applyingLecture.title}
+                  </span>
+                  <span className="text-[8px] self-start px-1.5 py-0.2 rounded bg-kpcia-gold/15 text-kpcia-gold border border-kpcia-gold/20 font-bold font-mono">
+                    🛡️ 지원 자격: {applyingLecture.targetTier} ↑
+                  </span>
+                </div>
               </div>
               <button
                 onClick={() => setApplyingLecture(null)}

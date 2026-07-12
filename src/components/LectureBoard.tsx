@@ -1320,9 +1320,14 @@ export default function LectureBoard({
                 <h3 className="text-sm font-bold text-kpcia-gold flex items-center gap-2">
                   <Users className="w-4 h-4 text-kpcia-gold" /> 보조강사 동행 매칭 정보 & 출강 신청 확정
                 </h3>
-                <p className="text-[10px] text-neutral-400 font-sans truncate max-w-md">
-                  신청 강의: {applyingLecture.title}
-                </p>
+                <div className="flex items-center gap-2 mt-0.5 flex-wrap">
+                  <span className="text-[10px] text-neutral-400 font-sans truncate max-w-md">
+                    신청 강의: {applyingLecture.title}
+                  </span>
+                  <span className="text-[8.5px] px-1.5 py-0.5 rounded bg-kpcia-gold/15 text-kpcia-gold border border-kpcia-gold/20 font-bold font-mono">
+                    🛡️ {applyingLecture.targetTier} ↑ 지원
+                  </span>
+                </div>
               </div>
               <button
                 onClick={() => setApplyingLecture(null)}
@@ -1334,6 +1339,28 @@ export default function LectureBoard({
 
             {/* Modal Body */}
             <div className="p-5 space-y-4 overflow-y-auto flex-1">
+              {/* 강의 통합 요약 정보 카드 (등급 포함) */}
+              <div className="bg-neutral-950/40 border border-neutral-850 p-4 rounded-xl flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs text-left">
+                <div className="space-y-1">
+                  <div className="font-semibold text-neutral-200 text-sm flex items-center gap-2">
+                    <span className="text-kpcia-gold font-mono text-[9.5px] px-2 py-0.5 rounded bg-kpcia-gold/10 border border-kpcia-gold/20 font-extrabold uppercase shrink-0">
+                      {applyingLecture.targetTier} 이상
+                    </span>
+                    <span className="truncate">{applyingLecture.title}</span>
+                  </div>
+                  <div className="text-neutral-450 text-[11px] flex flex-wrap gap-x-3 gap-y-1">
+                    <span>📅 {applyingLecture.date} ({applyingLecture.time})</span>
+                    <span>📍 {applyingLecture.location}</span>
+                    <span>👤 수강인원 {applyingLecture.attendees ? `${applyingLecture.attendees}명` : '미정'}</span>
+                  </div>
+                </div>
+                <div className="text-left sm:text-right shrink-0 bg-neutral-950/45 px-3 py-1.5 rounded-lg border border-neutral-850/60">
+                  <div className="text-[9.5px] text-neutral-500 font-sans">배정 강사료</div>
+                  <div className="text-[12.5px] font-mono font-bold text-kpcia-gold">
+                    ₩{applyingLecture.budget.toLocaleString()}원
+                  </div>
+                </div>
+              </div>
               {applyingLecture.attendees !== undefined && applyingLecture.attendees <= 20 ? (
                 <div className="bg-neutral-950/60 p-5 rounded-xl border border-neutral-850 space-y-2.5 text-xs text-left">
                   <p className="text-kpcia-gold font-bold flex items-center gap-1.5 text-sm">

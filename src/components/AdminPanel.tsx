@@ -2002,6 +2002,11 @@ export default function AdminPanel({
                           </span>
                           <span className="text-[10px] text-neutral-500 font-mono">ID: {lecture.id}</span>
                           <span className="text-[10px] text-neutral-400">예산: <strong className="text-neutral-300 font-mono">{lecture.budget.toLocaleString()} KRW</strong></span>
+                          {lecture.targetTier && (
+                            <span className="text-[9px] px-2 py-0.5 rounded border border-kpcia-gold/30 bg-kpcia-gold/10 text-kpcia-gold font-bold">
+                              {lecture.targetTier} ↑ 지원 등급
+                            </span>
+                          )}
                         </div>
                         
                         <h4 className="text-sm font-bold text-neutral-200 font-display">{lecture.title}</h4>
@@ -2200,7 +2205,14 @@ export default function AdminPanel({
                               🏦 {bankAccount}
                             </div>
                           </td>
-                          <td className="p-3 font-medium text-neutral-200">{lecture.title}</td>
+                          <td className="p-3 font-medium text-neutral-200">
+                            <div>{lecture.title}</div>
+                            {lecture.targetTier && (
+                              <div className="text-[9.5px] text-kpcia-gold font-mono mt-1">
+                                🛡️ 지원 등급: {lecture.targetTier} ↑
+                              </div>
+                            )}
+                          </td>
                           <td className="p-3 text-center font-mono text-[11px] text-neutral-400">{lecture.date || '기재 없음'}</td>
                           <td className="p-3 text-right font-mono font-bold text-kpcia-gold">{lecture.budget.toLocaleString()}원</td>
                           <td className="p-3 text-center">
