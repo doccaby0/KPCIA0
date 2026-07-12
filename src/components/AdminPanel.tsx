@@ -825,8 +825,20 @@ export default function AdminPanel({
   };
 
   // Filter lists
-  const pendingLectures = lectures.filter(l => l.status !== 'completed');
-  const completedLectures = lectures.filter(l => l.status === 'completed');
+  const pendingLectures = [...lectures]
+    .filter(l => l.status !== 'completed')
+    .sort((a, b) => {
+      const dateA = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+      const dateB = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+      return dateB - dateA;
+    });
+  const completedLectures = [...lectures]
+    .filter(l => l.status === 'completed')
+    .sort((a, b) => {
+      const dateA = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+      const dateB = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+      return dateB - dateA;
+    });
   const pendingApprovals = users.filter(u => !u.isAdmin && u.isApproved === false);
   const approvedUsers = users.filter(u => !u.isAdmin && u.isApproved !== false);
   const pendingPrograms = programs.filter(p => p.isApproved === false);

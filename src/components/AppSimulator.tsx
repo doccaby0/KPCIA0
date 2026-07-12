@@ -356,7 +356,13 @@ export default function AppSimulator({
                     </div>
 
                       <div className="space-y-3 pb-4" id="mobile-lectures-list">
-                        {lectures.map((l) => {
+                        {[...lectures]
+                          .sort((a, b) => {
+                            const dateA = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+                            const dateB = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+                            return dateB - dateA;
+                          })
+                          .map((l) => {
                           const isQualified = checkIsQualified(currentUser.tier, l.targetTier);
                           const hasApplied = l.applicants.includes(currentUser.uid);
                           const isMyJob = l.assignedTo === currentUser.uid;
