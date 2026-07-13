@@ -242,8 +242,40 @@ export class StorageService {
     return fallback;
   }
 
-  private static setLocal(key: string, data: any) {
+  public static setLocal(key: string, data: any) {
     localStorage.setItem(`kpcia_${key}`, JSON.stringify(data));
+  }
+
+  static getLocalUsers(): UserProfile[] {
+    const rawList = this.getLocal<UserProfile[]>('users', INITIAL_USERS);
+    return rawList.map(u => ({
+      ...u,
+      isApproved: u.isApproved !== undefined ? u.isApproved : true,
+      emailVerified: u.emailVerified !== undefined ? u.emailVerified : true,
+      lectureCount: u.lectureCount !== undefined ? u.lectureCount : 0,
+      lectureRatings: u.lectureRatings || [],
+      averageRating: u.averageRating !== undefined ? u.averageRating : 0,
+    }));
+  }
+
+  static getLocalLectures(): LectureRequest[] {
+    return this.getLocal<LectureRequest[]>('lectures', INITIAL_LECTURES);
+  }
+
+  static getLocalPrograms(): EducationalProgram[] {
+    const rawList = this.getLocal<EducationalProgram[]>('programs', INITIAL_PROGRAMS);
+    return rawList.map(p => ({
+      ...p,
+      isApproved: p.isApproved !== undefined ? p.isApproved : true
+    }));
+  }
+
+  static getLocalTransactions(): MileageTransaction[] {
+    return this.getLocal<MileageTransaction[]>('transactions', INITIAL_TRANSACTIONS);
+  }
+
+  static getLocalProposals(): PartnershipProposal[] {
+    return this.getLocal<PartnershipProposal[]>('proposals', INITIAL_PROPOSALS);
   }
 
   // Robust helper to execute Firestore operations with a fast timeout fallback

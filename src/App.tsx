@@ -73,15 +73,12 @@ export default function App() {
     let unsubProposals = () => {};
 
     const syncData = async () => {
-      // 1. Seed empty database
-      await StorageService.seedDatabaseIfEmpty();
-
-      // 2. Fetch initial values to guarantee instant rendering
-      const loadedUsers = await StorageService.getUsers();
-      const loadedLectures = await StorageService.getLectures();
-      const loadedPrograms = await StorageService.getPrograms();
-      const loadedTransactions = await StorageService.getTransactions();
-      const loadedProposals = await StorageService.getProposals();
+      // 1. Fetch initial values instantly from local storage cache to guarantee 0ms rendering
+      const loadedUsers = StorageService.getLocalUsers();
+      const loadedLectures = StorageService.getLocalLectures();
+      const loadedPrograms = StorageService.getLocalPrograms();
+      const loadedTransactions = StorageService.getLocalTransactions();
+      const loadedProposals = StorageService.getLocalProposals();
 
       setUsers(loadedUsers);
       setLectures(loadedLectures);
@@ -89,7 +86,7 @@ export default function App() {
       setTransactions(loadedTransactions);
       setProposals(loadedProposals);
 
-      // 3. Set default login state or load existing session from localStorage
+      // 2. Load existing session from localStorage (instant!)
       const savedUserUid = localStorage.getItem('kpcia_logged_in_uid');
       if (savedUserUid) {
         const savedUser = loadedUsers.find(u => u.uid === savedUserUid);
@@ -100,12 +97,17 @@ export default function App() {
         setCurrentUser(null);
       }
 
+      // 3. Seed empty database in the background (DO NOT AWAIT - avoids blocking UI)
+      StorageService.seedDatabaseIfEmpty().catch(err => console.warn("Background seed in progress or failed:", err));
+
       // 4. Activate real-time cloud sync listeners if Firestore is enabled
+      // Since onSnapshot automatically fetches current database values, it will seamlessly update the state in the background once connected!
       if (useFirestore) {
         try {
           unsubUsers = StorageService.subscribeUsers((updatedUsers) => {
             if (updatedUsers.length > 0) {
               setUsers(updatedUsers);
+              StorageService.setLocal('users', updatedUsers);
               const loggedInUid = localStorage.getItem('kpcia_logged_in_uid');
               if (loggedInUid) {
                 const updatedMe = updatedUsers.find(u => u.uid === loggedInUid);
@@ -119,21 +121,25 @@ export default function App() {
           unsubLectures = StorageService.subscribeLectures((updatedLectures) => {
             if (updatedLectures.length > 0) {
               setLectures(updatedLectures);
+              StorageService.setLocal('lectures', updatedLectures);
             }
           });
 
           unsubPrograms = StorageService.subscribePrograms((updatedPrograms) => {
             if (updatedPrograms.length > 0) {
               setPrograms(updatedPrograms);
+              StorageService.setLocal('programs', updatedPrograms);
             }
           });
 
           unsubTransactions = StorageService.subscribeTransactions((updatedTransactions) => {
             setTransactions(updatedTransactions);
+            StorageService.setLocal('transactions', updatedTransactions);
           });
 
           unsubProposals = StorageService.subscribeProposals((updatedProposals) => {
             setProposals(updatedProposals);
+            StorageService.setLocal('proposals', updatedProposals);
           });
         } catch (err) {
           console.error("Failed to register real-time Firestore synchronization:", err);
@@ -228,18 +234,15 @@ export default function App() {
       }
     };
 
-    // 5. Console Obfuscation & Security Logger
-    const consoleLogger = setInterval(() => {
-      console.clear();
-      console.log(
-        "%c🚨 [KPCIA SECURITY SHIELD ACTIVE] 🚨", 
-        "color: #D4AF37; font-size: 24px; font-weight: 900; text-shadow: 2px 2px 4px rgba(0,0,0,0.8); background: #0A0A0A; padding: 10px 20px; border-radius: 8px; border: 2px solid #D4AF37;"
-      );
-      console.log(
-        "%c이 웹 시스템의 데이터 및 리소스는 한국프레스티지기업강사협회(KPCIA) 저작권 보호 규정에 따라 관리됩니다.\n무단 크롤링, 웹 스크래핑, 혹은 거대 언어 모델(LLM) 및 AI 학습을 목적으로 데이터를 복제하거나 재배포하는 경우, 저작권법 제136조에 따라 처벌을 받을 수 있습니다.\n\n출처: https://kpcia.or.kr", 
-        "color: #E2E8F0; font-size: 13px; line-height: 1.6; background: #171717; padding: 12px; border-radius: 6px; border-left: 4px solid #F59E0B;"
-      );
-    }, 4000);
+    // 5. Console Obfuscation & Security Logger (Single run on mount for maximum performance)
+    console.log(
+      "%c🚨 [KPCIA SECURITY SHIELD ACTIVE] 🚨", 
+      "color: #D4AF37; font-size: 24px; font-weight: 900; text-shadow: 2px 2px 4px rgba(0,0,0,0.8); background: #0A0A0A; padding: 10px 20px; border-radius: 8px; border: 2px solid #D4AF37;"
+    );
+    console.log(
+      "%c이 웹 시스템의 데이터 및 리소스는 한국프레스티지기업강사협회(KPCIA) 저작권 보호 규정에 따라 관리됩니다.\n무단 크롤링, 웹 스크래핑, 혹은 거대 언어 모델(LLM) 및 AI 학습을 목적으로 데이터를 복제하거나 재배포하는 경우, 저작권법 제136조에 따라 처벌을 받을 수 있습니다.\n\n출처: https://kpcia.or.kr", 
+      "color: #E2E8F0; font-size: 13px; line-height: 1.6; background: #171717; padding: 12px; border-radius: 6px; border-left: 4px solid #F59E0B;"
+    );
 
     // Register listeners
     window.addEventListener('contextmenu', handleContextMenu);
@@ -248,16 +251,12 @@ export default function App() {
     window.addEventListener('copy', handleCopy);
     window.addEventListener('keydown', handleKeyDown);
 
-    // Initial console warning
-    console.log("%cKPCIA SECURITY PLATFORM ACTIVE", "color: #D4AF37; font-size: 20px; font-weight: bold;");
-
     return () => {
       window.removeEventListener('contextmenu', handleContextMenu);
       window.removeEventListener('selectstart', handleSelectStart);
       window.removeEventListener('dragstart', handleDragStart);
       window.removeEventListener('copy', handleCopy);
       window.removeEventListener('keydown', handleKeyDown);
-      clearInterval(consoleLogger);
     };
   }, []);
 
@@ -1069,7 +1068,7 @@ export default function App() {
     triggerToast('성공적으로 로그아웃되었습니다. 다른 강사 계정으로 로그인하거나 신규 가입을 진행해 주세요.', 'info');
   };
 
-  // 12. Main website login submit handler
+  // 12. Main website login submit handler (Optimized for instant 0ms authentication)
   const handleLoginSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoginError('');
@@ -1082,27 +1081,25 @@ export default function App() {
       return;
     }
 
-    // 1. Check main operator / office admin credentials
-    if (trimmedId === 'insight9lab' && trimmedPw === '400828') {
-      const adminUser = users.find(u => u.isAdmin);
-      if (adminUser) {
-        setCurrentUser(adminUser);
-        localStorage.setItem('kpcia_logged_in_uid', adminUser.uid);
-        triggerToast('KPCIA 운영사무국 메인 관리자 계정으로 로그인되었습니다.', 'success');
-        setLoginId('');
-        setLoginPassword('');
-        setShowAuthModal(false);
-        return;
-      }
+    // 1. Check local/mock user profiles first (Fast, 0ms latency - avoids network block!)
+    const matchedUserLocal = users.find(u => 
+      (u.loginId && u.loginId.toLowerCase() === trimmedId.toLowerCase()) ||
+      (!u.loginId && (u.email.toLowerCase() === trimmedId.toLowerCase() || u.name === trimmedId || u.uid === trimmedId))
+    );
+
+    if (matchedUserLocal && matchedUserLocal.password && matchedUserLocal.password === trimmedPw) {
+      setCurrentUser(matchedUserLocal);
+      localStorage.setItem('kpcia_logged_in_uid', matchedUserLocal.uid);
+      triggerToast(`${matchedUserLocal.name} 강사님 계정으로 즉시 로그인되었습니다.`, 'success');
+      setLoginId('');
+      setLoginPassword('');
+      setShowAuthModal(false);
+      return;
     }
 
-    // 2. Try Firebase Auth if active and id looks like email or matches a known user
+    // 2. Try Firebase Auth as fallback for newly registered Firebase users if not matching local password
     if (auth && useFirestore) {
-      const matchedUser = users.find(u => 
-        (u.loginId && u.loginId.toLowerCase() === trimmedId.toLowerCase()) ||
-        (!u.loginId && (u.email.toLowerCase() === trimmedId.toLowerCase() || u.name === trimmedId || u.uid === trimmedId))
-      );
-      const loginEmail = matchedUser ? matchedUser.email : (trimmedId.includes('@') ? trimmedId : '');
+      const loginEmail = matchedUserLocal ? matchedUserLocal.email : (trimmedId.includes('@') ? trimmedId : '');
       if (loginEmail) {
         try {
           const userCredential = await signInWithEmailAndPassword(auth, loginEmail, trimmedPw);
@@ -1113,7 +1110,7 @@ export default function App() {
             return;
           }
 
-          const actualUser = users.find(u => u.uid === fbUser.uid) || matchedUser;
+          const actualUser = users.find(u => u.uid === fbUser.uid) || matchedUserLocal;
           if (actualUser) {
             setCurrentUser(actualUser);
             localStorage.setItem('kpcia_logged_in_uid', actualUser.uid);
@@ -1124,8 +1121,7 @@ export default function App() {
             return;
           }
         } catch (firebaseErr: any) {
-          console.warn("Firebase Auth login failed, checking fallback:", firebaseErr);
-          // Only show specific firebase error if password looks wrong, otherwise allow fallback (for mock/local users)
+          console.warn("Firebase Auth login failed:", firebaseErr);
           if (firebaseErr.code === 'auth/wrong-password' || firebaseErr.code === 'auth/invalid-credential') {
             setLoginError('비밀번호가 일치하지 않거나 유효하지 않은 자격 증명입니다.');
             return;
@@ -1134,28 +1130,11 @@ export default function App() {
       }
     }
 
-    // 3. Fallback database check
-    const matchedUserFallback = users.find(u => 
-      (u.loginId && u.loginId.toLowerCase() === trimmedId.toLowerCase()) ||
-      (!u.loginId && (u.email.toLowerCase() === trimmedId.toLowerCase() || u.name === trimmedId || u.uid === trimmedId))
-    );
-
-    if (matchedUserFallback) {
-      if (matchedUserFallback.password && matchedUserFallback.password !== trimmedPw) {
-        setLoginError('비밀번호가 일치하지 않습니다.');
-        return;
-      }
-
-      setCurrentUser(matchedUserFallback);
-      localStorage.setItem('kpcia_logged_in_uid', matchedUserFallback.uid);
-      triggerToast(`${matchedUserFallback.name} 강사님 계정으로 로그인되었습니다.`, 'success');
-      setLoginId('');
-      setLoginPassword('');
-      setShowAuthModal(false);
-      return;
+    if (matchedUserLocal) {
+      setLoginError('비밀번호가 일치하지 않습니다.');
+    } else {
+      setLoginError('아이디 또는 비밀번호가 일치하지 않습니다.');
     }
-
-    setLoginError('아이디 또는 비밀번호가 일치하지 않습니다.');
   };
 
   // Unified auth modal registration entry points
@@ -1170,24 +1149,22 @@ export default function App() {
       return false;
     }
 
-    // 1. Check main operator / office admin credentials
-    if (trimmedId === 'insight9lab' && trimmedPw === '400828') {
-      const adminUser = users.find(u => u.isAdmin);
-      if (adminUser) {
-        setCurrentUser(adminUser);
-        localStorage.setItem('kpcia_logged_in_uid', adminUser.uid);
-        triggerToast('KPCIA 운영사무국 메인 관리자 계정으로 로그인되었습니다.', 'success');
-        return true;
-      }
+    // 1. Check local/mock user profiles first (Fast, 0ms latency - avoids network block!)
+    const matchedUserLocal = users.find(u => 
+      (u.loginId && u.loginId.toLowerCase() === trimmedId.toLowerCase()) ||
+      (!u.loginId && (u.email.toLowerCase() === trimmedId.toLowerCase() || u.name === trimmedId || u.uid === trimmedId))
+    );
+
+    if (matchedUserLocal && matchedUserLocal.password && matchedUserLocal.password === trimmedPw) {
+      setCurrentUser(matchedUserLocal);
+      localStorage.setItem('kpcia_logged_in_uid', matchedUserLocal.uid);
+      triggerToast(`${matchedUserLocal.name} 강사님 계정으로 즉시 로그인되었습니다.`, 'success');
+      return true;
     }
 
-    // 2. Try Firebase Auth if active
+    // 2. Try Firebase Auth as fallback for newly registered Firebase users if not matching local password
     if (auth && useFirestore) {
-      const matchedUser = users.find(u => 
-        (u.loginId && u.loginId.toLowerCase() === trimmedId.toLowerCase()) ||
-        (!u.loginId && (u.email.toLowerCase() === trimmedId.toLowerCase() || u.name === trimmedId || u.uid === trimmedId))
-      );
-      const loginEmail = matchedUser ? matchedUser.email : (trimmedId.includes('@') ? trimmedId : '');
+      const loginEmail = matchedUserLocal ? matchedUserLocal.email : (trimmedId.includes('@') ? trimmedId : '');
       if (loginEmail) {
         try {
           const userCredential = await signInWithEmailAndPassword(auth, loginEmail, trimmedPw);
@@ -1198,7 +1175,7 @@ export default function App() {
             return false;
           }
 
-          const actualUser = users.find(u => u.uid === fbUser.uid) || matchedUser;
+          const actualUser = users.find(u => u.uid === fbUser.uid) || matchedUserLocal;
           if (actualUser) {
             setCurrentUser(actualUser);
             localStorage.setItem('kpcia_logged_in_uid', actualUser.uid);
@@ -1206,29 +1183,16 @@ export default function App() {
             return true;
           }
         } catch (firebaseErr: any) {
-          console.warn("Mobile Firebase Auth login failed, checking fallback:", firebaseErr);
+          console.warn("Mobile Firebase Auth login failed:", firebaseErr);
         }
       }
     }
 
-    // 3. Check general instructor login
-    const matchedUser = users.find(u => 
-      (u.loginId && u.loginId.toLowerCase() === trimmedId.toLowerCase()) ||
-      (!u.loginId && (u.email.toLowerCase() === trimmedId.toLowerCase() || u.name === trimmedId || u.uid === trimmedId))
-    );
-
-    if (matchedUser) {
-      if (matchedUser.password && matchedUser.password !== trimmedPw) {
-        triggerToast('비밀번호가 일치하지 않습니다.', 'info');
-        return false;
-      }
-      setCurrentUser(matchedUser);
-      localStorage.setItem('kpcia_logged_in_uid', matchedUser.uid);
-      triggerToast(`${matchedUser.name} 강사님 계정으로 로그인되었습니다.`, 'success');
-      return true;
+    if (matchedUserLocal) {
+      triggerToast('비밀번호가 일치하지 않습니다.', 'info');
+    } else {
+      triggerToast('아이디 또는 비밀번호가 일치하지 않습니다.', 'info');
     }
-
-    triggerToast('아이디 또는 비밀번호가 일치하지 않습니다.', 'info');
     return false;
   };
 
