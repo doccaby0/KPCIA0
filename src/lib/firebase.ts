@@ -297,9 +297,6 @@ export class StorageService {
       ]);
     } catch (e) {
       console.warn("Could not seed Firestore due to permissions/connection/timeout. Standard operation continues via local state.", e);
-      if (e instanceof Error && e.message === "Timeout") {
-        useFirestore = false;
-      }
     }
   }
 
