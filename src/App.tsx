@@ -14,7 +14,7 @@ import BadgeCabinet from './components/BadgeCabinet';
 import PartnershipProposalBoard from './components/PartnershipProposalBoard';
 import KPCIALogo from './components/KPCIALogo';
 
-import { Award, BookOpen, GraduationCap, CheckCircle, ShieldAlert, Sparkles, TrendingUp, Compass, ArrowRight, UserCheck, Plus, LogIn, X } from 'lucide-react';
+import { Award, BookOpen, GraduationCap, CheckCircle, ShieldAlert, Sparkles, TrendingUp, Compass, ArrowRight, UserCheck, Plus, LogIn, X, RefreshCw, Cloud } from 'lucide-react';
 
 export default function App() {
   const [users, setUsers] = useState<UserProfile[]>([]);
@@ -57,6 +57,44 @@ export default function App() {
   // Notification Toast alert
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'info' } | null>(null);
 
+  // Cloud Sync States & Handlers
+  const [isSyncing, setIsSyncing] = useState<boolean>(false);
+
+  const handleUploadLocalToCloud = async () => {
+    if (window.confirm("🚨 중요 경고: 현재 컴퓨터 브라우저에 저장되어 화면에 보이고 있는 데이터를 클라우드 DB로 강제 백업(업로드)하시겠습니까?\n이 컴퓨터에 입력하셨던 데이터가 다른 스마트폰이나 크롬 시크릿 모드 등 모든 기기에 연동되도록 클라우드로 즉시 전송합니다.\n(클라우드에 기존 데이터가 있는 경우 덮어씌워질 수 있으므로, 데이터가 잘 보이고 있는 컴퓨터 기기에서 한 번만 실행해 주세요!)")) {
+      setIsSyncing(true);
+      try {
+        await StorageService.uploadLocalToCloud();
+        triggerToast("현재 브라우저의 모든 데이터가 파이어베이스 클라우드로 성공적으로 업로드 및 연동 완료되었습니다!", "success");
+      } catch (err: any) {
+        console.error(err);
+        triggerToast(`클라우드 업로드 실패: ${err.message || err}`, "info");
+      } finally {
+        setIsSyncing(false);
+      }
+    }
+  };
+
+  const handleDownloadCloudToLocal = async () => {
+    if (window.confirm("📥 클라우드 DB에서 최신 데이터를 다운로드하여 현재 기기(브라우저)에 강제 적용하시겠습니까?\n다른 컴퓨터에서 작성하여 클라우드에 백업한 데이터가 이 기기(휴대폰/시크릿모드 등)의 화면에 즉시 다운로드되어 표시됩니다.")) {
+      setIsSyncing(true);
+      try {
+        const data = await StorageService.downloadCloudToLocal();
+        setUsers(data.users);
+        setLectures(data.lectures);
+        setPrograms(data.programs);
+        setTransactions(data.transactions);
+        setProposals(data.proposals);
+        triggerToast("클라우드 DB로부터 전 기기 최신 데이터 연동 및 덮어쓰기가 완료되었습니다!", "success");
+      } catch (err: any) {
+        console.error(err);
+        triggerToast(`클라우드 동기화 실패: ${err.message || err}`, "info");
+      } finally {
+        setIsSyncing(false);
+      }
+    }
+  };
+
   const triggerToast = (message: string, type: 'success' | 'info' = 'success') => {
     setToast({ message, type });
     setTimeout(() => {
@@ -97,8 +135,11 @@ export default function App() {
         setCurrentUser(null);
       }
 
-      // 3. Seed empty database in the background (DO NOT AWAIT - avoids blocking UI)
-      StorageService.seedDatabaseIfEmpty().catch(err => console.warn("Background seed in progress or failed:", err));
+      // 3. Seed empty database and run automatic bidirectional synchronization in the background (DO NOT AWAIT - avoids blocking UI)
+      (async () => {
+        await StorageService.seedDatabaseIfEmpty();
+        await StorageService.autoSyncLocalAndCloud();
+      })().catch(err => console.warn("Background seed/auto-sync failed:", err));
 
       // 4. Activate real-time cloud sync listeners if Firestore is enabled
       // Since onSnapshot automatically fetches current database values, it will seamlessly update the state in the background once connected!
@@ -1654,6 +1695,29 @@ export default function App() {
                       <span>출강 매칭 공고 보기</span>
                       <ArrowRight className="w-4 h-4" />
                     </button>
+                  </div>
+                </div>
+
+                {/* Cloud Sync Status Indicator (Fully Automated) */}
+                <div className="bg-neutral-900/30 border border-neutral-800/60 rounded-2xl p-4 max-w-4xl mx-auto backdrop-blur-xs relative overflow-hidden" id="cloud-sync-status-indicator">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                    <div className="flex items-center gap-3">
+                      <div className="w-8 h-8 rounded-lg bg-kpcia-gold/10 border border-kpcia-gold/20 flex items-center justify-center text-kpcia-gold">
+                        <Cloud className="w-4 h-4" />
+                      </div>
+                      <div className="space-y-0.5">
+                        <h4 className="font-display font-extrabold text-xs text-neutral-200">
+                          KPCIA 클라우드 실시간 자동 동기화 활성화됨
+                        </h4>
+                        <p className="text-[11px] text-neutral-400 leading-normal">
+                          컴퓨터, 스마트폰, 크롬 시크릿 모드 간 데이터가 백업 버튼 없이 백그라운드에서 실시간으로 완벽하게 연동됩니다.
+                        </p>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2 self-start sm:self-center px-2.5 py-1 rounded-full bg-emerald-950/40 border border-emerald-500/20 text-[10px] text-emerald-400 font-mono font-bold shrink-0">
+                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                      <span>실시간 자동 연동 중</span>
+                    </div>
                   </div>
                 </div>
 

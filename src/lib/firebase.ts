@@ -576,6 +576,158 @@ export class StorageService {
     });
   }
 
+  // Bidirectional Automatic Sync on App Start
+  static async autoSyncLocalAndCloud(): Promise<void> {
+    if (!useFirestore || !db) return;
+
+    try {
+      // 1. Fetch all documents from Firestore
+      const usersSnap = await getDocs(collection(db, 'users'));
+      const lecturesSnap = await getDocs(collection(db, 'lectures'));
+      const programsSnap = await getDocs(collection(db, 'programs'));
+      const transactionsSnap = await getDocs(collection(db, 'transactions'));
+      const proposalsSnap = await getDocs(collection(db, 'proposals'));
+
+      const cloudUsers = usersSnap.docs.map(d => d.data() as UserProfile);
+      const cloudLectures = lecturesSnap.docs.map(d => d.data() as LectureRequest);
+      const cloudPrograms = programsSnap.docs.map(d => d.data() as EducationalProgram);
+      const cloudTransactions = transactionsSnap.docs.map(d => d.data() as MileageTransaction);
+      const cloudProposals = proposalsSnap.docs.map(d => d.data() as PartnershipProposal);
+
+      // 2. Fetch all local cache items
+      const localUsers = this.getLocalUsers();
+      const localLectures = this.getLocalLectures();
+      const localPrograms = this.getLocalPrograms();
+      const localTransactions = this.getLocalTransactions();
+      const localProposals = this.getLocalProposals();
+
+      const getTimestamp = (item: any) => {
+        const timeStr = item.updatedAt || item.createdAt || "2026-01-01T00:00:00Z";
+        return new Date(timeStr).getTime();
+      };
+
+      // Helper to perform the merge and push updates
+      const mergeAndSync = async <T extends { createdAt: string; updatedAt?: string }>(
+        localList: T[],
+        cloudList: T[],
+        getId: (item: T) => string,
+        colName: string
+      ) => {
+        const localMap = new Map(localList.map(item => [getId(item), item]));
+        const cloudMap = new Map(cloudList.map(item => [getId(item), item]));
+
+        const allIds = new Set([...localMap.keys(), ...cloudMap.keys()]);
+        const mergedList: T[] = [];
+
+        for (const id of allIds) {
+          const localItem = localMap.get(id);
+          const cloudItem = cloudMap.get(id);
+
+          if (localItem && cloudItem) {
+            const localTime = getTimestamp(localItem);
+            const cloudTime = getTimestamp(cloudItem);
+
+            if (localTime >= cloudTime) {
+              mergedList.push(localItem);
+              // Push local update to cloud if local is newer or equal (ensures recovery of failed writes)
+              await setDoc(doc(db, colName, id), localItem);
+            } else {
+              mergedList.push(cloudItem);
+            }
+          } else if (localItem) {
+            // Exists only locally -> Upload to Firestore
+            mergedList.push(localItem);
+            await setDoc(doc(db, colName, id), localItem);
+          } else if (cloudItem) {
+            // Exists only in Cloud -> Sync to Local
+            mergedList.push(cloudItem);
+          }
+        }
+
+        // Update local storage cache
+        this.setLocal(colName, mergedList);
+      };
+
+      // 3. Run synchronization for all collections
+      await mergeAndSync(localUsers, cloudUsers, (u) => u.uid, 'users');
+      await mergeAndSync(localLectures, cloudLectures, (l) => l.id, 'lectures');
+      await mergeAndSync(localPrograms, cloudPrograms, (p) => p.id, 'programs');
+      await mergeAndSync(localTransactions, cloudTransactions, (tx) => tx.id, 'transactions');
+      await mergeAndSync(localProposals, cloudProposals, (prop) => prop.id, 'proposals');
+
+      console.log("Automatic cloud-local database synchronization completed successfully!");
+    } catch (error) {
+      console.warn("Failed to automatically synchronize database with cloud on startup:", error);
+    }
+  }
+
+  // Force upload all local storage cache data to Firestore
+  static async uploadLocalToCloud(): Promise<void> {
+    if (!useFirestore || !db) throw new Error("클라우드 DB에 연결되어 있지 않습니다.");
+    
+    const users = this.getLocal<UserProfile[]>('users', INITIAL_USERS);
+    const lectures = this.getLocal<LectureRequest[]>('lectures', INITIAL_LECTURES);
+    const programs = this.getLocal<EducationalProgram[]>('programs', INITIAL_PROGRAMS);
+    const transactions = this.getLocal<MileageTransaction[]>('transactions', INITIAL_TRANSACTIONS);
+    const proposals = this.getLocal<PartnershipProposal[]>('proposals', INITIAL_PROPOSALS);
+
+    for (const u of users) {
+      await setDoc(doc(db, 'users', u.uid), u);
+    }
+    for (const l of lectures) {
+      await setDoc(doc(db, 'lectures', l.id), l);
+    }
+    for (const p of programs) {
+      await setDoc(doc(db, 'programs', p.id), p);
+    }
+    for (const tx of transactions) {
+      await setDoc(doc(db, 'transactions', tx.id), tx);
+    }
+    for (const p of proposals) {
+      await setDoc(doc(db, 'proposals', p.id), p);
+    }
+  }
+
+  // Force download Firestore data to local storage cache
+  static async downloadCloudToLocal(): Promise<{
+    users: UserProfile[];
+    lectures: LectureRequest[];
+    programs: EducationalProgram[];
+    transactions: MileageTransaction[];
+    proposals: PartnershipProposal[];
+  }> {
+    if (!useFirestore || !db) throw new Error("클라우드 DB에 연결되어 있지 않습니다.");
+
+    const usersSnap = await getDocs(collection(db, 'users'));
+    const lecturesSnap = await getDocs(collection(db, 'lectures'));
+    const programsSnap = await getDocs(collection(db, 'programs'));
+    const transactionsSnap = await getDocs(collection(db, 'transactions'));
+    const proposalsSnap = await getDocs(collection(db, 'proposals'));
+
+    const users: UserProfile[] = [];
+    usersSnap.forEach(d => users.push(d.data() as UserProfile));
+
+    const lectures: LectureRequest[] = [];
+    lecturesSnap.forEach(d => lectures.push(d.data() as LectureRequest));
+
+    const programs: EducationalProgram[] = [];
+    programsSnap.forEach(d => programs.push(d.data() as EducationalProgram));
+
+    const transactions: MileageTransaction[] = [];
+    transactionsSnap.forEach(d => transactions.push(d.data() as MileageTransaction));
+
+    const proposals: PartnershipProposal[] = [];
+    proposalsSnap.forEach(d => proposals.push(d.data() as PartnershipProposal));
+
+    if (users.length > 0) this.setLocal('users', users);
+    if (lectures.length > 0) this.setLocal('lectures', lectures);
+    if (programs.length > 0) this.setLocal('programs', programs);
+    this.setLocal('transactions', transactions);
+    this.setLocal('proposals', proposals);
+
+    return { users, lectures, programs, transactions, proposals };
+  }
+
   // Clear local storage and Firestore data and restore default state
   static async resetDatabase(): Promise<void> {
     localStorage.removeItem('kpcia_users');
