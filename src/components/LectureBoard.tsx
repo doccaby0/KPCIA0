@@ -429,7 +429,7 @@ export default function LectureBoard({
                         key={lecture.id}
                         className={`border-b border-neutral-850 hover:bg-neutral-800/40 transition-colors font-sans ${
                           isAssignedToMe ? 'bg-kpcia-gold/10' : ''
-                        }`}
+                        } ${isLectBlurred ? 'pointer-events-none select-none opacity-60' : ''}`}
                       >
                         {/* Row Index */}
                         <td className="px-2 py-3.5 border-r border-neutral-850 text-center font-mono text-neutral-500 bg-neutral-950/20 select-none">
@@ -438,7 +438,7 @@ export default function LectureBoard({
 
                         {/* Col A: Status */}
                         <td className="px-3 py-3.5 border-r border-neutral-850 text-center">
-                          <div className={isLectBlurred ? "blur-[3px] select-none" : ""}>
+                          <div className={isLectBlurred ? "blur-[6.5px] select-none pointer-events-none" : ""}>
                             {lecture.status === 'open' && (
                               <span className="text-[10px] px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-400 font-bold border border-emerald-500/20 animate-pulse">
                                 신청접수
@@ -460,7 +460,7 @@ export default function LectureBoard({
                         {/* Col B: Title & Description */}
                         <td className="px-3 py-3.5 border-r border-neutral-850">
                           <div 
-                            className={`font-bold text-neutral-200 flex flex-wrap items-center gap-1.5 ${(!isLectBlurred && lecture.status === 'open' && isQualified && !hasApplied) ? 'hover:text-kpcia-gold hover:underline cursor-pointer' : ''}`}
+                            className={`font-bold text-neutral-200 flex flex-wrap items-center gap-1.5 ${isLectBlurred ? 'pointer-events-none select-none' : ''} ${(!isLectBlurred && lecture.status === 'open' && isQualified && !hasApplied) ? 'hover:text-kpcia-gold hover:underline cursor-pointer' : ''}`}
                             onClick={() => {
                               if (isLectBlurred) return;
                               if (lecture.status === 'open' && isQualified && !hasApplied) {
@@ -468,7 +468,7 @@ export default function LectureBoard({
                               }
                             }}
                           >
-                            <span className={`whitespace-normal break-all leading-snug ${isLectBlurred ? "blur-[3px] select-none pointer-events-none" : ""}`}>{lecture.title}</span>
+                            <span className={`whitespace-normal break-all leading-snug ${isLectBlurred ? "blur-[6.5px] select-none pointer-events-none" : ""}`}>{lecture.title}</span>
                             {!isLectBlurred && (
                               <button
                                 type="button"
@@ -484,21 +484,21 @@ export default function LectureBoard({
                               </button>
                             )}
                           </div>
-                          <div className={`text-[10.5px] text-neutral-400 mt-1.5 leading-relaxed whitespace-normal break-all ${isLectBlurred ? "blur-[3px] select-none pointer-events-none" : ""}`}>
+                          <div className={`text-[10.5px] text-neutral-400 mt-1.5 leading-relaxed whitespace-normal break-all ${isLectBlurred ? "blur-[6.5px] select-none pointer-events-none" : ""}`}>
                             {lecture.description}
                           </div>
                         </td>
 
                         {/* Col C: Target Tier */}
                         <td className="px-3 py-3.5 border-r border-neutral-850 text-center">
-                          <span className={`text-[9px] px-2 py-0.5 rounded-full font-mono font-bold border ${tierColors[lecture.targetTier]} ${showBlurred ? "blur-[3px] select-none" : ""}`}>
+                          <span className={`text-[9px] px-2 py-0.5 rounded-full font-mono font-bold border ${tierColors[lecture.targetTier]} ${isLectBlurred ? "opacity-30 select-none pointer-events-none" : ""}`}>
                             {lecture.targetTier} ↑
                           </span>
                         </td>
 
                         {/* Col D: Date & Time */}
                         <td className="px-3 py-3.5 border-r border-neutral-850 font-mono text-[11px] text-neutral-300 leading-relaxed">
-                          <div className={isLectBlurred ? "blur-[3px] select-none pointer-events-none" : ""}>
+                          <div className={isLectBlurred ? "blur-[6.5px] select-none pointer-events-none" : ""}>
                             <div className="flex items-center gap-1">
                               <Calendar className="w-3 h-3 text-neutral-500" />
                               <span>{lecture.date}</span>
@@ -513,7 +513,7 @@ export default function LectureBoard({
                         {/* Col E: Location */}
                         <td className="px-3 py-3.5 border-r border-neutral-850 text-[11px] text-neutral-300">
                           <div className="flex flex-col gap-1.5">
-                            <span className={`whitespace-normal break-all ${isLectBlurred ? "blur-[3px] select-none pointer-events-none" : ""}`} title={isLectBlurred ? undefined : lecture.location}>{lecture.location}</span>
+                            <span className={`whitespace-normal break-all ${isLectBlurred ? "blur-[6.5px] select-none pointer-events-none" : ""}`} title={isLectBlurred ? undefined : lecture.location}>{lecture.location}</span>
                             {!isLectBlurred && (
                               <button
                                 type="button"
@@ -530,14 +530,14 @@ export default function LectureBoard({
                         </td>
 
                         {/* Col F: Attendees */}
-                        <td className={`px-3 py-3.5 border-r border-neutral-850 text-right font-mono text-neutral-200 ${isLectBlurred ? "blur-[3px] select-none pointer-events-none" : ""}`}>
+                        <td className={`px-3 py-3.5 border-r border-neutral-850 text-right font-mono text-neutral-200 ${isLectBlurred ? "blur-[6.5px] select-none pointer-events-none" : ""}`}>
                           {lecture.attendees ? `${lecture.attendees}명` : '-'}
                         </td>
 
                         {/* Col G: Budget (출강 강사료) */}
                         <td className="px-3 py-3.5 border-r border-neutral-850 text-right font-mono font-bold bg-neutral-900/10">
                           {isLectBlurred ? (
-                            <span className="text-neutral-100/50 blur-[3px] select-none font-mono text-[11px]">
+                            <span className="text-neutral-100/50 blur-[6.5px] select-none pointer-events-none font-mono text-[11px]">
                               ₩{lecture.budget.toLocaleString()}
                             </span>
                           ) : !currentUser || currentUser.uid === 'guest' ? (
@@ -558,7 +558,7 @@ export default function LectureBoard({
                         {/* Col H: Material Cost (재료비 총액) */}
                         <td className="px-3 py-3.5 border-r border-neutral-850 text-right font-mono text-neutral-300 bg-neutral-950/20">
                           {isLectBlurred ? (
-                            <span className="text-neutral-300/50 blur-[3px] select-none font-mono text-[11px]">
+                            <span className="text-neutral-300/50 blur-[6.5px] select-none pointer-events-none font-mono text-[11px]">
                               ₩{(lecture.materialCost || 0).toLocaleString()}
                             </span>
                           ) : !currentUser || currentUser.uid === 'guest' ? (
@@ -579,7 +579,7 @@ export default function LectureBoard({
                         {/* Col I: Total Outflow (총 출강비) */}
                         <td className="px-3 py-3.5 border-r border-neutral-850 text-right font-mono font-bold text-kpcia-gold bg-kpcia-gold/10">
                           {isLectBlurred ? (
-                            <span className="text-kpcia-gold/50 blur-[3px] select-none font-mono text-[11px]">
+                            <span className="text-kpcia-gold/50 blur-[6.5px] select-none pointer-events-none font-mono text-[11px]">
                               ₩{appliedTotalCost.toLocaleString()}
                             </span>
                           ) : !currentUser || currentUser.uid === 'guest' ? (
@@ -607,7 +607,7 @@ export default function LectureBoard({
                         {/* Col J: Associated Program */}
                         <td className="px-3 py-3.5 border-r border-neutral-850 text-neutral-300">
                           {isLectBlurred ? (
-                            <div className="space-y-1 blur-[3px] select-none">
+                            <div className="space-y-1 blur-[6.5px] select-none pointer-events-none">
                               <div className="font-semibold text-neutral-200 text-[11px] flex items-center gap-1 whitespace-normal break-all">
                                 <Sparkles className="w-3 h-3 text-kpcia-gold shrink-0" />
                                 <span>{lecture.programTitle || '연계 프로그램'}</span>
@@ -639,7 +639,7 @@ export default function LectureBoard({
                         {/* Col K: Assistant Partner */}
                         <td className="px-3 py-3.5 border-r border-neutral-850 text-[11px]">
                           {isLectBlurred ? (
-                            <span className="text-neutral-500 text-[10px] blur-[3px] select-none">단독 파견 / 보조강사</span>
+                            <span className="text-neutral-500 text-[10px] blur-[6.5px] select-none pointer-events-none">단독 파견 / 보조강사</span>
                           ) : (() => {
                             const assistantUser = allUsers?.find(u => u.uid === lecture.assistantId);
                             const isViewerHigherTier = currentUser && (currentUser.isAdmin || currentUser.tier !== 'Prestige Member');
@@ -831,17 +831,34 @@ export default function LectureBoard({
               <div
                 key={lecture.id}
                 className={`rounded-xl border bg-neutral-900/50 backdrop-blur p-4 flex flex-col justify-between hover:border-neutral-750 transition-all duration-300 relative overflow-hidden ${
-                  isAssignedToMe ? 'border-kpcia-gold/40 shadow-lg shadow-kpcia-gold/5' : 'border-neutral-800'
+                  isLectBlurred ? 'border-neutral-850 bg-neutral-950/25 pointer-events-none select-none' : isAssignedToMe ? 'border-kpcia-gold/40 shadow-lg shadow-kpcia-gold/5' : 'border-neutral-800'
                 }`}
                 id={`lecture-card-${lecture.id}`}
               >
                 {/* Highlight bar if assigned to me */}
-                {isAssignedToMe && (
+                {isAssignedToMe && !isLectBlurred && (
                   <div className="absolute top-0 left-0 right-0 h-1 bg-kpcia-gold" />
                 )}
 
-                {/* Card Top Information */}
-                <div className="space-y-2.5">
+                {/* Absolute Lock Overlay */}
+                {isLectBlurred && (
+                  <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/60 p-4 text-center z-10 pointer-events-auto select-none">
+                    <div className="p-3.5 bg-neutral-950/95 border border-neutral-800 rounded-xl flex flex-col items-center gap-2 shadow-2xl max-w-[90%]">
+                      <span className="text-[18px] animate-bounce">🔒</span>
+                      <span className="text-[11px] font-black text-kpcia-gold tracking-tight">
+                        {lecture.targetTier.replace('Prestige ', '')} 이상 출강 가능
+                      </span>
+                      <span className="text-[9px] text-neutral-400">
+                        회원님의 등급({currentUser?.tier?.replace('Prestige ', '') || '비회원'})보다 높은 공고입니다.
+                      </span>
+                    </div>
+                  </div>
+                )}
+
+                {/* Card Content Wrapper with Blur Filter */}
+                <div className={`flex-1 flex flex-col justify-between h-full space-y-3.5 ${isLectBlurred ? "blur-[6.5px] select-none pointer-events-none" : ""}`}>
+                  {/* Card Top Information */}
+                  <div className="space-y-2.5">
                   <div className="flex items-center justify-between gap-1">
                     {/* Status Badges */}
                     <div className={`flex items-center space-x-1 shrink-0 ${isLectBlurred ? "blur-[3px] select-none pointer-events-none" : ""}`}>
@@ -864,7 +881,7 @@ export default function LectureBoard({
 
                     {/* Required Tier Qualification */}
                     <div className="flex items-center">
-                      <span className={`text-[9px] px-1.5 py-0.5 rounded font-mono font-bold border shrink-0 ${tierColors[lecture.targetTier]} ${showBlurred ? "blur-[3px] select-none" : ""}`}>
+                      <span className={`text-[9px] px-1.5 py-0.5 rounded font-mono font-bold border shrink-0 ${tierColors[lecture.targetTier]} ${isLectBlurred ? "blur-[3px] select-none pointer-events-none" : ""}`}>
                         🛡️ {lecture.targetTier.replace('Prestige ', '')} ↑
                       </span>
                     </div>
@@ -949,8 +966,8 @@ export default function LectureBoard({
                     const calculatedRoyalty = Math.round(originalTotal * 0.05);
                     const royaltyToShow = lecture.mileageRoyalty || calculatedRoyalty;
                     return (
-                      <div className="bg-kpcia-gold/5 border border-kpcia-gold/15 rounded-lg p-1.5 flex items-center justify-between text-[9.5px]" id={`lecture-program-royalty-${lecture.id}`}>
-                        <span className="text-neutral-350 font-medium flex items-center gap-1 truncate max-w-[150px]" title={lecture.programTitle}>
+                      <div className={`bg-kpcia-gold/5 border border-kpcia-gold/15 rounded-lg p-1.5 flex items-center justify-between text-[9.5px] ${isLectBlurred ? "blur-[3px] select-none pointer-events-none" : ""}`} id={`lecture-program-royalty-${lecture.id}`}>
+                        <span className="text-neutral-350 font-medium flex items-center gap-1 truncate max-w-[150px]" title={isLectBlurred ? undefined : lecture.programTitle}>
                           <Sparkles className="w-2.5 h-2.5 text-kpcia-gold shrink-0" /> 연계: {lecture.programTitle}
                         </span>
                         <span className="text-kpcia-gold font-mono font-bold shrink-0">
@@ -1250,6 +1267,7 @@ export default function LectureBoard({
                     )}
                   </div>
                 </div>
+                </div> {/* End Card Content Wrapper with Blur Filter */}
               </div>
             );
           })}

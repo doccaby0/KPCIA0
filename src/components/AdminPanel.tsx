@@ -124,6 +124,82 @@ export function getSpecialtiesList(user: UserProfile): string[] {
   return ['기업 맞춤형 HRD 특강', '직무 역량 강화 설계', '스피치 및 강의 기법'];
 }
 
+export function calculateHoursFromTimeRange(timeStr: string): number | null {
+  if (!timeStr) return null;
+  
+  // Normalize string: remove spaces, convert Korean PM/AM/Hour/Minute terms to simplified equivalents
+  let s = timeStr.trim().toLowerCase().replace(/\s+/g, '');
+  
+  // If user inputs e.g. "13:00~16:00", we can split by common separators: ~, -, to, @, |
+  const separators = /[~\-]|to/;
+  const parts = s.split(separators);
+  
+  if (parts.length === 2) {
+    const parsePart = (part: string) => {
+      // Check for PM/AM indicators
+      let isPM = false;
+      let partClean = part;
+      if (part.includes('오후') || part.includes('pm')) {
+        isPM = true;
+        partClean = part.replace('오후', '').replace('pm', '');
+      } else if (part.includes('오전') || part.includes('am')) {
+        partClean = part.replace('오전', '').replace('am', '');
+      }
+      
+      // Parse hour and minute
+      // Support formats like "13:30", "13시30분", "13시", "13", "1.5"
+      let hour = 0;
+      let minute = 0;
+      
+      const colonMatch = partClean.match(/^(\d{1,2}):(\d{2})$/);
+      const krMatch = partClean.match(/^(\d{1,2})시(?:(\d{1,2})분?)?$/);
+      const pureNumMatch = partClean.match(/^(\d{1,2})$/);
+      
+      if (colonMatch) {
+        hour = parseInt(colonMatch[1], 10);
+        minute = parseInt(colonMatch[2], 10);
+      } else if (krMatch) {
+        hour = parseInt(krMatch[1], 10);
+        minute = krMatch[2] ? parseInt(krMatch[2], 10) : 0;
+      } else if (pureNumMatch) {
+        hour = parseInt(pureNumMatch[1], 10);
+        minute = 0;
+      } else {
+        return null;
+      }
+      
+      if (isPM && hour < 12) {
+        hour += 12;
+      }
+      
+      return hour * 60 + minute;
+    };
+    
+    const startMinutes = parsePart(parts[0]);
+    const endMinutes = parsePart(parts[1]);
+    
+    if (startMinutes !== null && endMinutes !== null) {
+      let diff = endMinutes - startMinutes;
+      if (diff < 0) {
+        // Handle afternoon transitions if start is e.g., 1시 (13:00) but end is 4시 (16:00) without explicit PM markers
+        const startHour = Math.floor(startMinutes / 60);
+        const endHour = Math.floor(endMinutes / 60);
+        if (endHour < 12 && startHour >= 12) {
+          diff += 12 * 60; // end could be pm, so endMinutes += 12 hours
+        } else if (endHour < startHour && endHour < 12) {
+          // E.g., 10:00 to 2:00 -> 10:00 to 14:00
+          diff += 12 * 60;
+        }
+      }
+      if (diff > 0) {
+        return parseFloat((diff / 60).toFixed(2));
+      }
+    }
+  }
+  
+  return null;
+}
+
 interface AdminPanelProps {
   users: UserProfile[];
   lectures: LectureRequest[];
@@ -189,6 +265,8 @@ export default function AdminPanel({
   const [previewLectures, setPreviewLectures] = useState<any[]>([]);
   const [showPreviewModal, setShowPreviewModal] = useState(false);
 
+  const [lectCompany, setLectCompany] = useState('');
+  const [lectDurationHours, setLectDurationHours] = useState<string>('2');
   const [lectTitle, setLectTitle] = useState('');
   const [lectDescription, setLectDescription] = useState('');
   const [lectTargetTier, setLectTargetTier] = useState<InstructorTier>('Prestige Associate');
@@ -209,6 +287,8 @@ export default function AdminPanel({
 
   // Lecture Editing States
   const [editingLecture, setEditingLecture] = useState<LectureRequest | null>(null);
+  const [editLectCompany, setEditLectCompany] = useState('');
+  const [editLectDurationHours, setEditLectDurationHours] = useState<string>('2');
   const [editLectTitle, setEditLectTitle] = useState('');
   const [editLectDescription, setEditLectDescription] = useState('');
   const [editLectTargetTier, setEditLectTargetTier] = useState<InstructorTier>('Prestige Associate');
@@ -230,11 +310,23 @@ export default function AdminPanel({
   // Start Editing Lecture
   const handleStartEditLecture = (lecture: LectureRequest) => {
     setEditingLecture(lecture);
-    setEditLectTitle(lecture.title || '');
+    
+    // Parse company name and subject from title e.g. "[Company] Topic"
+    let parsedCompany = '';
+    let parsedTitle = lecture.title || '';
+    const titleMatch = (lecture.title || '').match(/^\[(.*?)\]\s*(.*)$/);
+    if (titleMatch) {
+      parsedCompany = titleMatch[1];
+      parsedTitle = titleMatch[2];
+    }
+    
+    setEditLectCompany(parsedCompany);
+    setEditLectTitle(parsedTitle);
     setEditLectDescription(lecture.description || '');
     setEditLectTargetTier(lecture.targetTier || 'Prestige Associate');
     setEditLectMainHours((lecture.mainHours || 2).toString());
     setEditLectAssistantHours((lecture.assistantHours || 0).toString());
+    setEditLectDurationHours((lecture.mainHours || 2).toString());
     setEditLectMaterialCost((lecture.materialCost || 0).toString());
     const initialMaterial = lecture.materialCost || 0;
     const initialAttendeesCount = lecture.attendees || 30;
@@ -279,9 +371,11 @@ export default function AdminPanel({
     const finalMaterial = Number(editLectMaterialCost);
     const originalTotal = finalBudget + finalMaterial;
     
+    const combinedTitle = editLectCompany ? `[${editLectCompany}] ${editLectTitle}` : editLectTitle;
+    
     const updated: LectureRequest = {
       ...editingLecture,
-      title: editLectTitle,
+      title: combinedTitle,
       description: editLectDescription,
       targetTier: editLectTargetTier,
       budget: finalBudget,
@@ -305,6 +399,64 @@ export default function AdminPanel({
     onUpdateLecture(updated);
     setEditingLecture(null);
   };
+
+  // Auto-calculate hours from lectTime range for creation form
+  useEffect(() => {
+    if (lectTime) {
+      const parsedHours = calculateHoursFromTimeRange(lectTime);
+      if (parsedHours !== null && parsedHours > 0) {
+        setLectDurationHours(parsedHours.toString());
+      }
+    }
+  }, [lectTime]);
+
+  // Auto-calculate hours from editLectTime range for edit modal
+  useEffect(() => {
+    if (editLectTime) {
+      const parsedHours = calculateHoursFromTimeRange(editLectTime);
+      if (parsedHours !== null && parsedHours > 0) {
+        setEditLectDurationHours(parsedHours.toString());
+      }
+    }
+  }, [editLectTime]);
+
+  // Auto-set instructor hours based on general lecture hours and attendees count for creation form
+  useEffect(() => {
+    const hoursVal = lectDurationHours || '0';
+    const attendeesNum = parseInt(lectAttendees, 10) || 0;
+    
+    setLectMainHours(hoursVal);
+    
+    if (attendeesNum <= 20) {
+      setLectAssistantHours('0');
+    } else {
+      setLectAssistantHours(hoursVal);
+    }
+    
+    if (hoursVal && hoursVal !== '0') {
+      setLectDuration(`${hoursVal}시간`);
+    }
+  }, [lectDurationHours, lectAttendees]);
+
+  // Auto-set instructor hours based on general lecture hours and attendees count for edit modal
+  useEffect(() => {
+    if (editingLecture) {
+      const hoursVal = editLectDurationHours || '0';
+      const attendeesNum = parseInt(editLectAttendees, 10) || 0;
+      
+      setEditLectMainHours(hoursVal);
+      
+      if (attendeesNum <= 20) {
+        setEditLectAssistantHours('0');
+      } else {
+        setEditLectAssistantHours(hoursVal);
+      }
+      
+      if (hoursVal && hoursVal !== '0') {
+        setEditLectDuration(`${hoursVal}시간`);
+      }
+    }
+  }, [editLectDurationHours, editLectAttendees, editingLecture]);
 
   // Auto-calculate lectBudget based on hours
   useEffect(() => {
@@ -489,15 +641,17 @@ export default function AdminPanel({
 
   const handleCreateLecture = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!lectTitle || !lectLocation || !onAddLecture) return;
+    if (!lectTitle || !lectCompany || !lectLocation || !onAddLecture) return;
 
     const selectedProg = programs.find(p => p.id === lectProgramId);
     const finalBudget = Number(lectBudget);
     const finalMaterial = Number(lectMaterialCost);
     const originalTotal = finalBudget + finalMaterial;
+    
+    const combinedTitle = `[${lectCompany}] ${lectTitle}`;
 
     const newLect = {
-      title: lectTitle,
+      title: combinedTitle,
       description: lectDescription,
       targetTier: lectTargetTier,
       budget: finalBudget,
@@ -507,12 +661,12 @@ export default function AdminPanel({
       programId: lectProgramId || undefined,
       programTitle: selectedProg ? selectedProg.title : undefined,
       date: lectDate,
-      time: lectTime,
-      duration: lectDuration,
+      time: lectTime || '오후 (일정 조율)',
+      duration: lectDuration || `${lectDurationHours}시간`,
       location: lectLocation,
       attendees: lectAttendees ? Number(lectAttendees) : undefined,
-      managerName: lectManagerName || undefined,
-      managerPhone: lectManagerPhone || undefined,
+      managerName: lectManagerName || '운영사무국',
+      managerPhone: lectManagerPhone || '02-123-4567',
       mainHours: Number(lectMainHours),
       assistantHours: Number(lectAssistantHours),
       materialCost: finalMaterial,
@@ -522,6 +676,8 @@ export default function AdminPanel({
     setShowAddForm(false);
     
     // Reset Form
+    setLectCompany('');
+    setLectDurationHours('2');
     setLectTitle('');
     setLectDescription('');
     setLectTargetTier('Prestige Associate');
@@ -1822,307 +1978,337 @@ export default function AdminPanel({
 
             {/* Lecture Post Form inside Admin Panel */}
             {showAddForm && (
-              <form onSubmit={handleCreateLecture} className="bg-neutral-950 border border-kpcia-gold/30 rounded-xl p-6 space-y-4 mb-6 animate-in fade-in slide-in-from-top-4 duration-300" id="lecture-add-form">
-                <div className="flex items-center justify-between border-b border-neutral-800 pb-3 mb-4">
+              <form onSubmit={handleCreateLecture} className="bg-neutral-950 border border-kpcia-gold/30 rounded-xl p-6 space-y-5 mb-6 animate-in fade-in slide-in-from-top-4 duration-300" id="lecture-add-form">
+                <div className="flex items-center justify-between border-b border-neutral-800 pb-3 mb-2">
                   <h4 className="font-display font-bold text-sm text-kpcia-gold flex items-center gap-2">
                     <CheckSquare className="w-4 h-4 text-kpcia-gold" /> 신규 출강 강의 요청 공고 등록 (사무국 전용)
                   </h4>
                   <span className="text-[10px] text-neutral-400 font-mono">KPCIA ADMIN ONLY</span>
                 </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div>
-                    <label className="text-[10px] font-mono text-neutral-400 block mb-1">강의 명칭 / 주제</label>
-                    <input
-                      type="text"
-                      placeholder="예: 현대자동차 차세대 신사업본부 리더십 포럼"
-                      value={lectTitle}
-                      onChange={(e) => setLectTitle(e.target.value)}
-                      required
-                      className="w-full px-3.5 py-2 rounded-lg bg-neutral-900 border border-neutral-800 text-xs font-medium text-neutral-100 focus:border-kpcia-gold focus:outline-none"
-                      id="admin-lect-title"
-                    />
-                  </div>
-                  <div>
-                    <label className="text-[10px] font-mono text-neutral-400 block mb-1">강의 진행 장소 / 기업 정보</label>
-                    <input
-                      type="text"
-                      placeholder="예: 경기도 용인시 삼성인력개발원"
-                      value={lectLocation}
-                      onChange={(e) => setLectLocation(e.target.value)}
-                      required
-                      className="w-full px-3.5 py-2 rounded-lg bg-neutral-900 border border-neutral-800 text-xs font-medium text-neutral-100 focus:border-kpcia-gold focus:outline-none"
-                      id="admin-lect-location"
-                    />
-                  </div>
-                </div>
-
-                <div>
-                  <label className="text-[10px] font-mono text-neutral-400 block mb-1">강의 설명 및 세부 요구사항</label>
-                  <textarea
-                    rows={3}
-                    placeholder="대기업 파견 강사로서 담당할 세부 커리큘럼 및 기대사항을 자세히 적어주세요."
-                    value={lectDescription}
-                    onChange={(e) => setLectDescription(e.target.value)}
-                    className="w-full px-3.5 py-2 rounded-lg bg-neutral-900 border border-neutral-800 text-xs font-medium text-neutral-100 focus:border-kpcia-gold focus:outline-none resize-none"
-                    id="admin-lect-desc"
-                  />
-                </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  {/* Required Tier */}
-                  <div>
-                    <label className="text-[10px] font-mono text-neutral-400 block mb-1">지원 가능한 최소 강사 등급</label>
-                    <select
-                      value={lectTargetTier}
-                      onChange={(e) => setLectTargetTier(e.target.value as any)}
-                      className="w-full px-3.5 py-2 rounded-lg bg-neutral-900 border border-neutral-800 text-xs font-medium text-neutral-100 focus:border-kpcia-gold focus:outline-none"
-                      id="admin-lect-tier"
-                    >
-                      <option value="Prestige Member">Prestige Member (일반)</option>
-                      <option value="Prestige Associate">Prestige Associate (어소시에이트)</option>
-                      <option value="Prestige Professional">Prestige Professional (프로페셔널)</option>
-                      <option value="Prestige Master">Prestige Master (마스터)</option>
-                      <option value="Prestige Elite">Prestige Elite (엘리트)</option>
-                    </select>
-                  </div>
-
-                  {/* Associate Educational Program */}
-                  <div>
-                    <label className="text-[10px] font-mono text-neutral-400 block mb-1">지정 교육 프로그램 연계</label>
-                    <select
-                      value={lectProgramId}
-                      onChange={(e) => setLectProgramId(e.target.value)}
-                      className="w-full px-3.5 py-2 rounded-lg bg-neutral-900 border border-neutral-800 text-xs font-medium text-neutral-100 focus:border-kpcia-gold focus:outline-none"
-                      id="admin-lect-program"
-                    >
-                      <option value="">연계 프로그램 없음 (자유교안)</option>
-                      {programs.map(p => (
-                        <option key={p.id} value={p.id}>{p.title} (저작자: {p.authorName})</option>
-                      ))}
-                    </select>
-                  </div>
-
-                  {/* Attendees Count */}
-                  <div>
-                    <label className="text-[10px] font-mono text-neutral-400 block mb-1">수강 대상 인원 (명)</label>
-                    <input
-                      type="number"
-                      min={1}
-                      placeholder="예: 30"
-                      value={lectAttendees}
-                      onChange={(e) => setLectAttendees(e.target.value)}
-                      required
-                      className="w-full px-3.5 py-2 rounded-lg bg-neutral-900 border border-neutral-800 text-xs font-medium text-neutral-100 focus:border-kpcia-gold focus:outline-none"
-                      id="admin-lect-attendees"
-                    />
-                  </div>
-                </div>
-
-                {/* Hours & Fees & Materials Calculation Grid */}
-                <div className="grid grid-cols-1 md:grid-cols-5 gap-3.5 p-4 rounded-xl bg-neutral-900/40 border border-neutral-800/80">
-                  <div className="space-y-1">
-                    <label className="text-[10px] font-mono font-bold text-neutral-400 block">
-                      주강사 강의 시간 (단가: 100,000원)
-                    </label>
-                    <div className="relative">
+                {/* 1. Essential Fields Section (9 items) */}
+                <div className="space-y-4">
+                  {/* Row 1: 기업기관명, 날짜, 강의 시간 */}
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div>
+                      <label className="text-[10px] font-bold text-neutral-300 block mb-1">① 기업기관명 *</label>
                       <input
-                        type="number"
-                        step="0.5"
-                        min="0"
-                        placeholder="예: 2"
-                        value={lectMainHours}
-                        onChange={(e) => setLectMainHours(e.target.value)}
-                        className="w-full pl-3 pr-8 py-2 rounded-lg bg-neutral-950 border border-neutral-800 text-xs font-semibold text-neutral-100 focus:border-kpcia-gold focus:outline-none transition-colors"
-                        id="admin-lect-main-hours"
+                        type="text"
+                        placeholder="예: 현대자동차, SK텔레콤 등"
+                        value={lectCompany}
+                        onChange={(e) => setLectCompany(e.target.value)}
+                        required
+                        className="w-full px-3.5 py-2 rounded-lg bg-neutral-900 border border-neutral-800 text-xs font-medium text-neutral-100 focus:border-kpcia-gold focus:outline-none"
+                        id="admin-lect-company"
                       />
-                      <span className="absolute right-2.5 top-2 text-[9px] text-neutral-500 font-bold">시간</span>
                     </div>
-                    <p className="text-[8.5px] text-neutral-500">※ 기본료: {(parseFloat(lectMainHours || '0') * 100000).toLocaleString()}원</p>
-                  </div>
-
-                  <div className="space-y-1">
-                    <label className="text-[10px] font-mono font-bold text-neutral-400 block">
-                      보조강사 강의 시간 (단가: 50,000원)
-                    </label>
-                    <div className="relative">
+                    <div>
+                      <label className="text-[10px] font-bold text-neutral-300 block mb-1">② 날짜 *</label>
                       <input
-                        type="number"
-                        step="0.5"
-                        min="0"
-                        placeholder="예: 0"
-                        value={lectAssistantHours}
-                        onChange={(e) => setLectAssistantHours(e.target.value)}
-                        className="w-full pl-3 pr-8 py-2 rounded-lg bg-neutral-950 border border-neutral-800 text-xs font-semibold text-neutral-100 focus:border-kpcia-gold focus:outline-none transition-colors"
-                        id="admin-lect-assistant-hours"
+                        type="date"
+                        value={lectDate}
+                        onChange={(e) => setLectDate(e.target.value)}
+                        required
+                        className="w-full px-3.5 py-2 rounded-lg bg-neutral-900 border border-neutral-800 text-xs font-medium text-neutral-100 focus:border-kpcia-gold focus:outline-none"
+                        id="admin-lect-date"
                       />
-                      <span className="absolute right-2.5 top-2 text-[9px] text-neutral-500 font-bold">시간</span>
                     </div>
-                    <p className="text-[8.5px] text-neutral-500">※ 보조료: {(parseFloat(lectAssistantHours || '0') * 50000).toLocaleString()}원</p>
-                  </div>
-
-                  <div className="space-y-1">
-                    <label className="text-[10px] font-mono font-bold text-neutral-400 block">
-                      1인당 재료비 (KRW) *
-                    </label>
-                    <div className="relative">
-                      <input
-                        type="number"
-                        min="0"
-                        placeholder="예: 10000"
-                        value={lectMaterialCostPerPerson}
-                        onChange={(e) => setLectMaterialCostPerPerson(e.target.value)}
-                        className="w-full pl-3 pr-8 py-2 rounded-lg bg-neutral-950 border border-neutral-800 text-xs font-semibold text-neutral-100 focus:border-kpcia-gold focus:outline-none transition-colors"
-                        id="admin-lect-material-cost-per-person"
-                      />
-                      <span className="absolute right-2.5 top-2 text-[9px] text-neutral-500 font-bold">원</span>
-                    </div>
-                    <p className="text-[8.5px] text-neutral-500">※ 인원({lectAttendees || '0'}명) 자동 곱산</p>
-                  </div>
-
-                  <div className="space-y-1">
-                    <label className="text-[10px] font-mono font-bold text-neutral-400 block">
-                      재료비 총액 (자동 계산)
-                    </label>
-                    <div className="relative">
-                      <div className="w-full pl-3 pr-8 py-2 rounded-lg bg-neutral-950/60 border border-neutral-850 text-xs font-semibold text-neutral-400 flex items-center h-[34px]">
-                        ₩{Number(lectMaterialCost).toLocaleString()}
+                    <div>
+                      <label className="text-[10px] font-bold text-neutral-300 block mb-1">③ 강의 시간대 (몇시~몇시) *</label>
+                      <div className="relative">
+                        <input
+                          type="text"
+                          placeholder="예: 13:00~16:00 또는 13시~16시"
+                          value={lectTime}
+                          onChange={(e) => setLectTime(e.target.value)}
+                          required
+                          className="w-full px-3.5 py-2 rounded-lg bg-neutral-900 border border-neutral-800 text-xs font-medium text-neutral-100 focus:border-kpcia-gold focus:outline-none"
+                          id="admin-lect-time"
+                        />
                       </div>
-                      <span className="absolute right-2.5 top-2.5 text-[9px] text-neutral-500 font-bold">원</span>
+                      {lectDurationHours && lectDurationHours !== '0' && (
+                        <span className="text-[9px] text-kpcia-gold mt-1 block">
+                          ⏱️ 자동 계산: {lectDurationHours}시간
+                        </span>
+                      )}
                     </div>
-                    <p className="text-[8.5px] text-neutral-500">※ 실비 정산 및 청구 금액</p>
                   </div>
 
-                  <div className="space-y-1">
-                    <label className="text-[10px] font-mono font-bold text-kpcia-gold block">
-                      출강 강사료 (자동 계산)
-                    </label>
-                    <div className="relative">
+                  {/* Row 2: 주제, 대상자 인원, 1인당 재료비 */}
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div>
+                      <label className="text-[10px] font-bold text-neutral-300 block mb-1">⑤ 주제 *</label>
                       <input
-                        type="number"
-                        value={lectBudget}
-                        onChange={(e) => setLectBudget(Number(e.target.value))}
-                        className="w-full pl-3 pr-8 py-2 rounded-lg bg-neutral-950 border border-kpcia-gold/30 text-xs font-mono font-bold text-kpcia-gold focus:border-kpcia-gold focus:outline-none transition-colors"
-                        id="admin-lect-budget"
+                        type="text"
+                        placeholder="예: AI 기반 협업 리절십 포럼"
+                        value={lectTitle}
+                        onChange={(e) => setLectTitle(e.target.value)}
+                        required
+                        className="w-full px-3.5 py-2 rounded-lg bg-neutral-900 border border-neutral-800 text-xs font-medium text-neutral-100 focus:border-kpcia-gold focus:outline-none"
+                        id="admin-lect-title"
                       />
-                      <span className="absolute right-2.5 top-2 text-[9px] text-kpcia-gold font-bold">원</span>
                     </div>
-                    <p className="text-[8.5px] text-neutral-400">※ 임의 금액 입력/수정 가능</p>
-                  </div>
-                </div>
-
-                {/* Total Lecture Cost Summary Display Dashboard */}
-                {(() => {
-                  const isProgramSelected = !!lectProgramId;
-                  const originalTotal = lectBudget + Number(lectMaterialCost);
-                  const finalTotal = isProgramSelected ? (originalTotal - Math.round(originalTotal * 0.05)) : originalTotal;
-                  return (
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-3 p-3.5 rounded-xl bg-neutral-950/40 border border-neutral-850">
-                      <div className="p-3 rounded-lg bg-neutral-900/50 border border-neutral-800 flex items-center justify-between">
-                        <div>
-                          <div className="text-[10px] text-neutral-400 font-semibold">① 출강 강사료</div>
-                          <div className="text-sm font-bold text-neutral-100 mt-1 font-mono">
-                            ₩{lectBudget.toLocaleString()} <span className="text-[10px] font-normal text-neutral-400">원</span>
-                          </div>
-                        </div>
-                        <div className="text-[10px] text-neutral-500 font-mono text-right leading-tight">
-                          주강사 + 보조강사<br/>수당 합계액
-                        </div>
-                      </div>
-
-                      <div className="p-3 rounded-lg bg-neutral-900/50 border border-neutral-800 flex items-center justify-between">
-                        <div>
-                          <div className="text-[10px] text-neutral-400 font-semibold">② 재료비 총액</div>
-                          <div className="text-sm font-bold text-neutral-200 mt-1 font-mono">
-                            ₩{Number(lectMaterialCost).toLocaleString()} <span className="text-[10px] font-normal text-neutral-400">원</span>
-                          </div>
-                        </div>
-                        <div className="text-[10px] text-neutral-500 font-mono text-right leading-tight">
-                          1인당 재료비<br/>× {lectAttendees || 0}명
-                        </div>
-                      </div>
-
-                      <div className="p-3 rounded-lg bg-gradient-to-r from-kpcia-gold/15 to-amber-500/5 border border-kpcia-gold/25 flex items-center justify-between">
-                        <div>
-                          <div className="text-[10px] text-kpcia-gold font-bold flex items-center gap-1.5">
-                            <span>③ 총 출강비 청구액</span>
-                            {isProgramSelected && <span className="text-[8px] bg-kpcia-gold/20 text-kpcia-gold px-1 py-0.2 rounded font-normal">지정프로그램 5% 공제</span>}
-                          </div>
-                          <div className="text-base font-extrabold text-kpcia-gold mt-1 font-mono">
-                            ₩{finalTotal.toLocaleString()} <span className="text-xs font-semibold">원</span>
-                          </div>
-                        </div>
-                        <div className="text-[10px] text-kpcia-gold/70 font-mono text-right leading-tight">
-                          {isProgramSelected ? (
-                            <>
-                              강사료+재료비에서<br/>프로그램 사용료(로열티) 5% 차감
-                            </>
-                          ) : (
-                            <>
-                              강사료 + 재료비<br/>최종 실청구액
-                            </>
-                          )}
-                        </div>
+                    <div>
+                      <label className="text-[10px] font-bold text-neutral-300 block mb-1">④ 대상자 인원 (명) *</label>
+                      <div className="relative">
+                        <input
+                          type="number"
+                          min="1"
+                          placeholder="예: 30"
+                          value={lectAttendees}
+                          onChange={(e) => setLectAttendees(e.target.value)}
+                          required
+                          className="w-full pl-3.5 pr-8 py-2 rounded-lg bg-neutral-900 border border-neutral-800 text-xs font-medium text-neutral-100 focus:border-kpcia-gold focus:outline-none"
+                          id="admin-lect-attendees"
+                        />
+                        <span className="absolute right-3 top-2 text-[10px] text-neutral-500 font-bold">명</span>
                       </div>
                     </div>
-                  );
-                })()}
+                    <div>
+                      <label className="text-[10px] font-bold text-neutral-300 block mb-1">⑥ 1인당 재료비 *</label>
+                      <div className="relative">
+                        <input
+                          type="number"
+                          min="0"
+                          placeholder="예: 10000"
+                          value={lectMaterialCostPerPerson}
+                          onChange={(e) => setLectMaterialCostPerPerson(e.target.value)}
+                          required
+                          className="w-full pl-3.5 pr-8 py-2 rounded-lg bg-neutral-900 border border-neutral-800 text-xs font-medium text-neutral-100 focus:border-kpcia-gold focus:outline-none"
+                          id="admin-lect-material-cost-per-person"
+                        />
+                        <span className="absolute right-3 top-2 text-[10px] text-neutral-500 font-bold">원</span>
+                      </div>
+                    </div>
+                  </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  <div>
-                    <label className="text-[10px] font-mono text-neutral-400 block mb-1">출강 일정</label>
-                    <input
-                      type="date"
-                      value={lectDate}
-                      onChange={(e) => setLectDate(e.target.value)}
-                      className="w-full px-3.5 py-2 rounded-lg bg-neutral-900 border border-neutral-800 text-xs font-medium text-neutral-100 focus:border-kpcia-gold"
-                      id="admin-lect-date"
-                    />
+                  {/* Row 3: 강의 장소, 최소 강사 등급 */}
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div className="md:col-span-2">
+                      <label className="text-[10px] font-bold text-neutral-300 block mb-1">⑦ 강의 장소 *</label>
+                      <input
+                        type="text"
+                        placeholder="예: 경기도 용인시 삼성인력개발원"
+                        value={lectLocation}
+                        onChange={(e) => setLectLocation(e.target.value)}
+                        required
+                        className="w-full px-3.5 py-2 rounded-lg bg-neutral-900 border border-neutral-800 text-xs font-medium text-neutral-100 focus:border-kpcia-gold focus:outline-none"
+                        id="admin-lect-location"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-[10px] font-bold text-neutral-300 block mb-1">⑨ 지원 가능한 최소 강사 등급 *</label>
+                      <select
+                        value={lectTargetTier}
+                        onChange={(e) => setLectTargetTier(e.target.value as any)}
+                        className="w-full px-3.5 py-2 rounded-lg bg-neutral-900 border border-neutral-800 text-xs font-medium text-neutral-100 focus:border-kpcia-gold focus:outline-none"
+                        id="admin-lect-tier"
+                      >
+                        <option value="Prestige Member">Prestige Member (일반)</option>
+                        <option value="Prestige Associate">Prestige Associate (어소시에이트)</option>
+                        <option value="Prestige Professional">Prestige Professional (프로페셔널)</option>
+                        <option value="Prestige Master">Prestige Master (마스터)</option>
+                        <option value="Prestige Elite">Prestige Elite (엘리트)</option>
+                      </select>
+                    </div>
                   </div>
+
+                  {/* Row 4: 세부 요구사항 */}
                   <div>
-                    <label className="text-[10px] font-mono text-neutral-400 block mb-1">강의 진행 시간</label>
-                    <input
-                      type="text"
-                      value={lectTime}
-                      onChange={(e) => setLectTime(e.target.value)}
-                      className="w-full px-3.5 py-2 rounded-lg bg-neutral-900 border border-neutral-800 text-xs font-medium text-neutral-100 focus:border-kpcia-gold"
-                      id="admin-lect-time"
-                    />
-                  </div>
-                  <div>
-                    <label className="text-[10px] font-mono text-neutral-400 block mb-1">총 소요 시간</label>
-                    <input
-                      type="text"
-                      value={lectDuration}
-                      onChange={(e) => setLectDuration(e.target.value)}
-                      className="w-full px-3.5 py-2 rounded-lg bg-neutral-900 border border-neutral-800 text-xs font-medium text-neutral-100 focus:border-kpcia-gold"
-                      id="admin-lect-duration"
+                    <label className="text-[10px] font-bold text-neutral-300 block mb-1">⑧ 세부 요구사항</label>
+                    <textarea
+                      rows={3}
+                      placeholder="수강 대상 수준, 필요 교재/교구, 강사 만족도 평가지표 등의 요구사항을 적어주세요."
+                      value={lectDescription}
+                      onChange={(e) => setLectDescription(e.target.value)}
+                      className="w-full px-3.5 py-2 rounded-lg bg-neutral-900 border border-neutral-800 text-xs font-medium text-neutral-100 focus:border-kpcia-gold focus:outline-none resize-none"
+                      id="admin-lect-desc"
                     />
                   </div>
                 </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-2">
-                  <div>
-                    <label className="text-[10px] font-mono text-neutral-400 block mb-1">현장 담당자 이름</label>
-                    <input
-                      type="text"
-                      placeholder="예: 김성진"
-                      value={lectManagerName}
-                      onChange={(e) => setLectManagerName(e.target.value)}
-                      className="w-full px-3.5 py-2 rounded-lg bg-neutral-900 border border-neutral-800 text-xs font-medium text-neutral-100 focus:border-kpcia-gold focus:outline-none"
-                      id="admin-lect-manager-name"
-                    />
+                {/* 2. Advanced / Operational Details (Auto-calculated, Editable by Administration Office) */}
+                <div className="p-4 rounded-xl bg-neutral-900/30 border border-neutral-800/80 space-y-4">
+                  <div className="flex items-center justify-between border-b border-neutral-800/60 pb-2">
+                    <h5 className="text-[10px] font-bold text-kpcia-gold/80 uppercase tracking-wider flex items-center gap-1.5">
+                      <span>⚙️ 운영 및 강사 세부 시간/비용 설정 (자동 반영됨)</span>
+                      <span className="text-[9px] px-1.5 py-0.2 rounded-full bg-neutral-800 text-neutral-400 font-normal">사무국 수정가능</span>
+                    </h5>
+                    {parseInt(lectAttendees, 10) <= 20 ? (
+                      <span className="text-[9px] text-amber-500 font-medium">※ 인원 20명 이하: 보조강사 없음 (0시간 자동 세팅)</span>
+                    ) : (
+                      <span className="text-[9px] text-emerald-500 font-medium">※ 인원 20명 초과: 보조강사 배정 가능 ({lectDurationHours}시간 자동 세팅)</span>
+                    )}
                   </div>
-                  <div>
-                    <label className="text-[10px] font-mono text-neutral-400 block mb-1">현장 담당자 연락처</label>
-                    <input
-                      type="text"
-                      placeholder="예: 010-5259-7458"
-                      value={lectManagerPhone}
-                      onChange={(e) => setLectManagerPhone(e.target.value)}
-                      className="w-full px-3.5 py-2 rounded-lg bg-neutral-900 border border-neutral-800 text-xs font-medium text-neutral-100 focus:border-kpcia-gold focus:outline-none"
-                      id="admin-lect-manager-phone"
-                    />
+
+                  <div className="grid grid-cols-1 md:grid-cols-5 gap-3.5">
+                    <div className="space-y-1">
+                      <label className="text-[9px] font-mono font-bold text-neutral-400 block">
+                        주강사 강의 시간 (단가: 100,000원)
+                      </label>
+                      <div className="relative">
+                        <input
+                          type="number"
+                          step="0.5"
+                          min="0"
+                          value={lectMainHours}
+                          onChange={(e) => setLectMainHours(e.target.value)}
+                          className="w-full pl-3 pr-8 py-2 rounded-lg bg-neutral-950 border border-neutral-800 text-xs font-semibold text-neutral-100 focus:border-kpcia-gold focus:outline-none"
+                          id="admin-lect-main-hours"
+                        />
+                        <span className="absolute right-2.5 top-2 text-[9px] text-neutral-500 font-bold">시간</span>
+                      </div>
+                      <p className="text-[8.5px] text-neutral-500">※ 기본료: {(parseFloat(lectMainHours || '0') * 100000).toLocaleString()}원</p>
+                    </div>
+
+                    <div className="space-y-1">
+                      <label className="text-[9px] font-mono font-bold text-neutral-400 block">
+                        보조강사 강의 시간 (단가: 50,000원)
+                      </label>
+                      <div className="relative">
+                        <input
+                          type="number"
+                          step="0.5"
+                          min="0"
+                          value={lectAssistantHours}
+                          onChange={(e) => setLectAssistantHours(e.target.value)}
+                          className="w-full pl-3 pr-8 py-2 rounded-lg bg-neutral-950 border border-neutral-800 text-xs font-semibold text-neutral-100 focus:border-kpcia-gold focus:outline-none"
+                          id="admin-lect-assistant-hours"
+                        />
+                        <span className="absolute right-2.5 top-2 text-[9px] text-neutral-500 font-bold">시간</span>
+                      </div>
+                      <p className="text-[8.5px] text-neutral-500">※ 보조료: {(parseFloat(lectAssistantHours || '0') * 50000).toLocaleString()}원</p>
+                    </div>
+
+                    <div className="space-y-1">
+                      <label className="text-[9px] font-mono font-bold text-neutral-400 block">
+                        재료비 총액 (자동 계산)
+                      </label>
+                      <div className="relative">
+                        <div className="w-full pl-3 pr-8 py-2 rounded-lg bg-neutral-950/60 border border-neutral-850 text-xs font-semibold text-neutral-400 flex items-center h-[34px]">
+                          ₩{Number(lectMaterialCost).toLocaleString()}
+                        </div>
+                        <span className="absolute right-2.5 top-2.5 text-[9px] text-neutral-500 font-bold">원</span>
+                      </div>
+                      <p className="text-[8.5px] text-neutral-500">※ 1인당 재료비 자동 곱산</p>
+                    </div>
+
+                    <div className="space-y-1">
+                      <label className="text-[9px] font-mono font-bold text-kpcia-gold block">
+                        출강 강사료 (수정 가능)
+                      </label>
+                      <div className="relative">
+                        <input
+                          type="number"
+                          value={lectBudget}
+                          onChange={(e) => setLectBudget(Number(e.target.value))}
+                          className="w-full pl-3 pr-8 py-2 rounded-lg bg-neutral-950 border border-kpcia-gold/30 text-xs font-mono font-bold text-kpcia-gold focus:border-kpcia-gold focus:outline-none"
+                          id="admin-lect-budget"
+                        />
+                        <span className="absolute right-2.5 top-2 text-[9px] text-kpcia-gold font-bold">원</span>
+                      </div>
+                      <p className="text-[8.5px] text-neutral-500">※ 주강사 + 보조강사료 합산</p>
+                    </div>
+
+                    <div className="space-y-1">
+                      <label className="text-[9px] font-mono font-bold text-neutral-300 block">
+                        지정 교육 프로그램 연계
+                      </label>
+                      <select
+                        value={lectProgramId}
+                        onChange={(e) => setLectProgramId(e.target.value)}
+                        className="w-full px-2.5 py-2 rounded-lg bg-neutral-950 border border-neutral-800 text-[11px] font-medium text-neutral-100 focus:border-kpcia-gold focus:outline-none"
+                        id="admin-lect-program"
+                      >
+                        <option value="">연계 프로그램 없음 (자유교안)</option>
+                        {programs.map(p => (
+                          <option key={p.id} value={p.id}>{p.title}</option>
+                        ))}
+                      </select>
+                      <p className="text-[8.5px] text-neutral-500">※ 연계 시 저작권료 5% 공제</p>
+                    </div>
+                  </div>
+
+                  {/* Total Lecture Cost Summary Display Dashboard */}
+                  {(() => {
+                    const isProgramSelected = !!lectProgramId;
+                    const originalTotal = lectBudget + Number(lectMaterialCost);
+                    const finalTotal = isProgramSelected ? (originalTotal - Math.round(originalTotal * 0.05)) : originalTotal;
+                    return (
+                      <div className="grid grid-cols-1 md:grid-cols-3 gap-3 p-3.5 rounded-xl bg-neutral-950/40 border border-neutral-850">
+                        <div className="p-3 rounded-lg bg-neutral-900/50 border border-neutral-800 flex items-center justify-between">
+                          <div>
+                            <div className="text-[10px] text-neutral-400 font-semibold">① 출강 강사료</div>
+                            <div className="text-sm font-bold text-neutral-100 mt-1 font-mono">
+                              ₩{lectBudget.toLocaleString()} <span className="text-[10px] font-normal text-neutral-400">원</span>
+                            </div>
+                          </div>
+                          <div className="text-[10px] text-neutral-500 font-mono text-right leading-tight">
+                            주강사 + 보조강사<br/>수당 합계액
+                          </div>
+                        </div>
+
+                        <div className="p-3 rounded-lg bg-neutral-900/50 border border-neutral-800 flex items-center justify-between">
+                          <div>
+                            <div className="text-[10px] text-neutral-400 font-semibold">② 재료비 총액</div>
+                            <div className="text-sm font-bold text-neutral-200 mt-1 font-mono">
+                              ₩{Number(lectMaterialCost).toLocaleString()} <span className="text-[10px] font-normal text-neutral-400">원</span>
+                            </div>
+                          </div>
+                          <div className="text-[10px] text-neutral-500 font-mono text-right leading-tight">
+                            1인당 재료비<br/>× {lectAttendees || 0}명
+                          </div>
+                        </div>
+
+                        <div className="p-3 rounded-lg bg-gradient-to-r from-kpcia-gold/15 to-amber-500/5 border border-kpcia-gold/25 flex items-center justify-between">
+                          <div>
+                            <div className="text-[10px] text-kpcia-gold font-bold flex items-center gap-1.5">
+                              <span>③ 총 출강비 청구액</span>
+                              {isProgramSelected && <span className="text-[8px] bg-kpcia-gold/20 text-kpcia-gold px-1 py-0.2 rounded font-normal">지정프로그램 5% 공제</span>}
+                            </div>
+                            <div className="text-base font-extrabold text-kpcia-gold mt-1 font-mono">
+                              ₩{finalTotal.toLocaleString()} <span className="text-xs font-semibold">원</span>
+                            </div>
+                          </div>
+                          <div className="text-[10px] text-kpcia-gold/70 font-mono text-right leading-tight">
+                            {isProgramSelected ? (
+                              <>
+                                강사료+재료비에서<br/>프로그램 사용료(로열티) 5% 차감
+                              </>
+                            ) : (
+                              <>
+                                강사료 + 재료비<br/>최종 실청구액
+                              </>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })()}
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <label className="text-[10px] font-mono text-neutral-400 block mb-1">현장 담당자 이름 (공고에는 표시되지 않음)</label>
+                      <input
+                        type="text"
+                        placeholder="기본값: 운영사무국"
+                        value={lectManagerName}
+                        onChange={(e) => setLectManagerName(e.target.value)}
+                        className="w-full px-3.5 py-2 rounded-lg bg-neutral-900 border border-neutral-800 text-xs font-medium text-neutral-100 focus:border-kpcia-gold focus:outline-none"
+                        id="admin-lect-manager-name"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-[10px] font-mono text-neutral-400 block mb-1">현장 담당자 연락처 (공고에는 표시되지 않음)</label>
+                      <input
+                        type="text"
+                        placeholder="기본값: 02-123-4567"
+                        value={lectManagerPhone}
+                        onChange={(e) => setLectManagerPhone(e.target.value)}
+                        className="w-full px-3.5 py-2 rounded-lg bg-neutral-900 border border-neutral-800 text-xs font-medium text-neutral-100 focus:border-kpcia-gold focus:outline-none"
+                        id="admin-lect-manager-phone"
+                      />
+                    </div>
                   </div>
                 </div>
 
@@ -3705,241 +3891,283 @@ export default function AdminPanel({
               </div>
 
               {/* Modal Body */}
-              <div className="p-6 space-y-4 overflow-y-auto text-left text-xs">
-                {/* 1. Basic Info */}
-                <div className="space-y-3">
-                  <h4 className="text-[10px] font-bold text-kpcia-gold uppercase tracking-wider pb-1 border-b border-neutral-800">
-                    기본 강의 정보
-                  </h4>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                    <div className="space-y-1">
-                      <label className="text-[10px] text-neutral-400 font-semibold block">강의 대표 주제명 *</label>
+              <div className="p-6 space-y-5 overflow-y-auto text-left text-xs">
+                {/* 1. Essential Fields Section (9 items) */}
+                <div className="space-y-4">
+                  <div className="flex items-center gap-1.5 border-b border-neutral-800 pb-1.5">
+                    <span className="w-1.5 h-3 bg-kpcia-gold rounded"></span>
+                    <h4 className="text-[11px] font-bold text-kpcia-gold uppercase tracking-wider">
+                      필수 강의 정보 (9가지 기본 설정)
+                    </h4>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <label className="text-[10px] font-bold text-neutral-300 block mb-1">① 기업기관명 *</label>
                       <input
                         type="text"
-                        value={editLectTitle}
-                        onChange={(e) => setEditLectTitle(e.target.value)}
-                        className="w-full px-3 py-2 rounded-lg bg-neutral-950 border border-neutral-800 text-neutral-100 font-medium focus:border-kpcia-gold focus:outline-none text-xs"
-                        placeholder="예: 인공지능 디지털 혁신 특강"
+                        placeholder="예: 현대자동차, SK텔레콤 등"
+                        value={editLectCompany}
+                        onChange={(e) => setEditLectCompany(e.target.value)}
+                        required
+                        className="w-full px-3.5 py-2 rounded-lg bg-neutral-950 border border-neutral-800 text-xs font-medium text-neutral-100 focus:border-kpcia-gold focus:outline-none"
+                        id="admin-edit-lect-company"
                       />
                     </div>
-                    <div className="space-y-1">
-                      <label className="text-[10px] text-neutral-400 font-semibold block">연계 교육 과정 교안</label>
-                      <select
-                        value={editLectProgramId}
-                        onChange={(e) => setEditLectProgramId(e.target.value)}
-                        className="w-full px-3 py-2 rounded-lg bg-neutral-950 border border-neutral-800 text-neutral-150 font-medium focus:border-kpcia-gold focus:outline-none text-xs"
-                      >
-                        <option value="">-- 연계 공인 교안 없음 (순수 개별 위탁 출강) --</option>
-                        {programs.map((p) => (
-                          <option key={p.id} value={p.id}>
-                            {p.title} (저작권료 요율: 총 출강비의 5%)
-                          </option>
-                        ))}
-                      </select>
+                    <div>
+                      <label className="text-[10px] font-bold text-neutral-300 block mb-1">⑤ 주제 *</label>
+                      <input
+                        type="text"
+                        placeholder="예: AI 기반 협업 리더십 포럼"
+                        value={editLectTitle}
+                        onChange={(e) => setEditLectTitle(e.target.value)}
+                        required
+                        className="w-full px-3.5 py-2 rounded-lg bg-neutral-950 border border-neutral-800 text-xs font-medium text-neutral-100 focus:border-kpcia-gold focus:outline-none"
+                        id="admin-edit-lect-title"
+                      />
                     </div>
                   </div>
-                  <div className="space-y-1">
-                    <label className="text-[10px] text-neutral-400 font-semibold block">강의 상세 안내 및 의뢰 시놉시스 *</label>
-                    <textarea
-                      rows={3}
-                      value={editLectDescription}
-                      onChange={(e) => setEditLectDescription(e.target.value)}
-                      className="w-full px-3 py-2 rounded-lg bg-neutral-950 border border-neutral-800 text-neutral-100 font-medium focus:border-kpcia-gold focus:outline-none text-xs resize-none"
-                      placeholder="강의 개요, 수강 대상 및 세부 커리큘럼 아웃라인 기재"
-                    />
-                  </div>
-                </div>
 
-                {/* 2. Schedule & Target */}
-                <div className="space-y-3 pt-2">
-                  <h4 className="text-[10px] font-bold text-kpcia-gold uppercase tracking-wider pb-1 border-b border-neutral-800">
-                    일정 및 지원 자격 조건
-                  </h4>
-                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                    <div className="space-y-1">
-                      <label className="text-[10px] text-neutral-400 font-semibold block">출강 일자 *</label>
+                  <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                    <div>
+                      <label className="text-[10px] font-bold text-neutral-300 block mb-1">② 날짜 *</label>
                       <input
                         type="date"
                         value={editLectDate}
                         onChange={(e) => setEditLectDate(e.target.value)}
-                        className="w-full px-3 py-2 rounded-lg bg-neutral-950 border border-neutral-800 text-neutral-100 font-medium focus:border-kpcia-gold focus:outline-none text-xs"
+                        required
+                        className="w-full px-3.5 py-2 rounded-lg bg-neutral-950 border border-neutral-800 text-xs font-medium text-neutral-100 focus:border-kpcia-gold focus:outline-none"
+                        id="admin-edit-lect-date"
                       />
                     </div>
-                    <div className="space-y-1">
-                      <label className="text-[10px] text-neutral-400 font-semibold block">출강 상세 시간대 *</label>
-                      <input
-                        type="text"
-                        value={editLectTime}
-                        onChange={(e) => setEditLectTime(e.target.value)}
-                        className="w-full px-3 py-2 rounded-lg bg-neutral-950 border border-neutral-800 text-neutral-100 font-medium focus:border-kpcia-gold focus:outline-none text-xs"
-                        placeholder="예: 14:00 - 16:00"
-                      />
+                    <div>
+                      <label className="text-[10px] font-bold text-neutral-300 block mb-1">③ 강의 시간대 (몇시~몇시) *</label>
+                      <div className="relative">
+                        <input
+                          type="text"
+                          placeholder="예: 13:00~16:00 또는 13시~16시"
+                          value={editLectTime}
+                          onChange={(e) => setEditLectTime(e.target.value)}
+                          required
+                          className="w-full px-3.5 py-2 rounded-lg bg-neutral-950 border border-neutral-800 text-xs font-medium text-neutral-100 focus:border-kpcia-gold focus:outline-none"
+                          id="admin-edit-lect-time-range"
+                        />
+                      </div>
+                      {editLectDurationHours && editLectDurationHours !== '0' && (
+                        <span className="text-[9px] text-kpcia-gold mt-1 block">
+                          ⏱️ 자동 계산: {editLectDurationHours}시간
+                        </span>
+                      )}
                     </div>
-                    <div className="space-y-1">
-                      <label className="text-[10px] text-neutral-400 font-semibold block">강의 총 시간 (Duration) *</label>
-                      <input
-                        type="text"
-                        value={editLectDuration}
-                        onChange={(e) => setEditLectDuration(e.target.value)}
-                        className="w-full px-3 py-2 rounded-lg bg-neutral-950 border border-neutral-800 text-neutral-100 font-medium focus:border-kpcia-gold focus:outline-none text-xs"
-                        placeholder="예: 2 hours"
-                      />
+                    <div>
+                      <label className="text-[10px] font-bold text-neutral-300 block mb-1">④ 대상자 인원 (명) *</label>
+                      <div className="relative">
+                        <input
+                          type="number"
+                          min="0"
+                          placeholder="예: 30"
+                          value={editLectAttendees}
+                          onChange={(e) => setEditLectAttendees(e.target.value)}
+                          required
+                          className="w-full pl-3.5 pr-10 py-2 rounded-lg bg-neutral-950 border border-neutral-800 text-xs font-medium text-neutral-100 focus:border-kpcia-gold focus:outline-none"
+                          id="admin-edit-lect-attendees"
+                        />
+                        <span className="absolute right-3 top-2 text-[10px] text-neutral-500 font-bold">명</span>
+                      </div>
+                    </div>
+                    <div>
+                      <label className="text-[10px] font-bold text-neutral-300 block mb-1">⑥ 1인당 재료비 (원) *</label>
+                      <div className="relative">
+                        <input
+                          type="number"
+                          min="0"
+                          placeholder="예: 5000"
+                          value={editLectMaterialCostPerPerson}
+                          onChange={(e) => setEditLectMaterialCostPerPerson(e.target.value)}
+                          required
+                          className="w-full pl-3.5 pr-8 py-2 rounded-lg bg-neutral-950 border border-neutral-800 text-xs font-medium text-neutral-100 focus:border-kpcia-gold focus:outline-none"
+                          id="admin-edit-lect-material-cost-per-person"
+                        />
+                        <span className="absolute right-3 top-2 text-[10px] text-neutral-500 font-bold">원</span>
+                      </div>
                     </div>
                   </div>
-                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                    <div className="space-y-1">
-                      <label className="text-[10px] text-neutral-400 font-semibold block">출강 장소/기관 정보 *</label>
-                      <input
-                        type="text"
-                        value={editLectLocation}
-                        onChange={(e) => setEditLectLocation(e.target.value)}
-                        className="w-full px-3 py-2 rounded-lg bg-neutral-950 border border-neutral-800 text-neutral-100 font-medium focus:border-kpcia-gold focus:outline-none text-xs"
-                        placeholder="예: 현대자동차 상계 연수원"
-                      />
-                    </div>
-                    <div className="space-y-1">
-                      <label className="text-[10px] text-neutral-400 font-semibold block">교육 예상 수강 인원 *</label>
-                      <input
-                        type="number"
-                        value={editLectAttendees}
-                        onChange={(e) => setEditLectAttendees(e.target.value)}
-                        className="w-full px-3 py-2 rounded-lg bg-neutral-950 border border-neutral-800 text-neutral-100 font-medium focus:border-kpcia-gold focus:outline-none text-xs"
-                        placeholder="예: 30"
-                      />
-                    </div>
-                    <div className="space-y-1">
-                      <label className="text-[10px] text-neutral-400 font-semibold block">최소 자격 허들 등급 *</label>
-                      <select
-                        value={editLectTargetTier}
-                        onChange={(e) => setEditLectTargetTier(e.target.value as InstructorTier)}
-                        className="w-full px-3 py-2 rounded-lg bg-neutral-950 border border-neutral-800 text-neutral-100 font-medium focus:border-kpcia-gold focus:outline-none text-xs"
-                      >
-                        <option value="Prestige Member">Prestige Member (일반)</option>
-                        <option value="Prestige Associate">Prestige Associate (어소시에이트)</option>
-                        <option value="Prestige Professional">Prestige Professional (프로페셔널)</option>
-                        <option value="Prestige Master">Prestige Master (마스터)</option>
-                        <option value="Prestige Elite">Prestige Elite (엘리트)</option>
-                      </select>
-                    </div>
+
+                  <div>
+                    <label className="text-[10px] font-bold text-neutral-300 block mb-1">⑦ 강의 장소 *</label>
+                    <input
+                      type="text"
+                      placeholder="예: 서울시 강남구 테헤란로 123 연수원 4층"
+                      value={editLectLocation}
+                      onChange={(e) => setEditLectLocation(e.target.value)}
+                      required
+                      className="w-full px-3.5 py-2 rounded-lg bg-neutral-950 border border-neutral-800 text-xs font-medium text-neutral-100 focus:border-kpcia-gold focus:outline-none"
+                      id="admin-edit-lect-location"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="text-[10px] font-bold text-neutral-300 block mb-1">⑧ 세부 요구사항 / 특이사항 *</label>
+                    <textarea
+                      rows={3}
+                      placeholder="강의 상세 개요, 아웃라인 또는 요청 대상자의 배경 지식을 적어주세요."
+                      value={editLectDescription}
+                      onChange={(e) => setEditLectDescription(e.target.value)}
+                      required
+                      className="w-full px-3.5 py-2.5 rounded-lg bg-neutral-950 border border-neutral-800 text-xs font-medium text-neutral-100 focus:border-kpcia-gold focus:outline-none resize-none"
+                      id="admin-edit-lect-description"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="text-[10px] font-bold text-neutral-300 block mb-1">⑨ 지원 가능한 최소 강사 등급 *</label>
+                    <select
+                      value={editLectTargetTier}
+                      onChange={(e) => setEditLectTargetTier(e.target.value as InstructorTier)}
+                      className="w-full px-3.5 py-2 rounded-lg bg-neutral-950 border border-neutral-800 text-xs font-medium text-neutral-100 focus:border-kpcia-gold focus:outline-none cursor-pointer"
+                      id="admin-edit-lect-target-tier"
+                    >
+                      <option value="Prestige Member">Prestige Member (일반)</option>
+                      <option value="Prestige Associate">Prestige Associate (어소시에이트)</option>
+                      <option value="Prestige Professional">Prestige Professional (프로페셔널)</option>
+                      <option value="Prestige Master">Prestige Master (마스터)</option>
+                      <option value="Prestige Elite">Prestige Elite (엘리트)</option>
+                    </select>
                   </div>
                 </div>
 
-                {/* 3. Hours & Expenses & Contact */}
-                <div className="space-y-3 pt-2">
-                  <h4 className="text-[10px] font-bold text-kpcia-gold uppercase tracking-wider pb-1 border-b border-neutral-800">
-                    출강 예산 세무 구성 및 비상 연락처
-                  </h4>
-                  <div className="grid grid-cols-1 sm:grid-cols-5 gap-3">
-                    <div className="space-y-1">
-                      <label className="text-[10px] text-neutral-400 font-semibold block">주강사 강의 시간 *</label>
-                      <input
-                        type="number"
-                        step="0.5"
-                        value={editLectMainHours}
-                        onChange={(e) => setEditLectMainHours(e.target.value)}
-                        className="w-full px-3 py-2 rounded-lg bg-neutral-950 border border-neutral-800 text-neutral-100 font-medium focus:border-kpcia-gold focus:outline-none text-xs"
-                      />
-                    </div>
-                    <div className="space-y-1">
-                      <label className="text-[10px] text-neutral-400 font-semibold block">보조강사 배정 시간 *</label>
-                      <input
-                        type="number"
-                        step="0.5"
-                        value={editLectAssistantHours}
-                        onChange={(e) => setEditLectAssistantHours(e.target.value)}
-                        className="w-full px-3 py-2 rounded-lg bg-neutral-950 border border-neutral-800 text-neutral-100 font-medium focus:border-kpcia-gold focus:outline-none text-xs"
-                      />
-                    </div>
-                    <div className="space-y-1">
-                      <label className="text-[10px] text-neutral-400 font-semibold block">1인당 재료비 *</label>
-                      <input
-                        type="number"
-                        value={editLectMaterialCostPerPerson}
-                        onChange={(e) => setEditLectMaterialCostPerPerson(e.target.value)}
-                        className="w-full px-3 py-2 rounded-lg bg-neutral-950 border border-neutral-800 text-neutral-100 font-medium focus:border-kpcia-gold focus:outline-none text-xs"
-                      />
-                    </div>
-                    <div className="space-y-1">
-                      <label className="text-[10px] text-neutral-400 font-semibold block">재료비 총액 (자동 계산)</label>
-                      <div className="w-full px-3 py-2 rounded-lg bg-neutral-950/60 border border-neutral-850 text-neutral-400 font-semibold text-xs flex items-center h-[34px]">
-                        ₩{Number(editLectMaterialCost).toLocaleString()}
+                {/* 2. Advanced Configurations (Override Desk) */}
+                <div className="space-y-4 pt-3 border-t border-neutral-850">
+                  <div className="flex items-center gap-1.5 pb-0.5">
+                    <span className="w-1.5 h-3 bg-amber-500 rounded"></span>
+                    <h4 className="text-[11px] font-bold text-amber-500 uppercase tracking-wider flex items-center gap-1.5">
+                      행정 및 예산 세부 설정 (수정 및 재계산 데스크)
+                    </h4>
+                  </div>
+
+                  <div className="p-3.5 bg-amber-500/5 rounded-xl border border-amber-500/10 space-y-3">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div>
+                        <label className="text-[10px] font-bold text-neutral-400 block mb-1">주강사 강의 배정 시간 (시간) *</label>
+                        <div className="relative">
+                          <input
+                            type="number"
+                            step="0.5"
+                            min="0"
+                            value={editLectMainHours}
+                            onChange={(e) => setEditLectMainHours(e.target.value)}
+                            required
+                            className="w-full pl-3.5 pr-10 py-1.5 rounded-lg bg-neutral-950 border border-neutral-800 text-xs text-neutral-100 font-mono focus:border-amber-500 focus:outline-none"
+                            id="admin-edit-lect-main-hours"
+                          />
+                          <span className="absolute right-3 top-2 text-[9px] text-neutral-500 font-bold">시간</span>
+                        </div>
+                      </div>
+                      <div>
+                        <label className="text-[10px] font-bold text-neutral-400 block mb-1">보조강사 배정 시간 (시간) *</label>
+                        <div className="relative">
+                          <input
+                            type="number"
+                            step="0.5"
+                            min="0"
+                            value={editLectAssistantHours}
+                            onChange={(e) => setEditLectAssistantHours(e.target.value)}
+                            required
+                            className="w-full pl-3.5 pr-10 py-1.5 rounded-lg bg-neutral-950 border border-neutral-800 text-xs text-neutral-100 font-mono focus:border-amber-500 focus:outline-none"
+                            id="admin-edit-lect-assistant-hours"
+                          />
+                          <span className="absolute right-3 top-2 text-[9px] text-neutral-500 font-bold">시간</span>
+                        </div>
+                        <p className="text-[9px] text-neutral-500 mt-1">※ 수강 대상자 20명 이하 시 자동으로 0시간 설정됩니다.</p>
                       </div>
                     </div>
-                    <div className="space-y-1">
-                      <label className="text-[10px] text-kpcia-gold font-semibold block">출강 강사료 (자동 계산)</label>
-                      <input
-                        type="number"
-                        value={editLectBudget}
-                        onChange={(e) => setEditLectBudget(Number(e.target.value))}
-                        className="w-full px-3 py-2 rounded-lg bg-neutral-950 border border-kpcia-gold/30 text-kpcia-gold font-bold focus:border-kpcia-gold focus:outline-none text-xs"
-                      />
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-1">
+                      <div>
+                        <label className="text-[10px] font-semibold text-neutral-400 block mb-1">재료비 총액 (원)</label>
+                        <div className="w-full px-3 py-1.5 rounded-lg bg-neutral-900 border border-neutral-800 text-xs font-mono text-neutral-400 font-bold flex items-center h-[32px]">
+                          ₩{Number(editLectMaterialCost).toLocaleString()} 원
+                        </div>
+                      </div>
+                      <div>
+                        <label className="text-[10px] font-semibold text-neutral-400 block mb-1">지정 교육 과정 교안</label>
+                        <select
+                          value={editLectProgramId}
+                          onChange={(e) => setEditLectProgramId(e.target.value)}
+                          className="w-full px-2 py-1.5 rounded-lg bg-neutral-950 border border-neutral-800 text-[11px] text-neutral-300 focus:outline-none focus:border-amber-500"
+                          id="admin-edit-lect-program-id"
+                        >
+                          <option value="">교안 지정 안함 (개별 위탁)</option>
+                          {programs.map((p) => (
+                            <option key={p.id} value={p.id}>
+                              {p.title} (5% 적립)
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-1">
+                      <div>
+                        <label className="text-[10px] font-semibold text-neutral-400 block mb-1">위탁 기관 담당자명</label>
+                        <input
+                          type="text"
+                          placeholder="담당자 성함"
+                          value={editLectManagerName}
+                          onChange={(e) => setEditLectManagerName(e.target.value)}
+                          className="w-full px-3 py-1.5 rounded-lg bg-neutral-950 border border-neutral-800 text-xs text-neutral-200 focus:outline-none"
+                          id="admin-edit-lect-manager-name"
+                        />
+                      </div>
+                      <div>
+                        <label className="text-[10px] font-semibold text-neutral-400 block mb-1">담당자 연락처</label>
+                        <input
+                          type="text"
+                          placeholder="예: 010-1234-5678"
+                          value={editLectManagerPhone}
+                          onChange={(e) => setEditLectManagerPhone(e.target.value)}
+                          className="w-full px-3 py-1.5 rounded-lg bg-neutral-950 border border-neutral-800 text-xs text-neutral-200 focus:outline-none"
+                          id="admin-edit-lect-manager-phone"
+                        />
+                      </div>
                     </div>
                   </div>
 
-                  {/* Edit Form Total Lecture Cost Summary Display Dashboard */}
+                  {/* Dynamic cost breakdown dashboard */}
                   {(() => {
                     const isProgramSelected = !!editLectProgramId;
                     const originalTotal = editLectBudget + Number(editLectMaterialCost);
                     const finalTotal = isProgramSelected ? (originalTotal - Math.round(originalTotal * 0.05)) : originalTotal;
                     return (
-                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 p-3 rounded-xl bg-neutral-950/40 border border-neutral-850 mt-1">
-                        <div className="p-2.5 rounded-lg bg-neutral-900/50 border border-neutral-800 flex items-center justify-between text-xs">
-                          <div>
-                            <div className="text-[9px] text-neutral-400 font-semibold">① 출강 강사료</div>
-                            <div className="text-xs font-bold text-neutral-100 mt-0.5 font-mono">
-                              ₩{editLectBudget.toLocaleString()} <span className="text-[9px] font-normal text-neutral-400">원</span>
-                            </div>
-                          </div>
+                      <div className="grid grid-cols-1 md:grid-cols-3 gap-3 p-3.5 rounded-xl bg-neutral-950 border border-neutral-850">
+                        <div className="p-2.5 rounded-lg bg-neutral-900 border border-neutral-800/80 text-left">
+                          <span className="text-[9px] font-bold text-neutral-500 uppercase block">① 출강 강사료 (자동 정산)</span>
+                          <span className="text-sm font-mono font-bold text-neutral-200 block mt-1">
+                            ₩{editLectBudget.toLocaleString()}원
+                          </span>
+                          <span className="text-[8px] text-neutral-500 block mt-0.5">※ 주당 10만 / 보조당 5만 책정</span>
                         </div>
-
-                        <div className="p-2.5 rounded-lg bg-neutral-900/50 border border-neutral-800 flex items-center justify-between text-xs">
-                          <div>
-                            <div className="text-[9px] text-neutral-400 font-semibold">② 재료비 총액</div>
-                            <div className="text-xs font-bold text-neutral-200 mt-0.5 font-mono">
-                              ₩{Number(editLectMaterialCost).toLocaleString()} <span className="text-[9px] font-normal text-neutral-400">원</span>
-                            </div>
-                          </div>
-                          <div className="text-[9px] text-neutral-500 font-mono text-right">
-                            {editLectAttendees || 0}명 대상
-                          </div>
+                        <div className="p-2.5 rounded-lg bg-neutral-900 border border-neutral-800/80 text-left">
+                          <span className="text-[9px] font-bold text-neutral-500 uppercase block">② 총 교육 재료비</span>
+                          <span className="text-sm font-mono font-bold text-neutral-200 block mt-1">
+                            ₩{Number(editLectMaterialCost).toLocaleString()}원
+                          </span>
+                          <span className="text-[8px] text-neutral-500 block mt-0.5">※ {editLectAttendees || 0}명 × {Number(editLectMaterialCostPerPerson).toLocaleString()}원</span>
                         </div>
-
-                        <div className="p-2.5 rounded-lg bg-gradient-to-r from-kpcia-gold/15 to-amber-500/5 border border-kpcia-gold/25 flex items-center justify-between text-xs">
-                          <div>
-                            <div className="text-[9px] text-kpcia-gold font-bold flex items-center gap-1.5">
-                              <span>③ 총 출강비 청구액</span>
-                              {isProgramSelected && <span className="text-[8px] bg-kpcia-gold/20 text-kpcia-gold px-1 py-0.2 rounded font-normal">5% 공제</span>}
-                            </div>
-                            <div className="text-sm font-extrabold text-kpcia-gold mt-0.5 font-mono">
-                              ₩{finalTotal.toLocaleString()} <span className="text-[10px] font-semibold">원</span>
-                            </div>
-                          </div>
+                        <div className="p-2.5 rounded-lg bg-kpcia-gold/10 border border-kpcia-gold/20 text-left relative overflow-hidden">
+                          <span className="text-[9px] font-black text-kpcia-gold uppercase block">③ 총 출강 청구 비용</span>
+                          <span className="text-sm font-mono font-bold text-kpcia-gold block mt-1">
+                            ₩{finalTotal.toLocaleString()}원
+                          </span>
+                          {isProgramSelected ? (
+                            <span className="text-[8px] text-emerald-500 block mt-0.5 font-bold">✓ 저작권 사용 수수료 5% 포함</span>
+                          ) : (
+                            <span className="text-[8px] text-neutral-500 block mt-0.5">※ 저작권 미지정 수수료 미공제</span>
+                          )}
                         </div>
                       </div>
                     );
                   })()}
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                    <div className="space-y-1">
-                      <label className="text-[10px] text-neutral-400 font-semibold block">위탁 기업 담당자명</label>
-                      <input
-                        type="text"
-                        value={editLectManagerName}
-                        onChange={(e) => setEditLectManagerName(e.target.value)}
-                        className="w-full px-3 py-2 rounded-lg bg-neutral-950 border border-neutral-800 text-neutral-100 font-medium focus:border-kpcia-gold focus:outline-none text-xs"
-                        placeholder="예: 김정우 책임연구원"
-                      />
-                    </div>
-                    <div className="space-y-1">
-                      <label className="text-[10px] text-neutral-400 font-semibold block">담당자 연락처</label>
-                      <input
-                        type="text"
-                        value={editLectManagerPhone}
-                        onChange={(e) => setEditLectManagerPhone(e.target.value)}
-                        className="w-full px-3 py-2 rounded-lg bg-neutral-950 border border-neutral-800 text-neutral-100 font-medium focus:border-kpcia-gold focus:outline-none text-xs"
-                        placeholder="예: 010-1234-5678"
-                      />
-                    </div>
-                  </div>
                 </div>
               </div>
 

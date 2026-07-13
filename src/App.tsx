@@ -118,13 +118,13 @@ export default function App() {
     setProposals(loadedProposals);
 
     // 2. Load existing session from sessionStorage (supports separate logins in separate tabs/windows!)
-    const savedUserUid = sessionStorage.getItem('kpcia_logged_in_uid') || localStorage.getItem('kpcia_logged_in_uid');
+    const savedUserUid = StorageService.getSessionItem('kpcia_logged_in_uid') || StorageService.getLocalItem('kpcia_logged_in_uid');
     if (savedUserUid) {
       const savedUser = loadedUsers.find(u => u.uid === savedUserUid);
       if (savedUser) {
         setCurrentUser(savedUser);
         // If we recovered it from localStorage, put it in sessionStorage now so we can be independent from now on
-        sessionStorage.setItem('kpcia_logged_in_uid', savedUserUid);
+        StorageService.setSessionItem('kpcia_logged_in_uid', savedUserUid);
       }
     } else {
       setCurrentUser(null);
@@ -148,7 +148,7 @@ export default function App() {
         unsubUsers = StorageService.subscribeUsers((updatedUsers) => {
           setUsers(updatedUsers);
           StorageService.setLocal('users', updatedUsers);
-          const loggedInUid = sessionStorage.getItem('kpcia_logged_in_uid');
+          const loggedInUid = StorageService.getSessionItem('kpcia_logged_in_uid');
           if (loggedInUid) {
             const updatedMe = updatedUsers.find(u => u.uid === loggedInUid);
             if (updatedMe) {
@@ -189,7 +189,7 @@ export default function App() {
         if (e.key === 'kpcia_users') {
           const freshUsers = StorageService.getLocalUsers();
           setUsers(freshUsers);
-          const loggedInUid = sessionStorage.getItem('kpcia_logged_in_uid');
+          const loggedInUid = StorageService.getSessionItem('kpcia_logged_in_uid');
           if (loggedInUid) {
             const updatedMe = freshUsers.find(u => u.uid === loggedInUid);
             if (updatedMe) {
@@ -347,8 +347,8 @@ export default function App() {
     setProposals(loadedProposals);
 
     // Reset login session
-    sessionStorage.removeItem('kpcia_logged_in_uid');
-    localStorage.removeItem('kpcia_logged_in_uid');
+    StorageService.removeSessionItem('kpcia_logged_in_uid');
+    StorageService.removeLocalItem('kpcia_logged_in_uid');
     setCurrentUser(null);
   };
 
@@ -1167,8 +1167,8 @@ export default function App() {
   const handleLogout = () => {
     setCurrentUser(null);
     setActiveTab('home');
-    sessionStorage.removeItem('kpcia_logged_in_uid');
-    localStorage.removeItem('kpcia_logged_in_uid');
+    StorageService.removeSessionItem('kpcia_logged_in_uid');
+    StorageService.removeLocalItem('kpcia_logged_in_uid');
     triggerToast('성공적으로 로그아웃되었습니다. 다른 강사 계정으로 로그인하거나 신규 가입을 진행해 주세요.', 'info');
   };
 
@@ -1193,7 +1193,7 @@ export default function App() {
 
     if (matchedUserLocal && matchedUserLocal.password && matchedUserLocal.password === trimmedPw) {
       setCurrentUser(matchedUserLocal);
-      sessionStorage.setItem('kpcia_logged_in_uid', matchedUserLocal.uid);
+      StorageService.setSessionItem('kpcia_logged_in_uid', matchedUserLocal.uid);
       triggerToast(`${matchedUserLocal.name} 강사님 계정으로 즉시 로그인되었습니다.`, 'success');
       setLoginId('');
       setLoginPassword('');
@@ -1217,7 +1217,7 @@ export default function App() {
           const actualUser = users.find(u => u.uid === fbUser.uid) || matchedUserLocal;
           if (actualUser) {
             setCurrentUser(actualUser);
-            sessionStorage.setItem('kpcia_logged_in_uid', actualUser.uid);
+            StorageService.setSessionItem('kpcia_logged_in_uid', actualUser.uid);
             triggerToast(`${actualUser.name} 강사님 계정으로 로그인되었습니다.`, 'success');
             setLoginId('');
             setLoginPassword('');
@@ -1261,7 +1261,7 @@ export default function App() {
 
     if (matchedUserLocal && matchedUserLocal.password && matchedUserLocal.password === trimmedPw) {
       setCurrentUser(matchedUserLocal);
-      sessionStorage.setItem('kpcia_logged_in_uid', matchedUserLocal.uid);
+      StorageService.setSessionItem('kpcia_logged_in_uid', matchedUserLocal.uid);
       triggerToast(`${matchedUserLocal.name} 강사님 계정으로 즉시 로그인되었습니다.`, 'success');
       return true;
     }
@@ -1282,7 +1282,7 @@ export default function App() {
           const actualUser = users.find(u => u.uid === fbUser.uid) || matchedUserLocal;
           if (actualUser) {
             setCurrentUser(actualUser);
-            sessionStorage.setItem('kpcia_logged_in_uid', actualUser.uid);
+            StorageService.setSessionItem('kpcia_logged_in_uid', actualUser.uid);
             triggerToast(`${actualUser.name} 강사님 계정으로 로그인되었습니다.`, 'success');
             return true;
           }

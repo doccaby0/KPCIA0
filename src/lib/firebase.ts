@@ -233,17 +233,78 @@ export function generateBadgeForTier(tier: InstructorTier, dateGranted?: string)
 // If Firestore throws permission errors or missing collections, it transparently synchronizes with localStorage.
 // This guarantees smooth UX and live changes!
 export class StorageService {
+  // Safe helper to check storage availability (e.g. Chrome Incognito mode)
+  public static isStorageAvailable(type: 'localStorage' | 'sessionStorage'): boolean {
+    try {
+      if (typeof window === 'undefined') return false;
+      const storage = window[type];
+      if (!storage) return false;
+      const testKey = '__storage_test__';
+      storage.setItem(testKey, testKey);
+      storage.removeItem(testKey);
+      return true;
+    } catch (e) {
+      return false;
+    }
+  }
+
+  // Memory backups for when storage is unavailable
+  private static memoryStorage: Record<string, string> = {};
+  private static memorySession: Record<string, string> = {};
+
+  public static getSessionItem(key: string): string | null {
+    if (this.isStorageAvailable('sessionStorage')) {
+      try { return sessionStorage.getItem(key); } catch (e) { return null; }
+    }
+    return this.memorySession[key] || null;
+  }
+
+  public static setSessionItem(key: string, value: string): void {
+    if (this.isStorageAvailable('sessionStorage')) {
+      try { sessionStorage.setItem(key, value); return; } catch (e) {}
+    }
+    this.memorySession[key] = value;
+  }
+
+  public static removeSessionItem(key: string): void {
+    if (this.isStorageAvailable('sessionStorage')) {
+      try { sessionStorage.removeItem(key); return; } catch (e) {}
+    }
+    delete this.memorySession[key];
+  }
+
+  public static getLocalItem(key: string): string | null {
+    if (this.isStorageAvailable('localStorage')) {
+      try { return localStorage.getItem(key); } catch (e) { return null; }
+    }
+    return this.memoryStorage[key] || null;
+  }
+
+  public static setLocalItem(key: string, value: string): void {
+    if (this.isStorageAvailable('localStorage')) {
+      try { localStorage.setItem(key, value); return; } catch (e) {}
+    }
+    this.memoryStorage[key] = value;
+  }
+
+  public static removeLocalItem(key: string): void {
+    if (this.isStorageAvailable('localStorage')) {
+      try { localStorage.removeItem(key); return; } catch (e) {}
+    }
+    delete this.memoryStorage[key];
+  }
+
   private static getLocal<T>(key: string, fallback: T): T {
-    const saved = localStorage.getItem(`kpcia_${key}`);
+    const saved = this.getLocalItem(`kpcia_${key}`);
     if (saved) {
       try { return JSON.parse(saved); } catch (e) { return fallback; }
     }
-    localStorage.setItem(`kpcia_${key}`, JSON.stringify(fallback));
+    this.setLocalItem(`kpcia_${key}`, JSON.stringify(fallback));
     return fallback;
   }
 
   public static setLocal(key: string, data: any) {
-    localStorage.setItem(`kpcia_${key}`, JSON.stringify(data));
+    this.setLocalItem(`kpcia_${key}`, JSON.stringify(data));
   }
 
   static getLocalUsers(): UserProfile[] {
@@ -730,11 +791,11 @@ export class StorageService {
 
   // Clear local storage and Firestore data and restore default state
   static async resetDatabase(): Promise<void> {
-    localStorage.removeItem('kpcia_users');
-    localStorage.removeItem('kpcia_lectures');
-    localStorage.removeItem('kpcia_programs');
-    localStorage.removeItem('kpcia_transactions');
-    localStorage.removeItem('kpcia_proposals');
+    this.removeLocalItem('kpcia_users');
+    this.removeLocalItem('kpcia_lectures');
+    this.removeLocalItem('kpcia_programs');
+    this.removeLocalItem('kpcia_transactions');
+    this.removeLocalItem('kpcia_proposals');
 
     if (useFirestore && db) {
       try {

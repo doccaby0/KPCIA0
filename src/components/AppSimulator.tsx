@@ -374,97 +374,114 @@ export default function AppSimulator({
                           const hasApplied = l.applicants.includes(currentUser.uid);
                           const isMyJob = l.assignedTo === currentUser.uid;
 
+                          const isLectBlurred = currentUser.uid === 'guest' || (!currentUser.isAdmin && !isQualified);
+
                           return (
                             <div 
                               key={l.id} 
-                              className={`p-3 rounded-xl border bg-neutral-900/60 flex flex-col justify-between space-y-2.5 hover:border-neutral-800 transition-all ${
-                                isMyJob ? 'border-kpcia-gold/40 bg-kpcia-gold/5' : 'border-neutral-900'
+                              className={`p-3 rounded-xl border bg-neutral-900/60 flex flex-col justify-between space-y-2.5 hover:border-neutral-800 transition-all relative overflow-hidden ${
+                                isLectBlurred ? 'border-neutral-850 bg-neutral-950/20 pointer-events-none select-none' : isMyJob ? 'border-kpcia-gold/40 bg-kpcia-gold/5' : 'border-neutral-900'
                               }`}
                               id={`mobile-lect-${l.id}`}
                             >
-                              <div className="flex justify-between items-start">
-                                <span className={`text-[8px] font-mono px-1.5 py-0.5 rounded font-bold ${
-                                  l.targetTier === 'Prestige Elite' ? 'bg-emerald-950/40 text-emerald-400 border border-emerald-800/20' :
-                                  l.targetTier === 'Prestige Master' ? 'bg-red-950/40 text-red-400 border border-red-800/20' :
-                                  'bg-blue-950/40 text-blue-400 border border-blue-800/20'
-                                }`}>
-                                  {l.targetTier}
-                                </span>
-                                <span className="text-[8px] font-mono text-kpcia-gold">
-                                  {currentUser.uid === 'guest' ? (
-                                    <span className="blur-[3px] select-none opacity-50">
-                                      {l.budget.toLocaleString()}원
+                              {/* Absolute Lock Overlay */}
+                              {isLectBlurred && (
+                                <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/60 p-2 text-center z-10 pointer-events-auto select-none">
+                                  <div className="p-2 bg-neutral-950/95 border border-neutral-850 rounded-lg flex flex-col items-center gap-1 shadow-xl max-w-[95%]">
+                                    <span className="text-[12px] animate-bounce">🔒</span>
+                                    <span className="text-[9.5px] font-extrabold text-kpcia-gold tracking-tight">
+                                      {l.targetTier.replace('Prestige ', '')} 이상
                                     </span>
-                                  ) : currentUser.isAdmin || isQualified 
-                                    ? `${l.budget.toLocaleString()}원` 
-                                    : '🔒 등급 상향 시 공개'}
-                                </span>
-                              </div>
-
-                              <div className="space-y-1.5">
-                                <h4 className="text-xs font-bold text-neutral-200 line-clamp-1">{l.title}</h4>
-                                {l.description && (
-                                  <p className="text-[9px] text-neutral-400 line-clamp-2 leading-relaxed font-sans">
-                                    {l.description}
-                                  </p>
-                                )}
-                                <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-[9px] text-neutral-400 font-sans pt-0.5">
-                                  <div className="flex items-center space-x-1">
-                                    <MapPin className="w-2.5 h-2.5 text-neutral-500 shrink-0" />
-                                    <span className="truncate max-w-[120px]">{l.location}</span>
                                   </div>
-                                  {l.attendees !== undefined && (
-                                    <div className="flex items-center space-x-1 border-l border-neutral-800 pl-2">
-                                      <Users className="w-2.5 h-2.5 text-neutral-500 shrink-0" />
-                                      <span>{l.attendees}명</span>
-                                    </div>
-                                  )}
                                 </div>
-                              </div>
+                              )}
 
-                              <div className="flex items-center justify-between pt-2 border-t border-neutral-900/50">
-                                <div className="flex items-center space-x-1.5">
-                                  <span className="text-[8px] text-neutral-500 font-mono">{l.date} 출강</span>
-                                  <button
-                                    onClick={() => downloadLectureAsExcel(l)}
-                                    className="p-1 hover:bg-neutral-800 rounded text-neutral-400 hover:text-kpcia-gold transition-colors cursor-pointer"
-                                    title="출강 강의 파견 안내서(변경 강의 요청서) 다운로드"
-                                    id={`mobile-xls-down-${l.id}`}
-                                  >
-                                    <FileDown className="w-3.5 h-3.5" />
-                                  </button>
+                              {/* Mobile Card Content Wrapper with Blur Filter */}
+                              <div className={`flex flex-col justify-between h-full space-y-2.5 ${isLectBlurred ? "blur-[6px] select-none pointer-events-none" : ""}`}>
+                                <div className="flex justify-between items-start">
+                                  <span className={`text-[8px] font-mono px-1.5 py-0.5 rounded font-bold ${
+                                    l.targetTier === 'Prestige Elite' ? 'bg-emerald-950/40 text-emerald-400 border border-emerald-800/20' :
+                                    l.targetTier === 'Prestige Master' ? 'bg-red-950/40 text-red-400 border border-red-800/20' :
+                                    'bg-blue-950/40 text-blue-400 border border-blue-800/20'
+                                  }`}>
+                                    {l.targetTier}
+                                  </span>
+                                  <span className="text-[8px] font-mono text-kpcia-gold">
+                                    {currentUser.uid === 'guest' ? (
+                                      <span className="blur-[3px] select-none opacity-50">
+                                        {l.budget.toLocaleString()}원
+                                      </span>
+                                    ) : currentUser.isAdmin || isQualified 
+                                      ? `${l.budget.toLocaleString()}원` 
+                                      : '🔒 등급 상향 시 공개'}
+                                  </span>
                                 </div>
-                                {l.status === 'open' ? (
-                                  isQualified ? (
-                                    hasApplied ? (
-                                      <button
-                                        onClick={() => onCancelApplyLecture && onCancelApplyLecture(l.id)}
-                                        className="text-[9px] font-bold text-red-400 bg-red-950/20 hover:bg-red-950/40 border border-red-900/40 px-2 py-0.5 rounded transition-colors cursor-pointer"
-                                        id={`mobile-cancel-apply-btn-${l.id}`}
-                                      >
-                                        신청 취소
-                                      </button>
+
+                                <div className="space-y-1.5">
+                                  <h4 className="text-xs font-bold text-neutral-200 line-clamp-1">{l.title}</h4>
+                                  {l.description && (
+                                    <p className="text-[9px] text-neutral-400 line-clamp-2 leading-relaxed font-sans">
+                                      {l.description}
+                                    </p>
+                                  )}
+                                  <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-[9px] text-neutral-400 font-sans pt-0.5">
+                                    <div className="flex items-center space-x-1">
+                                      <MapPin className="w-2.5 h-2.5 text-neutral-500 shrink-0" />
+                                      <span className="truncate max-w-[120px]">{l.location}</span>
+                                    </div>
+                                    {l.attendees !== undefined && (
+                                      <div className="flex items-center space-x-1 border-l border-neutral-800 pl-2">
+                                        <Users className="w-2.5 h-2.5 text-neutral-500 shrink-0" />
+                                        <span>{l.attendees}명</span>
+                                      </div>
+                                    )}
+                                  </div>
+                                </div>
+
+                                <div className="flex items-center justify-between pt-2 border-t border-neutral-900/50">
+                                  <div className="flex items-center space-x-1.5">
+                                    <span className="text-[8px] text-neutral-500 font-mono">{l.date} 출강</span>
+                                    <button
+                                      onClick={() => downloadLectureAsExcel(l)}
+                                      className="p-1 hover:bg-neutral-800 rounded text-neutral-400 hover:text-kpcia-gold transition-colors cursor-pointer"
+                                      title="출강 강의 파견 안내서(변경 강의 요청서) 다운로드"
+                                      id={`mobile-xls-down-${l.id}`}
+                                    >
+                                      <FileDown className="w-3.5 h-3.5" />
+                                    </button>
+                                  </div>
+                                  {l.status === 'open' ? (
+                                    isQualified ? (
+                                      hasApplied ? (
+                                        <button
+                                          onClick={() => onCancelApplyLecture && onCancelApplyLecture(l.id)}
+                                          className="text-[9px] font-bold text-red-400 bg-red-950/20 hover:bg-red-950/40 border border-red-900/40 px-2 py-0.5 rounded transition-colors cursor-pointer"
+                                          id={`mobile-cancel-apply-btn-${l.id}`}
+                                        >
+                                          신청 취소
+                                        </button>
+                                      ) : (
+                                        <button
+                                          onClick={() => setApplyingLecture(l)}
+                                          className="text-[9px] font-bold text-kpcia-dark bg-kpcia-gold hover:bg-kpcia-gold-hover px-2.5 py-1 rounded transition-colors cursor-pointer"
+                                          id={`mobile-apply-btn-${l.id}`}
+                                        >
+                                          출강 신청
+                                        </button>
+                                      )
                                     ) : (
-                                      <button
-                                        onClick={() => setApplyingLecture(l)}
-                                        className="text-[9px] font-bold text-kpcia-dark bg-kpcia-gold hover:bg-kpcia-gold-hover px-2.5 py-1 rounded transition-colors cursor-pointer"
-                                        id={`mobile-apply-btn-${l.id}`}
-                                      >
-                                        출강 신청
-                                      </button>
+                                      <span className="text-[8px] text-neutral-500 bg-neutral-900 px-2 py-0.5 rounded">등급 제한</span>
+                                    )
+                                  ) : l.status === 'assigned' ? (
+                                    isMyJob ? (
+                                      <span className="text-[8px] font-bold text-kpcia-gold bg-kpcia-gold/10 px-2 py-0.5 rounded border border-kpcia-gold/20">내 강의 배정</span>
+                                    ) : (
+                                      <span className="text-[8px] text-neutral-500">배정완료</span>
                                     )
                                   ) : (
-                                    <span className="text-[8px] text-neutral-500 bg-neutral-900 px-2 py-0.5 rounded">등급 제한</span>
-                                  )
-                                ) : l.status === 'assigned' ? (
-                                  isMyJob ? (
-                                    <span className="text-[8px] font-bold text-kpcia-gold bg-kpcia-gold/10 px-2 py-0.5 rounded border border-kpcia-gold/20">내 강의 배정</span>
-                                  ) : (
-                                    <span className="text-[8px] text-neutral-500">배정완료</span>
-                                  )
-                                ) : (
-                                  <span className="text-[8px] text-neutral-500">종료</span>
-                                )}
+                                    <span className="text-[8px] text-neutral-500">종료</span>
+                                  )}
+                                </div>
                               </div>
                             </div>
                           );
