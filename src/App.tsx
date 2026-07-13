@@ -454,6 +454,47 @@ export default function App() {
     triggerToast(`신규 기업 출강 강의 공고 '${newLecture.title}'가 전체 위원회 게시판에 실시간으로 게시되었습니다.`);
   };
 
+  // 3.0. Post multiple lecture requests in bulk (Admin Only)
+  const handleAddLectures = async (lecturesData: any[]) => {
+    const updatedLectures = [...lectures];
+    const newLecturesToSave: LectureRequest[] = [];
+    const timestamp = Date.now().toString().slice(-4);
+    
+    for (let i = 0; i < lecturesData.length; i++) {
+      const data = lecturesData[i];
+      const sanitizedData = {
+        ...data,
+        title: sanitizeString(data.title),
+        description: sanitizeString(data.description || ''),
+        location: sanitizeString(data.location),
+        duration: sanitizeString(data.duration || ''),
+        time: sanitizeString(data.time || ''),
+        date: sanitizeString(data.date || '')
+      };
+      
+      const newId = `lect_bulk_${updatedLectures.length + 1}_${timestamp}_${i}`;
+      const newLecture: LectureRequest = {
+        ...sanitizedData,
+        id: newId,
+        status: 'open',
+        applicants: [],
+        createdAt: new Date().toISOString()
+      };
+      
+      updatedLectures.push(newLecture);
+      newLecturesToSave.push(newLecture);
+    }
+    
+    setLectures(updatedLectures);
+    
+    // Save to Firestore/LocalStorage
+    for (const newLect of newLecturesToSave) {
+      await StorageService.saveLecture(newLect);
+    }
+    
+    triggerToast(`총 ${newLecturesToSave.length}건의 대량 기업 출강 강의 공고가 일괄 등록되었으며, 실시간으로 배포 완료되었습니다!`, 'success');
+  };
+
   // 3.1. Update an existing lecture request (Admin Only)
   const handleUpdateLecture = async (updatedLecture: LectureRequest) => {
     const sanitizedLecture: LectureRequest = {
@@ -1878,6 +1919,7 @@ export default function App() {
                 onRejectUser={handleRejectUser}
                 onApproveProgram={handleApproveProgram}
                 onAddLecture={handleAddLecture}
+                onAddLectures={handleAddLectures}
                 onUpdateLecture={handleUpdateLecture}
                 onUpdateUserPerformance={handleUpdateUserPerformance}
                 onUpdateUserProfile={handleUpdateUserProfile}

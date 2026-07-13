@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import * as XLSX from 'xlsx';
 import { UserProfile, LectureRequest, MileageTransaction, InstructorTier, EducationalProgram, PartnershipProposal } from '../types';
 import { 
   Shield, 
@@ -26,7 +27,10 @@ import {
   CreditCard,
   FileDown,
   Edit,
-  Edit3
+  Edit3,
+  Upload,
+  Download,
+  Sparkles
 } from 'lucide-react';
 
 export function getLectureMilestoneBadge(lectureCount?: number) {
@@ -136,6 +140,7 @@ interface AdminPanelProps {
   onRejectUser?: (userId: string) => void;
   onApproveProgram?: (programId: string, updatedProgram: EducationalProgram) => void;
   onAddLecture?: (lecture: any) => void;
+  onAddLectures?: (lectures: any[]) => void;
   onUpdateLecture?: (lecture: LectureRequest) => void;
   onUpdateUserPerformance?: (userId: string, lectureCount: number, ratings: number[], bankAccount?: string) => void;
   onUpdateUserProfile?: (userId: string, updatedFields: Partial<UserProfile>) => void;
@@ -163,6 +168,7 @@ export default function AdminPanel({
   onRejectUser,
   onApproveProgram,
   onAddLecture,
+  onAddLectures,
   onUpdateLecture,
   onUpdateUserPerformance,
   onUpdateUserProfile,
@@ -178,6 +184,11 @@ export default function AdminPanel({
   
   // Lecture Posting States
   const [showAddForm, setShowAddForm] = useState(false);
+  
+  // Excel Bulk Import States
+  const [previewLectures, setPreviewLectures] = useState<any[]>([]);
+  const [showPreviewModal, setShowPreviewModal] = useState(false);
+
   const [lectTitle, setLectTitle] = useState('');
   const [lectDescription, setLectDescription] = useState('');
   const [lectTargetTier, setLectTargetTier] = useState<InstructorTier>('Prestige Associate');
@@ -524,6 +535,133 @@ export default function AdminPanel({
     setLectAttendees('30');
     setLectManagerName('');
     setLectManagerPhone('');
+  };
+
+  // Excel Template Download Function
+  const handleDownloadTemplate = () => {
+    const templateData = [
+      {
+        "강의주제(필수)": "현대자동차 차세대 신사업본부 리더십 포럼",
+        "강의내용설명": "대기업 부장급 대상 혁신 리더십 및 팀워크 역량 강화 교육",
+        "지원최소등급(Prestige Member/Associate/Professional/Master/Elite 중 택1)": "Prestige Associate",
+        "강의날짜(예: 2026-07-25)": "2026-07-25",
+        "강의시간(예: 14:00~17:00)": "14:00~17:00",
+        "강의총시간(예: 3시간)": "3시간",
+        "진행장소_기업명(필수)": "경기도 용인시 삼성인력개발원",
+        "수강인원(명)": 30,
+        "주강사시간(숫자)": 3,
+        "보조강사시간(숫자)": 0,
+        "1인당재료비(원)": 5000,
+        "강사료총산출비용(원)": 300000,
+        "마일리지로열티(원)": 15000,
+        "지정프로그램ID(선택)": "",
+        "담당자명(선택)": "김관리",
+        "담당자연락처(선택)": "010-1234-5678"
+      },
+      {
+        "강의주제(필수)": "스타트업 인공지능(AI) 비즈니스 활용 실무",
+        "강의내용설명": "생성형 AI 툴 실무 활용 및 프롬프트 엔지니어링 워크숍",
+        "지원최소등급(Prestige Member/Associate/Professional/Master/Elite 중 택1)": "Prestige Member",
+        "강의날짜(예: 2026-08-02)": "2026-08-02",
+        "강의시간(예: 10:00~12:00)": "10:00~12:00",
+        "강의총시간(예: 2시간)": "2시간",
+        "진행장소_기업명(필수)": "서울시 강남구 테헤란로 스타트업 허브",
+        "수강인원(명)": 15,
+        "주강사시간(숫자)": 2,
+        "보조강사시간(숫자)": 1,
+        "1인당재료비(원)": 0,
+        "강사료총산출비용(원)": 250000,
+        "마일리지로열티(원)": 12500,
+        "지정프로그램ID(선택)": "",
+        "담당자명(선택)": "박교육",
+        "담당자연락처(선택)": "010-9876-5432"
+      }
+    ];
+
+    const worksheet = XLSX.utils.json_to_sheet(templateData);
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, "강의공고_일괄등록_양식");
+    XLSX.writeFile(workbook, "KPCIA_강의요청_대량등록_양식.xlsx");
+  };
+
+  // Excel Upload Parser Function
+  const handleExcelUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      try {
+        const data = new Uint8Array(event.target?.result as ArrayBuffer);
+        const workbook = XLSX.read(data, { type: 'array' });
+        const sheetName = workbook.SheetNames[0];
+        const worksheet = workbook.Sheets[sheetName];
+        const jsonData = XLSX.utils.sheet_to_json<any>(worksheet);
+
+        if (!jsonData || jsonData.length === 0) {
+          alert("엑셀 파일에 유효한 데이터가 없습니다.");
+          return;
+        }
+
+        // Parse and map rows
+        const parsedLectures = jsonData.map((row: any, index: number) => {
+          const title = row["강의주제(필수)"]?.toString().trim();
+          const location = row["진행장소_기업명(필수)"]?.toString().trim();
+
+          if (!title || !location) {
+            throw new Error(`엑셀 행 #${index + 2}: 필수값인 '강의주제(필수)' 또는 '진행장소_기업명(필수)'이 누락되었습니다.`);
+          }
+
+          // Tier mapping validation
+          let targetTier = row["지원최소등급(Prestige Member/Associate/Professional/Master/Elite 중 택1)"]?.toString().trim() || "Prestige Member";
+          if (!["Prestige Member", "Prestige Associate", "Prestige Professional", "Prestige Master", "Prestige Elite"].includes(targetTier)) {
+            targetTier = "Prestige Member";
+          }
+
+          return {
+            title,
+            description: row["강의내용설명"]?.toString().trim() || "",
+            targetTier,
+            budget: Number(row["강사료총산출비용(원)"]) || 200000,
+            mileageRoyalty: Number(row["마일리지로열티(원)"]) || 5000,
+            programId: row["지정프로그램ID(선택)"]?.toString().trim() || undefined,
+            date: row["강의날짜(예: 2026-07-25)"]?.toString().trim() || "",
+            time: row["강의시간(예: 14:00~17:00)"]?.toString().trim() || "",
+            duration: row["강의총시간(예: 3시간)"]?.toString().trim() || "",
+            location,
+            attendees: Number(row["수강인원(명)"]) || 30,
+            managerName: row["담당자명(선택)"]?.toString().trim() || undefined,
+            managerPhone: row["담당자연락처(선택)"]?.toString().trim() || undefined,
+            mainHours: Number(row["주강사시간(숫자)"]) || 2,
+            assistantHours: Number(row["보조강사시간(숫자)"]) || 0,
+            materialCost: Number(row["1인당재료비(원)"]) || 0,
+          };
+        });
+
+        setPreviewLectures(parsedLectures);
+        setShowPreviewModal(true);
+        
+        // Clear input value to allow uploading same file again
+        if (e.target) e.target.value = '';
+      } catch (err: any) {
+        alert(`엑셀 분석 오류: ${err.message || err}`);
+      }
+    };
+
+    reader.readAsArrayBuffer(file);
+  };
+
+  // Confirm and upload the parsed list
+  const handleConfirmBulkImport = () => {
+    if (previewLectures.length === 0) return;
+    if (onAddLectures) {
+      onAddLectures(previewLectures);
+    } else if (onAddLecture) {
+      // Fallback: add iteratively
+      previewLectures.forEach(l => onAddLecture(l));
+    }
+    setPreviewLectures([]);
+    setShowPreviewModal(false);
   };
 
   // Editing and approval states for Educational Programs
@@ -1640,14 +1778,46 @@ export default function AdminPanel({
                   출강 신청을 접수한 강사들의 등급 및 적합성을 평가하여 최종 강사로 배정하고, 공고별 공식 강의 요청서(엑셀 파일)를 실시간 출력합니다.
                 </p>
               </div>
-              <button
-                onClick={() => setShowAddForm(!showAddForm)}
-                className="px-4 py-2 bg-kpcia-gold hover:bg-kpcia-gold-hover text-kpcia-dark text-xs font-bold rounded-lg transition-all flex items-center gap-2 shadow-lg shadow-kpcia-gold/15 cursor-pointer shrink-0"
-                id="admin-add-lecture-btn"
-              >
-                <Plus className="w-4 h-4" />
-                <span>강의 요청서 공고하기</span>
-              </button>
+              <div className="flex flex-wrap items-center gap-3 shrink-0" id="lecture-admin-actions">
+                {/* 엑셀 일괄 등록 버튼 */}
+                <div className="relative">
+                  <label
+                    htmlFor="bulk-excel-upload"
+                    className="px-4 py-2 bg-neutral-900 border border-neutral-800 hover:border-kpcia-gold/50 text-neutral-200 hover:text-kpcia-gold text-xs font-bold rounded-lg transition-all flex items-center gap-2 cursor-pointer shadow-md"
+                    title="엑셀 화일(.xlsx)을 업로드하여 대량 강의 요청을 한번에 공고합니다."
+                  >
+                    <Upload className="w-4 h-4 text-kpcia-gold" />
+                    <span>엑셀 일괄 등록하기</span>
+                  </label>
+                  <input
+                    id="bulk-excel-upload"
+                    type="file"
+                    accept=".xlsx, .xls"
+                    onChange={handleExcelUpload}
+                    className="hidden"
+                  />
+                </div>
+
+                {/* 예시 엑셀 화일 양식 다운로드 버튼 */}
+                <button
+                  onClick={handleDownloadTemplate}
+                  className="px-4 py-2 bg-neutral-900/40 border border-neutral-800 hover:border-neutral-700 text-neutral-400 hover:text-neutral-200 text-xs font-bold rounded-lg transition-all flex items-center gap-2 cursor-pointer"
+                  title="일괄 등록용 엑셀 예시 템플릿 양식을 다운로드합니다."
+                >
+                  <Download className="w-4 h-4 text-neutral-400" />
+                  <span>예시 엑셀 양식 다운로드</span>
+                </button>
+
+                {/* 개별 공고 등록 버튼 */}
+                <button
+                  onClick={() => setShowAddForm(!showAddForm)}
+                  className="px-4 py-2 bg-kpcia-gold hover:bg-kpcia-gold-hover text-kpcia-dark text-xs font-bold rounded-lg transition-all flex items-center gap-2 shadow-lg shadow-kpcia-gold/15 cursor-pointer shrink-0"
+                  id="admin-add-lecture-btn"
+                >
+                  <Plus className="w-4 h-4" />
+                  <span>강의 요청서 공고하기</span>
+                </button>
+              </div>
             </div>
 
             {/* Lecture Post Form inside Admin Panel */}
@@ -3791,6 +3961,122 @@ export default function AdminPanel({
                   <span>공고 변경사항 적용</span>
                 </button>
               </div>
+            </div>
+          </div>
+        )}
+
+        {/* Excel Bulk Import Preview Modal */}
+        {showPreviewModal && (
+          <div className="fixed inset-0 bg-neutral-950/80 backdrop-blur-md flex items-center justify-center z-50 p-4 animate-in fade-in duration-200">
+            <div className="bg-neutral-900 border border-neutral-800 rounded-2xl w-full max-w-5xl shadow-2xl flex flex-col max-h-[85vh] overflow-hidden">
+              
+              {/* Modal Header */}
+              <div className="p-6 border-b border-neutral-800/80 flex items-center justify-between bg-neutral-900/60">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-xl bg-kpcia-gold/10 border border-kpcia-gold/30 flex items-center justify-center text-kpcia-gold">
+                    <Sparkles className="w-5 h-5 text-kpcia-gold animate-pulse" />
+                  </div>
+                  <div className="text-left">
+                    <h3 className="font-display font-extrabold text-base text-neutral-100 flex items-center gap-2">
+                      엑셀 대량 공고 등록 검토 및 승인
+                    </h3>
+                    <p className="text-xs text-neutral-400">
+                      업로드한 엑셀 파일에서 총 <span className="text-kpcia-gold font-bold">{previewLectures.length}건</span>의 강의 요청서가 식별되었습니다. 아래의 데이터를 검토 후 공고해 주세요.
+                    </p>
+                  </div>
+                </div>
+                <button
+                  onClick={() => {
+                    setPreviewLectures([]);
+                    setShowPreviewModal(false);
+                  }}
+                  className="w-8 h-8 rounded-lg bg-neutral-800 hover:bg-neutral-700 text-neutral-400 hover:text-neutral-200 flex items-center justify-center transition-all cursor-pointer text-sm font-bold"
+                >
+                  ✕
+                </button>
+              </div>
+
+              {/* Modal Body - Grid/Table of parsed rows */}
+              <div className="p-6 overflow-y-auto space-y-4 flex-1">
+                <div className="border border-neutral-800/80 rounded-xl overflow-hidden bg-neutral-950">
+                  <table className="w-full border-collapse text-left text-xs text-neutral-300">
+                    <thead>
+                      <tr className="bg-neutral-900 border-b border-neutral-800 text-[10px] font-mono font-bold text-neutral-400 uppercase tracking-wider">
+                        <th className="py-3 px-4 w-12 text-center">번호</th>
+                        <th className="py-3 px-4">강의주제 및 내용 설명</th>
+                        <th className="py-3 px-4">진행장소 / 일정</th>
+                        <th className="py-3 px-4 text-center">최소 강사 등급</th>
+                        <th className="py-3 px-4 text-right">총 강사료</th>
+                        <th className="py-3 px-4 text-right">수수료(로열티)</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-neutral-800/50">
+                      {previewLectures.map((item, idx) => (
+                        <tr key={idx} className="hover:bg-neutral-900/30 transition-colors">
+                          <td className="py-3 px-4 text-center text-neutral-500 font-mono font-bold">{idx + 1}</td>
+                          <td className="py-3 px-4 space-y-1 max-w-sm">
+                            <p className="font-bold text-neutral-100 leading-tight">{item.title}</p>
+                            {item.description && (
+                              <p className="text-[11px] text-neutral-400 line-clamp-1">{item.description}</p>
+                            )}
+                            {item.managerName && (
+                              <p className="text-[10px] text-neutral-500">담당자: {item.managerName} ({item.managerPhone || '연락처 없음'})</p>
+                            )}
+                          </td>
+                          <td className="py-3 px-4 space-y-1">
+                            <div className="flex items-center gap-1.5">
+                              <span className="px-1.5 py-0.5 rounded bg-neutral-800 border border-neutral-700/60 font-mono text-[9px] text-neutral-300">장소</span>
+                              <span className="font-medium text-neutral-200">{item.location}</span>
+                            </div>
+                            {(item.date || item.time) && (
+                              <div className="flex items-center gap-1.5">
+                                <span className="px-1.5 py-0.5 rounded bg-neutral-800 border border-neutral-700/60 font-mono text-[9px] text-neutral-300">일정</span>
+                                <span className="text-[11px] text-neutral-400 font-medium">
+                                  {item.date} {item.time && `(${item.time})`}
+                                </span>
+                              </div>
+                            )}
+                          </td>
+                          <td className="py-3 px-4 text-center">
+                            <span className="inline-block px-2.5 py-1 rounded-md bg-kpcia-gold/10 border border-kpcia-gold/25 text-[10px] font-bold text-kpcia-gold font-mono">
+                              {item.targetTier.replace("Prestige ", "")}
+                            </span>
+                          </td>
+                          <td className="py-3 px-4 text-right font-mono font-bold text-neutral-100">
+                            {item.budget.toLocaleString()}원
+                          </td>
+                          <td className="py-3 px-4 text-right font-mono text-emerald-400 text-[11px]">
+                            +{item.mileageRoyalty.toLocaleString()} M
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+
+              {/* Modal Footer */}
+              <div className="p-6 border-t border-neutral-800/80 bg-neutral-900/40 flex items-center justify-end gap-3">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setPreviewLectures([]);
+                    setShowPreviewModal(false);
+                  }}
+                  className="px-4 py-2 border border-neutral-800 bg-neutral-950 hover:bg-neutral-900 text-neutral-400 text-xs font-bold rounded-xl transition-colors cursor-pointer"
+                >
+                  취소하고 파일 닫기
+                </button>
+                <button
+                  type="button"
+                  onClick={handleConfirmBulkImport}
+                  className="px-5 py-2.5 bg-kpcia-gold hover:bg-kpcia-gold-hover text-kpcia-dark text-xs font-extrabold rounded-xl flex items-center gap-2 shadow-lg shadow-kpcia-gold/10 transition-colors cursor-pointer"
+                >
+                  <Check className="w-4 h-4 text-kpcia-dark" />
+                  <span>총 {previewLectures.length}건 강의 일괄 공고 개시하기</span>
+                </button>
+              </div>
+
             </div>
           </div>
         )}
