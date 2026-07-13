@@ -408,6 +408,7 @@ export default function LectureBoard({
                 ) : (
                   paginatedLectures.map((lecture, idx) => {
                     const isQualified = currentUser ? checkQualification(currentUser.tier, lecture.targetTier) : false;
+                    const isLectBlurred = showBlurred || (!currentUser?.isAdmin && !isQualified);
                     const hasApplied = currentUser ? lecture.applicants.includes(currentUser.uid) : false;
                     const isAssignedToMe = currentUser ? lecture.assignedTo === currentUser.uid : false;
 
@@ -437,7 +438,7 @@ export default function LectureBoard({
 
                         {/* Col A: Status */}
                         <td className="px-3 py-3.5 border-r border-neutral-850 text-center">
-                          <div className={showBlurred ? "blur-[3px] select-none" : ""}>
+                          <div className={isLectBlurred ? "blur-[3px] select-none" : ""}>
                             {lecture.status === 'open' && (
                               <span className="text-[10px] px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-400 font-bold border border-emerald-500/20 animate-pulse">
                                 신청접수
@@ -459,16 +460,16 @@ export default function LectureBoard({
                         {/* Col B: Title & Description */}
                         <td className="px-3 py-3.5 border-r border-neutral-850">
                           <div 
-                            className={`font-bold text-neutral-200 flex flex-wrap items-center gap-1.5 ${(!showBlurred && lecture.status === 'open' && isQualified && !hasApplied) ? 'hover:text-kpcia-gold hover:underline cursor-pointer' : ''}`}
+                            className={`font-bold text-neutral-200 flex flex-wrap items-center gap-1.5 ${(!isLectBlurred && lecture.status === 'open' && isQualified && !hasApplied) ? 'hover:text-kpcia-gold hover:underline cursor-pointer' : ''}`}
                             onClick={() => {
-                              if (showBlurred) return;
+                              if (isLectBlurred) return;
                               if (lecture.status === 'open' && isQualified && !hasApplied) {
                                 setApplyingLecture(lecture);
                               }
                             }}
                           >
-                            <span className="whitespace-normal break-all leading-snug">{lecture.title}</span>
-                            {!showBlurred && (
+                            <span className={`whitespace-normal break-all leading-snug ${isLectBlurred ? "blur-[3px] select-none pointer-events-none" : ""}`}>{lecture.title}</span>
+                            {!isLectBlurred && (
                               <button
                                 type="button"
                                 onClick={(e) => {
@@ -483,7 +484,7 @@ export default function LectureBoard({
                               </button>
                             )}
                           </div>
-                          <div className="text-[10.5px] text-neutral-400 mt-1.5 leading-relaxed whitespace-normal break-all">
+                          <div className={`text-[10.5px] text-neutral-400 mt-1.5 leading-relaxed whitespace-normal break-all ${isLectBlurred ? "blur-[3px] select-none pointer-events-none" : ""}`}>
                             {lecture.description}
                           </div>
                         </td>
@@ -497,7 +498,7 @@ export default function LectureBoard({
 
                         {/* Col D: Date & Time */}
                         <td className="px-3 py-3.5 border-r border-neutral-850 font-mono text-[11px] text-neutral-300 leading-relaxed">
-                          <div className={showBlurred ? "blur-[3px] select-none" : ""}>
+                          <div className={isLectBlurred ? "blur-[3px] select-none pointer-events-none" : ""}>
                             <div className="flex items-center gap-1">
                               <Calendar className="w-3 h-3 text-neutral-500" />
                               <span>{lecture.date}</span>
@@ -512,8 +513,8 @@ export default function LectureBoard({
                         {/* Col E: Location */}
                         <td className="px-3 py-3.5 border-r border-neutral-850 text-[11px] text-neutral-300">
                           <div className="flex flex-col gap-1.5">
-                            <span className={`whitespace-normal break-all ${showBlurred ? "blur-[3px] select-none" : ""}`} title={showBlurred ? undefined : lecture.location}>{lecture.location}</span>
-                            {!showBlurred && (
+                            <span className={`whitespace-normal break-all ${isLectBlurred ? "blur-[3px] select-none pointer-events-none" : ""}`} title={isLectBlurred ? undefined : lecture.location}>{lecture.location}</span>
+                            {!isLectBlurred && (
                               <button
                                 type="button"
                                 onClick={() => {
@@ -529,13 +530,13 @@ export default function LectureBoard({
                         </td>
 
                         {/* Col F: Attendees */}
-                        <td className={`px-3 py-3.5 border-r border-neutral-850 text-right font-mono text-neutral-200 ${showBlurred ? "blur-[3px] select-none" : ""}`}>
+                        <td className={`px-3 py-3.5 border-r border-neutral-850 text-right font-mono text-neutral-200 ${isLectBlurred ? "blur-[3px] select-none pointer-events-none" : ""}`}>
                           {lecture.attendees ? `${lecture.attendees}명` : '-'}
                         </td>
 
                         {/* Col G: Budget (출강 강사료) */}
                         <td className="px-3 py-3.5 border-r border-neutral-850 text-right font-mono font-bold bg-neutral-900/10">
-                          {showBlurred ? (
+                          {isLectBlurred ? (
                             <span className="text-neutral-100/50 blur-[3px] select-none font-mono text-[11px]">
                               ₩{lecture.budget.toLocaleString()}
                             </span>
@@ -556,7 +557,7 @@ export default function LectureBoard({
 
                         {/* Col H: Material Cost (재료비 총액) */}
                         <td className="px-3 py-3.5 border-r border-neutral-850 text-right font-mono text-neutral-300 bg-neutral-950/20">
-                          {showBlurred ? (
+                          {isLectBlurred ? (
                             <span className="text-neutral-300/50 blur-[3px] select-none font-mono text-[11px]">
                               ₩{(lecture.materialCost || 0).toLocaleString()}
                             </span>
@@ -577,7 +578,7 @@ export default function LectureBoard({
 
                         {/* Col I: Total Outflow (총 출강비) */}
                         <td className="px-3 py-3.5 border-r border-neutral-850 text-right font-mono font-bold text-kpcia-gold bg-kpcia-gold/10">
-                          {showBlurred ? (
+                          {isLectBlurred ? (
                             <span className="text-kpcia-gold/50 blur-[3px] select-none font-mono text-[11px]">
                               ₩{appliedTotalCost.toLocaleString()}
                             </span>
@@ -605,7 +606,7 @@ export default function LectureBoard({
 
                         {/* Col J: Associated Program */}
                         <td className="px-3 py-3.5 border-r border-neutral-850 text-neutral-300">
-                          {showBlurred ? (
+                          {isLectBlurred ? (
                             <div className="space-y-1 blur-[3px] select-none">
                               <div className="font-semibold text-neutral-200 text-[11px] flex items-center gap-1 whitespace-normal break-all">
                                 <Sparkles className="w-3 h-3 text-kpcia-gold shrink-0" />
@@ -637,7 +638,7 @@ export default function LectureBoard({
 
                         {/* Col K: Assistant Partner */}
                         <td className="px-3 py-3.5 border-r border-neutral-850 text-[11px]">
-                          {showBlurred ? (
+                          {isLectBlurred ? (
                             <span className="text-neutral-500 text-[10px] blur-[3px] select-none">단독 파견 / 보조강사</span>
                           ) : (() => {
                             const assistantUser = allUsers?.find(u => u.uid === lecture.assistantId);
@@ -809,6 +810,7 @@ export default function LectureBoard({
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4" id="lectures-grid">
           {paginatedLectures.map((lecture) => {
             const isQualified = currentUser ? checkQualification(currentUser.tier, lecture.targetTier) : false;
+            const isLectBlurred = showBlurred || (!currentUser?.isAdmin && !isQualified);
             const hasApplied = currentUser ? lecture.applicants.includes(currentUser.uid) : false;
             const isAssignedToMe = currentUser ? lecture.assignedTo === currentUser.uid : false;
 
@@ -842,7 +844,7 @@ export default function LectureBoard({
                 <div className="space-y-2.5">
                   <div className="flex items-center justify-between gap-1">
                     {/* Status Badges */}
-                    <div className={`flex items-center space-x-1 shrink-0 ${showBlurred ? "blur-[3px] select-none" : ""}`}>
+                    <div className={`flex items-center space-x-1 shrink-0 ${isLectBlurred ? "blur-[3px] select-none pointer-events-none" : ""}`}>
                       {lecture.status === 'open' && (
                         <span className="text-[9.5px] px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-400 font-bold border border-emerald-500/20 animate-pulse">
                           신청 접수중
@@ -870,10 +872,10 @@ export default function LectureBoard({
 
                   {/* Title & info buttons */}
                   <div className="flex items-start justify-between gap-1.5">
-                    <h3 className="font-display font-bold text-[14px] text-neutral-100 tracking-tight leading-snug hover:text-kpcia-gold transition-colors line-clamp-1" title={lecture.title}>
+                    <h3 className={`font-display font-bold text-[14px] text-neutral-100 tracking-tight leading-snug hover:text-kpcia-gold transition-colors line-clamp-1 ${isLectBlurred ? "blur-[3px] select-none pointer-events-none" : ""}`} title={isLectBlurred ? undefined : lecture.title}>
                       {lecture.title}
                     </h3>
-                    {!showBlurred && (
+                    {!isLectBlurred && (
                       <button
                         type="button"
                         onClick={() => downloadLectureAsExcel(lecture)}
@@ -887,32 +889,32 @@ export default function LectureBoard({
                   </div>
 
                   {/* Description */}
-                  <p className="text-[10.5px] text-neutral-400 leading-relaxed font-sans line-clamp-2 min-h-[32px]" title={lecture.description}>
+                  <p className={`text-[10.5px] text-neutral-400 leading-relaxed font-sans line-clamp-2 min-h-[32px] ${isLectBlurred ? "blur-[3px] select-none pointer-events-none" : ""}`} title={isLectBlurred ? undefined : lecture.description}>
                     {lecture.description}
                   </p>
 
                   {/* Logistics */}
                   <div className="grid grid-cols-2 gap-x-2 gap-y-1.5 pt-2 border-t border-neutral-850/50 text-[10px] text-neutral-400 font-sans">
-                    <div className={`flex items-center space-x-1 ${showBlurred ? "blur-[3px] select-none" : ""}`}>
+                    <div className={`flex items-center space-x-1 ${isLectBlurred ? "blur-[3px] select-none pointer-events-none" : ""}`}>
                       <Calendar className="w-3 h-3 text-neutral-500 shrink-0" />
-                      <span className="truncate" title={lecture.date}>{lecture.date}</span>
+                      <span className="truncate" title={isLectBlurred ? undefined : lecture.date}>{lecture.date}</span>
                     </div>
-                    <div className={`flex items-center space-x-1 ${showBlurred ? "blur-[3px] select-none" : ""}`}>
+                    <div className={`flex items-center space-x-1 ${isLectBlurred ? "blur-[3px] select-none pointer-events-none" : ""}`}>
                       <Clock className="w-3 h-3 text-neutral-500 shrink-0" />
-                      <span className="truncate" title={lecture.time}>{lecture.time}</span>
+                      <span className="truncate" title={isLectBlurred ? undefined : lecture.time}>{lecture.time}</span>
                     </div>
                     {lecture.attendees !== undefined && (
-                      <div className={`flex items-center space-x-1 ${showBlurred ? "blur-[3px] select-none" : ""}`}>
+                      <div className={`flex items-center space-x-1 ${isLectBlurred ? "blur-[3px] select-none pointer-events-none" : ""}`}>
                         <Users className="w-3 h-3 text-neutral-500 shrink-0" />
                         <span className="truncate">인원: <strong className="text-neutral-200 font-mono">{lecture.attendees}명</strong></span>
                       </div>
                     )}
-                    <div className={`flex items-center space-x-1 ${showBlurred ? "blur-[3px] select-none" : ""}`}>
+                    <div className={`flex items-center space-x-1 ${isLectBlurred ? "blur-[3px] select-none pointer-events-none" : ""}`}>
                       <Clock className="w-3 h-3 text-neutral-500 shrink-0" />
                       <span className="truncate">소요: <strong className="text-neutral-200 font-mono">{lecture.duration}</strong></span>
                     </div>
                     <div className="col-span-2 mt-0.5">
-                      {showBlurred ? (
+                      {isLectBlurred ? (
                         <div className="flex items-center space-x-1 p-1 rounded bg-neutral-950 border border-neutral-855 text-neutral-500 text-[9.5px] blur-[3px] select-none">
                           <MapPin className="w-3 h-3 text-neutral-500 shrink-0" />
                           <span className="truncate">출강지 정보 (등급 이상 열람 가능)</span>
@@ -1124,7 +1126,7 @@ export default function LectureBoard({
                           <span className="text-[7.5px] bg-kpcia-gold/10 text-kpcia-gold border border-kpcia-gold/20 px-0.5 rounded font-normal shrink-0">5%공제</span>
                         )}
                       </span>
-                      {showBlurred ? (
+                      {isLectBlurred ? (
                         <span className="font-bold text-kpcia-gold/50 blur-[3px] select-none font-mono">
                           ₩{appliedTotalCost.toLocaleString()}
                         </span>
@@ -1144,7 +1146,7 @@ export default function LectureBoard({
                     {/* Row 2: 강사료 */}
                     <div className="flex items-center justify-between gap-2 border-t border-neutral-800/40 pt-1 text-[9.5px]">
                       <span className="text-neutral-450">└ 강사료</span>
-                      {showBlurred ? (
+                      {isLectBlurred ? (
                         <span className="text-neutral-500 blur-[3px] select-none font-mono">
                           ₩{lecture.budget.toLocaleString()}
                         </span>
@@ -1164,7 +1166,7 @@ export default function LectureBoard({
                     {/* Row 3: 재료비 */}
                     <div className="flex items-center justify-between gap-2 text-[9.5px]">
                       <span className="text-neutral-450">└ 재료비</span>
-                      {showBlurred ? (
+                      {isLectBlurred ? (
                         <span className="text-neutral-500 blur-[3px] select-none font-mono">
                           ₩{(lecture.materialCost || 0).toLocaleString()}
                         </span>
