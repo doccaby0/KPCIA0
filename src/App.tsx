@@ -104,93 +104,110 @@ export default function App() {
 
   // Initial Data Sync on startup and Real-time Synchronization
   useEffect(() => {
+    // 1. Fetch initial values instantly from local storage cache to guarantee 0ms rendering
+    const loadedUsers = StorageService.getLocalUsers();
+    const loadedLectures = StorageService.getLocalLectures();
+    const loadedPrograms = StorageService.getLocalPrograms();
+    const loadedTransactions = StorageService.getLocalTransactions();
+    const loadedProposals = StorageService.getLocalProposals();
+
+    setUsers(loadedUsers);
+    setLectures(loadedLectures);
+    setPrograms(loadedPrograms);
+    setTransactions(loadedTransactions);
+    setProposals(loadedProposals);
+
+    // 2. Load existing session from sessionStorage (supports separate logins in separate tabs/windows!)
+    const savedUserUid = sessionStorage.getItem('kpcia_logged_in_uid') || localStorage.getItem('kpcia_logged_in_uid');
+    if (savedUserUid) {
+      const savedUser = loadedUsers.find(u => u.uid === savedUserUid);
+      if (savedUser) {
+        setCurrentUser(savedUser);
+        // If we recovered it from localStorage, put it in sessionStorage now so we can be independent from now on
+        sessionStorage.setItem('kpcia_logged_in_uid', savedUserUid);
+      }
+    } else {
+      setCurrentUser(null);
+    }
+
+    // 3. Seed empty database and run automatic bidirectional synchronization in the background (DO NOT AWAIT - avoids blocking UI)
+    StorageService.seedDatabaseIfEmpty()
+      .then(() => StorageService.autoSyncLocalAndCloud())
+      .catch(err => console.warn("Background seed/auto-sync failed:", err));
+
+    // 4. Activate real-time cloud sync listeners if Firestore is enabled
+    // Since onSnapshot automatically fetches current database values, it will seamlessly update the state in the background once connected!
     let unsubUsers = () => {};
     let unsubLectures = () => {};
     let unsubPrograms = () => {};
     let unsubTransactions = () => {};
     let unsubProposals = () => {};
 
-    const syncData = async () => {
-      // 1. Fetch initial values instantly from local storage cache to guarantee 0ms rendering
-      const loadedUsers = StorageService.getLocalUsers();
-      const loadedLectures = StorageService.getLocalLectures();
-      const loadedPrograms = StorageService.getLocalPrograms();
-      const loadedTransactions = StorageService.getLocalTransactions();
-      const loadedProposals = StorageService.getLocalProposals();
+    if (useFirestore) {
+      try {
+        unsubUsers = StorageService.subscribeUsers((updatedUsers) => {
+          setUsers(updatedUsers);
+          StorageService.setLocal('users', updatedUsers);
+          const loggedInUid = sessionStorage.getItem('kpcia_logged_in_uid');
+          if (loggedInUid) {
+            const updatedMe = updatedUsers.find(u => u.uid === loggedInUid);
+            if (updatedMe) {
+              setCurrentUser(updatedMe);
+            }
+          }
+        });
 
-      setUsers(loadedUsers);
-      setLectures(loadedLectures);
-      setPrograms(loadedPrograms);
-      setTransactions(loadedTransactions);
-      setProposals(loadedProposals);
+        unsubLectures = StorageService.subscribeLectures((updatedLectures) => {
+          setLectures(updatedLectures);
+          StorageService.setLocal('lectures', updatedLectures);
+        });
 
-      // 2. Load existing session from sessionStorage (supports separate logins in separate tabs/windows!)
-      const savedUserUid = sessionStorage.getItem('kpcia_logged_in_uid') || localStorage.getItem('kpcia_logged_in_uid');
-      if (savedUserUid) {
-        const savedUser = loadedUsers.find(u => u.uid === savedUserUid);
-        if (savedUser) {
-          setCurrentUser(savedUser);
-          // If we recovered it from localStorage, put it in sessionStorage now so we can be independent from now on
-          sessionStorage.setItem('kpcia_logged_in_uid', savedUserUid);
-        }
-      } else {
-        setCurrentUser(null);
+        unsubPrograms = StorageService.subscribePrograms((updatedPrograms) => {
+          setPrograms(updatedPrograms);
+          StorageService.setLocal('programs', updatedPrograms);
+        });
+
+        unsubTransactions = StorageService.subscribeTransactions((updatedTransactions) => {
+          setTransactions(updatedTransactions);
+          StorageService.setLocal('transactions', updatedTransactions);
+        });
+
+        unsubProposals = StorageService.subscribeProposals((updatedProposals) => {
+          setProposals(updatedProposals);
+          StorageService.setLocal('proposals', updatedProposals);
+        });
+      } catch (err) {
+        console.error("Failed to register real-time Firestore synchronization:", err);
       }
+    }
 
-      // 3. Seed empty database and run automatic bidirectional synchronization in the background (DO NOT AWAIT - avoids blocking UI)
-      (async () => {
-        await StorageService.seedDatabaseIfEmpty();
-        await StorageService.autoSyncLocalAndCloud();
-      })().catch(err => console.warn("Background seed/auto-sync failed:", err));
-
-      // 4. Activate real-time cloud sync listeners if Firestore is enabled
-      // Since onSnapshot automatically fetches current database values, it will seamlessly update the state in the background once connected!
-      if (useFirestore) {
-        try {
-          unsubUsers = StorageService.subscribeUsers((updatedUsers) => {
-            if (updatedUsers.length > 0) {
-              setUsers(updatedUsers);
-              StorageService.setLocal('users', updatedUsers);
-              const loggedInUid = sessionStorage.getItem('kpcia_logged_in_uid');
-              if (loggedInUid) {
-                const updatedMe = updatedUsers.find(u => u.uid === loggedInUid);
-                if (updatedMe) {
-                  setCurrentUser(updatedMe);
-                }
-              }
+    // 5. Cross-tab/window localStorage synchronization (very powerful fallback & development helper)
+    const handleStorageChange = (e: StorageEvent) => {
+      if (!e.key) return;
+      if (e.key.startsWith('kpcia_')) {
+        console.log(`[Storage Sync] Key ${e.key} updated in another tab/window. Synchronizing local state...`);
+        if (e.key === 'kpcia_users') {
+          const freshUsers = StorageService.getLocalUsers();
+          setUsers(freshUsers);
+          const loggedInUid = sessionStorage.getItem('kpcia_logged_in_uid');
+          if (loggedInUid) {
+            const updatedMe = freshUsers.find(u => u.uid === loggedInUid);
+            if (updatedMe) {
+              setCurrentUser(updatedMe);
             }
-          });
-
-          unsubLectures = StorageService.subscribeLectures((updatedLectures) => {
-            if (updatedLectures.length > 0) {
-              setLectures(updatedLectures);
-              StorageService.setLocal('lectures', updatedLectures);
-            }
-          });
-
-          unsubPrograms = StorageService.subscribePrograms((updatedPrograms) => {
-            if (updatedPrograms.length > 0) {
-              setPrograms(updatedPrograms);
-              StorageService.setLocal('programs', updatedPrograms);
-            }
-          });
-
-          unsubTransactions = StorageService.subscribeTransactions((updatedTransactions) => {
-            setTransactions(updatedTransactions);
-            StorageService.setLocal('transactions', updatedTransactions);
-          });
-
-          unsubProposals = StorageService.subscribeProposals((updatedProposals) => {
-            setProposals(updatedProposals);
-            StorageService.setLocal('proposals', updatedProposals);
-          });
-        } catch (err) {
-          console.error("Failed to register real-time Firestore synchronization:", err);
+          }
+        } else if (e.key === 'kpcia_lectures') {
+          setLectures(StorageService.getLocalLectures());
+        } else if (e.key === 'kpcia_programs') {
+          setPrograms(StorageService.getLocalPrograms());
+        } else if (e.key === 'kpcia_transactions') {
+          setTransactions(StorageService.getLocalTransactions());
+        } else if (e.key === 'kpcia_proposals') {
+          setProposals(StorageService.getLocalProposals());
         }
       }
     };
-
-    syncData();
+    window.addEventListener('storage', handleStorageChange);
 
     return () => {
       unsubUsers();
@@ -198,6 +215,7 @@ export default function App() {
       unsubPrograms();
       unsubTransactions();
       unsubProposals();
+      window.removeEventListener('storage', handleStorageChange);
     };
   }, []);
 
