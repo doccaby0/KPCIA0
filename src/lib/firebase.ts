@@ -233,6 +233,23 @@ export function generateBadgeForTier(tier: InstructorTier, dateGranted?: string)
 // If Firestore throws permission errors or missing collections, it transparently synchronizes with localStorage.
 // This guarantees smooth UX and live changes!
 export class StorageService {
+  // Recursively remove undefined values from objects to prevent Firestore setDoc errors
+  private static cleanUndefined(obj: any): any {
+    if (obj === null || obj === undefined) return null;
+    if (typeof obj !== 'object') return obj;
+    if (Array.isArray(obj)) {
+      return obj.map(item => this.cleanUndefined(item));
+    }
+    const cleaned: Record<string, any> = {};
+    Object.keys(obj).forEach(key => {
+      const val = obj[key];
+      if (val !== undefined) {
+        cleaned[key] = this.cleanUndefined(val);
+      }
+    });
+    return cleaned;
+  }
+
   // Safe helper to check storage availability (e.g. Chrome Incognito mode)
   public static isStorageAvailable(type: 'localStorage' | 'sessionStorage'): boolean {
     try {
@@ -437,15 +454,16 @@ export class StorageService {
   }
 
   static async saveUser(user: UserProfile): Promise<void> {
+    const cleaned = this.cleanUndefined(user);
     const current = await this.getUsers();
-    const updated = current.map(u => u.uid === user.uid ? user : u);
-    if (!updated.some(u => u.uid === user.uid)) {
-      updated.push(user);
+    const updated = current.map(u => u.uid === cleaned.uid ? cleaned : u);
+    if (!updated.some(u => u.uid === cleaned.uid)) {
+      updated.push(cleaned);
     }
     this.setLocal('users', updated);
 
     await this.runWithTimeout(async () => {
-      await setDoc(doc(db, 'users', user.uid), user);
+      await setDoc(doc(db, 'users', cleaned.uid), cleaned);
     }, null);
   }
 
@@ -464,15 +482,16 @@ export class StorageService {
   }
 
   static async saveLecture(lecture: LectureRequest): Promise<void> {
+    const cleaned = this.cleanUndefined(lecture);
     const current = await this.getLectures();
-    const updated = current.map(l => l.id === lecture.id ? lecture : l);
-    if (!updated.some(l => l.id === lecture.id)) {
-      updated.push(lecture);
+    const updated = current.map(l => l.id === cleaned.id ? cleaned : l);
+    if (!updated.some(l => l.id === cleaned.id)) {
+      updated.push(cleaned);
     }
     this.setLocal('lectures', updated);
 
     await this.runWithTimeout(async () => {
-      await setDoc(doc(db, 'lectures', lecture.id), lecture);
+      await setDoc(doc(db, 'lectures', cleaned.id), cleaned);
     }, null);
   }
 
@@ -506,15 +525,16 @@ export class StorageService {
   }
 
   static async saveProgram(program: EducationalProgram): Promise<void> {
+    const cleaned = this.cleanUndefined(program);
     const current = await this.getPrograms();
-    const updated = current.map(p => p.id === program.id ? program : p);
-    if (!updated.some(p => p.id === program.id)) {
-      updated.push(program);
+    const updated = current.map(p => p.id === cleaned.id ? cleaned : p);
+    if (!updated.some(p => p.id === cleaned.id)) {
+      updated.push(cleaned);
     }
     this.setLocal('programs', updated);
 
     await this.runWithTimeout(async () => {
-      await setDoc(doc(db, 'programs', program.id), program);
+      await setDoc(doc(db, 'programs', cleaned.id), cleaned);
     }, null);
   }
 
@@ -543,12 +563,13 @@ export class StorageService {
   }
 
   static async addTransaction(tx: MileageTransaction): Promise<void> {
+    const cleaned = this.cleanUndefined(tx);
     const current = await this.getTransactions();
-    current.push(tx);
+    current.push(cleaned);
     this.setLocal('transactions', current);
 
     await this.runWithTimeout(async () => {
-      await setDoc(doc(db, 'transactions', tx.id), tx);
+      await setDoc(doc(db, 'transactions', cleaned.id), cleaned);
     }, null);
   }
 
@@ -567,15 +588,16 @@ export class StorageService {
   }
 
   static async saveProposal(proposal: PartnershipProposal): Promise<void> {
+    const cleaned = this.cleanUndefined(proposal);
     const current = await this.getProposals();
-    const updated = current.map(p => p.id === proposal.id ? proposal : p);
-    if (!updated.some(p => p.id === proposal.id)) {
-      updated.push(proposal);
+    const updated = current.map(p => p.id === cleaned.id ? cleaned : p);
+    if (!updated.some(p => p.id === cleaned.id)) {
+      updated.push(cleaned);
     }
     this.setLocal('proposals', updated);
 
     await this.runWithTimeout(async () => {
-      await setDoc(doc(db, 'proposals', proposal.id), proposal);
+      await setDoc(doc(db, 'proposals', cleaned.id), cleaned);
     }, null);
   }
 

@@ -60,6 +60,7 @@ export default function LectureBoard({
   const checkQualification = (userTier: InstructorTier, requiredTier: InstructorTier) => {
     const userIndex = tiersOrder.indexOf(userTier);
     const requiredIndex = tiersOrder.indexOf(requiredTier);
+    if (userIndex === -1) return false;
     return userIndex >= requiredIndex;
   };
 
@@ -408,7 +409,7 @@ export default function LectureBoard({
                 ) : (
                   paginatedLectures.map((lecture, idx) => {
                     const isQualified = currentUser ? checkQualification(currentUser.tier, lecture.targetTier) : false;
-                    const isLectBlurred = showBlurred || (!currentUser?.isAdmin && !isQualified);
+                    const isLectBlurred = !currentUser || currentUser.uid === 'guest' || (!currentUser?.isAdmin && !isQualified);
                     const hasApplied = currentUser ? lecture.applicants.includes(currentUser.uid) : false;
                     const isAssignedToMe = currentUser ? lecture.assignedTo === currentUser.uid : false;
 
@@ -810,7 +811,7 @@ export default function LectureBoard({
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4" id="lectures-grid">
           {paginatedLectures.map((lecture) => {
             const isQualified = currentUser ? checkQualification(currentUser.tier, lecture.targetTier) : false;
-            const isLectBlurred = showBlurred || (!currentUser?.isAdmin && !isQualified);
+            const isLectBlurred = !currentUser || currentUser.uid === 'guest' || (!currentUser?.isAdmin && !isQualified);
             const hasApplied = currentUser ? lecture.applicants.includes(currentUser.uid) : false;
             const isAssignedToMe = currentUser ? lecture.assignedTo === currentUser.uid : false;
 
