@@ -130,56 +130,72 @@ export default function App() {
       setCurrentUser(null);
     }
 
-    // 3. Seed empty database and run automatic bidirectional synchronization in the background (DO NOT AWAIT - avoids blocking UI)
-    StorageService.seedDatabaseIfEmpty()
-      .then(() => StorageService.autoSyncLocalAndCloud())
-      .catch(err => console.warn("Background seed/auto-sync failed:", err));
+    // 3. Seed empty database and run automatic bidirectional synchronization on startup, then subscribe to real-time sync
+    let active = true;
+    let unsubs: (() => void)[] = [];
 
-    // 4. Activate real-time cloud sync listeners if Firestore is enabled
-    // Since onSnapshot automatically fetches current database values, it will seamlessly update the state in the background once connected!
-    let unsubUsers = () => {};
-    let unsubLectures = () => {};
-    let unsubPrograms = () => {};
-    let unsubTransactions = () => {};
-    let unsubProposals = () => {};
-
-    if (useFirestore) {
+    const initializeDatabaseAndSync = async () => {
       try {
-        unsubUsers = StorageService.subscribeUsers((updatedUsers) => {
-          setUsers(updatedUsers);
-          StorageService.setLocal('users', updatedUsers);
-          const loggedInUid = StorageService.getSessionItem('kpcia_logged_in_uid');
-          if (loggedInUid) {
-            const updatedMe = updatedUsers.find(u => u.uid === loggedInUid);
-            if (updatedMe) {
-              setCurrentUser(updatedMe);
-            }
-          }
-        });
-
-        unsubLectures = StorageService.subscribeLectures((updatedLectures) => {
-          setLectures(updatedLectures);
-          StorageService.setLocal('lectures', updatedLectures);
-        });
-
-        unsubPrograms = StorageService.subscribePrograms((updatedPrograms) => {
-          setPrograms(updatedPrograms);
-          StorageService.setLocal('programs', updatedPrograms);
-        });
-
-        unsubTransactions = StorageService.subscribeTransactions((updatedTransactions) => {
-          setTransactions(updatedTransactions);
-          StorageService.setLocal('transactions', updatedTransactions);
-        });
-
-        unsubProposals = StorageService.subscribeProposals((updatedProposals) => {
-          setProposals(updatedProposals);
-          StorageService.setLocal('proposals', updatedProposals);
-        });
+        await StorageService.seedDatabaseIfEmpty();
+        await StorageService.autoSyncLocalAndCloud();
       } catch (err) {
-        console.error("Failed to register real-time Firestore synchronization:", err);
+        console.warn("Startup database sync failed:", err);
       }
-    }
+
+      if (!active) return;
+
+      // 4. Activate real-time cloud sync listeners if Firestore is enabled
+      // Since onSnapshot automatically fetches current database values, it will seamlessly update the state in the background once connected!
+      if (useFirestore) {
+        try {
+          const unsubUsers = StorageService.subscribeUsers((updatedUsers) => {
+            if (!active) return;
+            setUsers(updatedUsers);
+            StorageService.setLocal('users', updatedUsers);
+            const loggedInUid = StorageService.getSessionItem('kpcia_logged_in_uid');
+            if (loggedInUid) {
+              const updatedMe = updatedUsers.find(u => u.uid === loggedInUid);
+              if (updatedMe) {
+                setCurrentUser(updatedMe);
+              }
+            }
+          });
+          unsubs.push(unsubUsers);
+
+          const unsubLectures = StorageService.subscribeLectures((updatedLectures) => {
+            if (!active) return;
+            setLectures(updatedLectures);
+            StorageService.setLocal('lectures', updatedLectures);
+          });
+          unsubs.push(unsubLectures);
+
+          const unsubPrograms = StorageService.subscribePrograms((updatedPrograms) => {
+            if (!active) return;
+            setPrograms(updatedPrograms);
+            StorageService.setLocal('programs', updatedPrograms);
+          });
+          unsubs.push(unsubPrograms);
+
+          const unsubTransactions = StorageService.subscribeTransactions((updatedTransactions) => {
+            if (!active) return;
+            setTransactions(updatedTransactions);
+            StorageService.setLocal('transactions', updatedTransactions);
+          });
+          unsubs.push(unsubTransactions);
+
+          const unsubProposals = StorageService.subscribeProposals((updatedProposals) => {
+            if (!active) return;
+            setProposals(updatedProposals);
+            StorageService.setLocal('proposals', updatedProposals);
+          });
+          unsubs.push(unsubProposals);
+        } catch (err) {
+          console.error("Failed to register real-time Firestore synchronization:", err);
+        }
+      }
+    };
+
+    initializeDatabaseAndSync();
 
     // 5. Cross-tab/window localStorage synchronization (very powerful fallback & development helper)
     const handleStorageChange = (e: StorageEvent) => {
@@ -210,11 +226,8 @@ export default function App() {
     window.addEventListener('storage', handleStorageChange);
 
     return () => {
-      unsubUsers();
-      unsubLectures();
-      unsubPrograms();
-      unsubTransactions();
-      unsubProposals();
+      active = false;
+      unsubs.forEach(unsub => unsub());
       window.removeEventListener('storage', handleStorageChange);
     };
   }, []);

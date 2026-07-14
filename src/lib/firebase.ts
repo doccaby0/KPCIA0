@@ -360,31 +360,51 @@ export class StorageService {
     try {
       await Promise.race([
         (async () => {
+          // 1. Seed users
           const usersSnap = await getDocs(collection(db, 'users'));
           if (usersSnap.empty) {
-            console.log("Seeding Firestore with initial values...");
-            // Seed users
+            console.log("Seeding users to Firestore...");
             for (const u of INITIAL_USERS) {
               await setDoc(doc(db, 'users', u.uid), u);
             }
-            // Seed lectures
+          }
+
+          // 2. Seed lectures
+          const lecturesSnap = await getDocs(collection(db, 'lectures'));
+          if (lecturesSnap.empty) {
+            console.log("Seeding lectures to Firestore...");
             for (const l of INITIAL_LECTURES) {
               await setDoc(doc(db, 'lectures', l.id), l);
             }
-            // Seed programs
+          }
+
+          // 3. Seed programs
+          const programsSnap = await getDocs(collection(db, 'programs'));
+          if (programsSnap.empty) {
+            console.log("Seeding programs to Firestore...");
             for (const p of INITIAL_PROGRAMS) {
               await setDoc(doc(db, 'programs', p.id), p);
             }
-            // Seed transactions
+          }
+
+          // 4. Seed transactions
+          const transactionsSnap = await getDocs(collection(db, 'transactions'));
+          if (transactionsSnap.empty) {
+            console.log("Seeding transactions to Firestore...");
             for (const tx of INITIAL_TRANSACTIONS) {
               await setDoc(doc(db, 'transactions', tx.id), tx);
             }
-            // Seed proposals
+          }
+
+          // 5. Seed proposals
+          const proposalsSnap = await getDocs(collection(db, 'proposals'));
+          if (proposalsSnap.empty) {
+            console.log("Seeding proposals to Firestore...");
             for (const p of INITIAL_PROPOSALS) {
               await setDoc(doc(db, 'proposals', p.id), p);
             }
-            console.log("Firestore successfully seeded!");
           }
+          console.log("Firestore database seeding check completed successfully!");
         })(),
         new Promise((_, reject) => setTimeout(() => reject(new Error("Timeout")), 8000))
       ]);
