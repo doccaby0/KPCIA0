@@ -469,7 +469,20 @@ export default function LectureBoard({
                               }
                             }}
                           >
-                            <span className={`whitespace-normal break-all leading-snug ${isLectBlurred ? "blur-[6.5px] select-none pointer-events-none" : ""}`}>{lecture.title}</span>
+                            {(() => {
+                              const match = lecture.title.match(/^(\[.*?\])\s*(.*)$/);
+                              if (match) {
+                                return (
+                                  <span className="whitespace-normal break-all leading-snug">
+                                    <span className="text-kpcia-gold font-bold mr-1 shrink-0">{match[1]}</span>
+                                    <span className={isLectBlurred ? "blur-[6.5px] select-none pointer-events-none" : ""}>{match[2]}</span>
+                                  </span>
+                                );
+                              }
+                              return (
+                                <span className={`whitespace-normal break-all leading-snug ${isLectBlurred ? "blur-[6.5px] select-none pointer-events-none" : ""}`}>{lecture.title}</span>
+                              );
+                            })()}
                             {!isLectBlurred && (
                               <button
                                 type="button"
@@ -856,8 +869,8 @@ export default function LectureBoard({
                   </div>
                 )}
 
-                {/* Card Content Wrapper with Blur Filter */}
-                <div className={`flex-1 flex flex-col justify-between h-full space-y-3.5 ${isLectBlurred ? "blur-[6.5px] select-none pointer-events-none" : ""}`}>
+                 {/* Card Content Wrapper with Selective Blur Filter */}
+                <div className={`flex-1 flex flex-col justify-between h-full space-y-3.5 ${isLectBlurred ? "select-none pointer-events-none" : ""}`}>
                   {/* Card Top Information */}
                   <div className="space-y-2.5">
                   <div className="flex items-center justify-between gap-1">
@@ -888,10 +901,23 @@ export default function LectureBoard({
                     </div>
                   </div>
 
-                  {/* Title & info buttons */}
+                   {/* Title & info buttons */}
                   <div className="flex items-start justify-between gap-1.5">
-                    <h3 className={`font-display font-bold text-[14px] text-neutral-100 tracking-tight leading-snug hover:text-kpcia-gold transition-colors line-clamp-1 ${isLectBlurred ? "blur-[3px] select-none pointer-events-none" : ""}`} title={isLectBlurred ? undefined : lecture.title}>
-                      {lecture.title}
+                    <h3 className={`font-display font-bold text-[14px] text-neutral-100 tracking-tight leading-snug hover:text-kpcia-gold transition-colors line-clamp-1 ${isLectBlurred ? "select-none pointer-events-none" : ""}`} title={isLectBlurred ? undefined : lecture.title}>
+                      {(() => {
+                        const match = lecture.title.match(/^(\[.*?\])\s*(.*)$/);
+                        if (match) {
+                          return (
+                            <>
+                              <span className="text-kpcia-gold font-bold mr-1 shrink-0">{match[1]}</span>
+                              <span className={isLectBlurred ? "blur-[3.5px] select-none pointer-events-none" : ""}>{match[2]}</span>
+                            </>
+                          );
+                        }
+                        return (
+                          <span className={isLectBlurred ? "blur-[3.5px] select-none pointer-events-none" : ""}>{lecture.title}</span>
+                        );
+                      })()}
                     </h3>
                     {!isLectBlurred && (
                       <button

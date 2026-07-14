@@ -382,7 +382,7 @@ export class StorageService {
           if (usersSnap.empty) {
             console.log("Seeding users to Firestore...");
             for (const u of INITIAL_USERS) {
-              await setDoc(doc(db, 'users', u.uid), u);
+              await setDoc(doc(db, 'users', u.uid), this.cleanUndefined(u));
             }
           }
 
@@ -391,7 +391,7 @@ export class StorageService {
           if (lecturesSnap.empty) {
             console.log("Seeding lectures to Firestore...");
             for (const l of INITIAL_LECTURES) {
-              await setDoc(doc(db, 'lectures', l.id), l);
+              await setDoc(doc(db, 'lectures', l.id), this.cleanUndefined(l));
             }
           }
 
@@ -400,7 +400,7 @@ export class StorageService {
           if (programsSnap.empty) {
             console.log("Seeding programs to Firestore...");
             for (const p of INITIAL_PROGRAMS) {
-              await setDoc(doc(db, 'programs', p.id), p);
+              await setDoc(doc(db, 'programs', p.id), this.cleanUndefined(p));
             }
           }
 
@@ -409,7 +409,7 @@ export class StorageService {
           if (transactionsSnap.empty) {
             console.log("Seeding transactions to Firestore...");
             for (const tx of INITIAL_TRANSACTIONS) {
-              await setDoc(doc(db, 'transactions', tx.id), tx);
+              await setDoc(doc(db, 'transactions', tx.id), this.cleanUndefined(tx));
             }
           }
 
@@ -418,7 +418,7 @@ export class StorageService {
           if (proposalsSnap.empty) {
             console.log("Seeding proposals to Firestore...");
             for (const p of INITIAL_PROPOSALS) {
-              await setDoc(doc(db, 'proposals', p.id), p);
+              await setDoc(doc(db, 'proposals', p.id), this.cleanUndefined(p));
             }
           }
           console.log("Firestore database seeding check completed successfully!");
@@ -733,14 +733,14 @@ export class StorageService {
             if (localTime >= cloudTime) {
               mergedList.push(localItem);
               // Push local update to cloud if local is newer or equal (ensures recovery of failed writes)
-              await setDoc(doc(db, colName, id), localItem);
+              await setDoc(doc(db, colName, id), this.cleanUndefined(localItem));
             } else {
               mergedList.push(cloudItem);
             }
           } else if (localItem) {
             // Exists only locally -> Upload to Firestore
             mergedList.push(localItem);
-            await setDoc(doc(db, colName, id), localItem);
+            await setDoc(doc(db, colName, id), this.cleanUndefined(localItem));
           } else if (cloudItem) {
             // Exists only in Cloud -> Sync to Local
             mergedList.push(cloudItem);
@@ -775,19 +775,19 @@ export class StorageService {
     const proposals = this.getLocal<PartnershipProposal[]>('proposals', INITIAL_PROPOSALS);
 
     for (const u of users) {
-      await setDoc(doc(db, 'users', u.uid), u);
+      await setDoc(doc(db, 'users', u.uid), this.cleanUndefined(u));
     }
     for (const l of lectures) {
-      await setDoc(doc(db, 'lectures', l.id), l);
+      await setDoc(doc(db, 'lectures', l.id), this.cleanUndefined(l));
     }
     for (const p of programs) {
-      await setDoc(doc(db, 'programs', p.id), p);
+      await setDoc(doc(db, 'programs', p.id), this.cleanUndefined(p));
     }
     for (const tx of transactions) {
-      await setDoc(doc(db, 'transactions', tx.id), tx);
+      await setDoc(doc(db, 'transactions', tx.id), this.cleanUndefined(tx));
     }
     for (const p of proposals) {
-      await setDoc(doc(db, 'proposals', p.id), p);
+      await setDoc(doc(db, 'proposals', p.id), this.cleanUndefined(p));
     }
   }
 
@@ -850,23 +850,23 @@ export class StorageService {
         }
         // Seed initial users
         for (const u of INITIAL_USERS) {
-          await setDoc(doc(db, 'users', u.uid), u);
+          await setDoc(doc(db, 'users', u.uid), this.cleanUndefined(u));
         }
         // Seed initial lectures
         for (const l of INITIAL_LECTURES) {
-          await setDoc(doc(db, 'lectures', l.id), l);
+          await setDoc(doc(db, 'lectures', l.id), this.cleanUndefined(l));
         }
         // Seed initial programs
         for (const p of INITIAL_PROGRAMS) {
-          await setDoc(doc(db, 'programs', p.id), p);
+          await setDoc(doc(db, 'programs', p.id), this.cleanUndefined(p));
         }
         // Seed initial transactions
         for (const tx of INITIAL_TRANSACTIONS) {
-          await setDoc(doc(db, 'transactions', tx.id), tx);
+          await setDoc(doc(db, 'transactions', tx.id), this.cleanUndefined(tx));
         }
         // Seed initial proposals
         for (const p of INITIAL_PROPOSALS) {
-          await setDoc(doc(db, 'proposals', p.id), p);
+          await setDoc(doc(db, 'proposals', p.id), this.cleanUndefined(p));
         }
       } catch (e) {
         console.warn("Firestore collection delete/reseed failed, fallback to local cache reset.", e);
