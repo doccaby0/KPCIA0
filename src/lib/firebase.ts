@@ -27,7 +27,9 @@ try {
   // Pass firestoreDatabaseId explicitly so it connects to the assigned database
   db = getFirestore(app, firebaseConfig.firestoreDatabaseId);
   auth = getAuth(app);
+  
   useFirestore = true;
+  
   console.log("Firebase initialized successfully with database ID:", firebaseConfig.firestoreDatabaseId);
 } catch (error) {
   console.warn("Firebase failed to initialize. Falling back to robust LocalStorage storage.", error);
@@ -213,6 +215,15 @@ export function generateBadgeForTier(tier: InstructorTier, dateGranted?: string)
         tier,
         title: "Prestige Elite 배지",
         description: "협회를 대표하며 선구자적 인사이트를 전파하는 최고 영예의 에메랄드 왕관 배지입니다.",
+        iconType: "emerald_crown",
+        dateGranted: dateStr
+      };
+    case 'Prestige Legend':
+      return {
+        id: `badge_legend_${Date.now()}`,
+        tier,
+        title: "Prestige Legend 배지",
+        description: "누적 10,000회 이상의 출강을 달성한, 강사업계의 신화이자 지사장급 공식 명예 배지입니다.",
         iconType: "emerald_crown",
         dateGranted: dateStr
       };
@@ -467,6 +478,16 @@ export class StorageService {
     }, null);
   }
 
+  static async deleteUser(uid: string): Promise<void> {
+    const current = await this.getUsers();
+    const updated = current.filter(u => u.uid !== uid);
+    this.setLocal('users', updated);
+
+    await this.runWithTimeout(async () => {
+      await deleteDoc(doc(db, 'users', uid));
+    }, null);
+  }
+
   // Lectures Operations
   static async getLectures(): Promise<LectureRequest[]> {
     const localData = this.getLocal<LectureRequest[]>('lectures', INITIAL_LECTURES);
@@ -601,15 +622,7 @@ export class StorageService {
     }, null);
   }
 
-  static async deleteUser(userId: string): Promise<void> {
-    const current = await this.getUsers();
-    const updated = current.filter(u => u.uid !== userId);
-    this.setLocal('users', updated);
 
-    await this.runWithTimeout(async () => {
-      await deleteDoc(doc(db, 'users', userId));
-    }, null);
-  }
 
   // Subscription Listeners for Real-time Sync
   static subscribeUsers(callback: (users: UserProfile[]) => void): () => void {
@@ -617,6 +630,17 @@ export class StorageService {
     return onSnapshot(collection(db, 'users'), (snap) => {
       const list: UserProfile[] = [];
       snap.forEach(d => list.push(d.data() as UserProfile));
+      
+      // Prevent empty cloud snapshot from wiping local storage
+      if (list.length === 0) {
+        const local = this.getLocalUsers();
+        if (local.length > 0) {
+          console.log("Firestore 'users' collection is empty. Retaining local data and uploading to cloud...");
+          local.forEach(u => setDoc(doc(db, 'users', u.uid), this.cleanUndefined(u)).catch(console.warn));
+          return;
+        }
+      }
+      
       const formatted = list.map(u => ({
         ...u,
         isApproved: u.isApproved !== undefined ? u.isApproved : true,
@@ -636,6 +660,17 @@ export class StorageService {
     return onSnapshot(collection(db, 'lectures'), (snap) => {
       const list: LectureRequest[] = [];
       snap.forEach(d => list.push(d.data() as LectureRequest));
+      
+      // Prevent empty cloud snapshot from wiping local storage
+      if (list.length === 0) {
+        const local = this.getLocalLectures();
+        if (local.length > 0) {
+          console.log("Firestore 'lectures' collection is empty. Retaining local data and uploading to cloud...");
+          local.forEach(l => setDoc(doc(db, 'lectures', l.id), this.cleanUndefined(l)).catch(console.warn));
+          return;
+        }
+      }
+      
       callback(list);
     }, (error) => {
       console.error("subscribeLectures error:", error);
@@ -647,6 +682,17 @@ export class StorageService {
     return onSnapshot(collection(db, 'programs'), (snap) => {
       const list: EducationalProgram[] = [];
       snap.forEach(d => list.push(d.data() as EducationalProgram));
+      
+      // Prevent empty cloud snapshot from wiping local storage
+      if (list.length === 0) {
+        const local = this.getLocalPrograms();
+        if (local.length > 0) {
+          console.log("Firestore 'programs' collection is empty. Retaining local data and uploading to cloud...");
+          local.forEach(p => setDoc(doc(db, 'programs', p.id), this.cleanUndefined(p)).catch(console.warn));
+          return;
+        }
+      }
+      
       const formatted = list.map(p => ({
         ...p,
         isApproved: p.isApproved !== undefined ? p.isApproved : true
@@ -662,6 +708,16 @@ export class StorageService {
     return onSnapshot(collection(db, 'transactions'), (snap) => {
       const list: MileageTransaction[] = [];
       snap.forEach(d => list.push(d.data() as MileageTransaction));
+      
+      // Prevent empty cloud snapshot from wiping local storage
+      if (list.length === 0) {
+        const local = this.getLocalTransactions();
+        if (local.length > 0) {
+          console.log("Firestore 'transactions' collection is empty. Retaining local data...");
+          return;
+        }
+      }
+      
       callback(list);
     }, (error) => {
       console.error("subscribeTransactions error:", error);
@@ -673,6 +729,16 @@ export class StorageService {
     return onSnapshot(collection(db, 'proposals'), (snap) => {
       const list: PartnershipProposal[] = [];
       snap.forEach(d => list.push(d.data() as PartnershipProposal));
+      
+      // Prevent empty cloud snapshot from wiping local storage
+      if (list.length === 0) {
+        const local = this.getLocalProposals();
+        if (local.length > 0) {
+          console.log("Firestore 'proposals' collection is empty. Retaining local data...");
+          return;
+        }
+      }
+      
       callback(list);
     }, (error) => {
       console.error("subscribeProposals error:", error);
@@ -829,48 +895,5 @@ export class StorageService {
     this.setLocal('proposals', proposals);
 
     return { users, lectures, programs, transactions, proposals };
-  }
-
-  // Clear local storage and Firestore data and restore default state
-  static async resetDatabase(): Promise<void> {
-    this.removeLocalItem('kpcia_users');
-    this.removeLocalItem('kpcia_lectures');
-    this.removeLocalItem('kpcia_programs');
-    this.removeLocalItem('kpcia_transactions');
-    this.removeLocalItem('kpcia_proposals');
-
-    if (useFirestore && db) {
-      try {
-        const collections = ['users', 'lectures', 'programs', 'transactions', 'proposals'];
-        for (const colName of collections) {
-          const snap = await getDocs(collection(db, colName));
-          for (const d of snap.docs) {
-            await deleteDoc(doc(db, colName, d.id));
-          }
-        }
-        // Seed initial users
-        for (const u of INITIAL_USERS) {
-          await setDoc(doc(db, 'users', u.uid), this.cleanUndefined(u));
-        }
-        // Seed initial lectures
-        for (const l of INITIAL_LECTURES) {
-          await setDoc(doc(db, 'lectures', l.id), this.cleanUndefined(l));
-        }
-        // Seed initial programs
-        for (const p of INITIAL_PROGRAMS) {
-          await setDoc(doc(db, 'programs', p.id), this.cleanUndefined(p));
-        }
-        // Seed initial transactions
-        for (const tx of INITIAL_TRANSACTIONS) {
-          await setDoc(doc(db, 'transactions', tx.id), this.cleanUndefined(tx));
-        }
-        // Seed initial proposals
-        for (const p of INITIAL_PROPOSALS) {
-          await setDoc(doc(db, 'proposals', p.id), this.cleanUndefined(p));
-        }
-      } catch (e) {
-        console.warn("Firestore collection delete/reseed failed, fallback to local cache reset.", e);
-      }
-    }
   }
 }

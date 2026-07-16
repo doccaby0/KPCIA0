@@ -3,7 +3,8 @@ export type InstructorTier =
   | 'Prestige Associate'
   | 'Prestige Professional'
   | 'Prestige Master'
-  | 'Prestige Elite';
+  | 'Prestige Elite'
+  | 'Prestige Legend';
 
 export interface DigitalBadge {
   id: string;
@@ -45,6 +46,7 @@ export interface UserProfile {
   emailVerified?: boolean;
   loginId?: string;
   password?: string;
+  organizationName?: string;
   lectureCount?: number;
   lectureRatings?: number[];
   averageRating?: number;
@@ -66,6 +68,7 @@ export interface AssistantEvaluation {
 export interface LectureRequest {
   id: string;
   title: string;
+  companyName?: string; // Company / Institution Name
   description: string;
   targetTier: InstructorTier; // Minimum tier required
   budget: number; // Lecture fee in KRW
@@ -91,6 +94,7 @@ export interface LectureRequest {
   assistantId?: string;
   assistantName?: string;
   assistantEvaluated?: boolean;
+  lectureRating?: number;
 }
 
 export interface EducationalProgram {
