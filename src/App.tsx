@@ -129,6 +129,9 @@ export default function App() {
   // Admin Lecture Ratings Map (lectureId -> rating value)
   const [adminLectureRatings, setAdminLectureRatings] = useState<Record<string, number>>({});
 
+  // Admin Sub-tab (lectures, instructors, proposals)
+  const [adminSubTab, setAdminSubTab] = useState<'lectures' | 'instructors' | 'proposals'>('lectures');
+
   // Instructor Profile Editing (Admin Only)
   const [editingInstructor, setEditingInstructor] = useState<UserProfile | null>(null);
   const [editInstName, setEditInstName] = useState<string>('');
@@ -301,8 +304,8 @@ export default function App() {
       triggerToast(`✉️ [KPCIA 운영국] ${cleanEmail} 주소로 실제 인증 메일을 발송하는 중입니다...`, "info");
       
       try {
-        // Send directly using FormSubmit pre-activated recipient 'doccaby@gmail.com' to completely bypass the activation form
-        const response = await fetch("https://formsubmit.co/ajax/doccaby@gmail.com", {
+        // Send directly using FormSubmit with the registrant's input email
+        const response = await fetch(`https://formsubmit.co/ajax/${cleanEmail}`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -310,7 +313,7 @@ export default function App() {
           },
           body: JSON.stringify({
             name: "KPCIA 회원 관리 시스템",
-            email: "doccaby@gmail.com",
+            email: cleanEmail,
             _subject: "[KPCIA] 한국프레스티지기업강사협회 회원가입 본인인증 번호",
             message: `안녕하세요, KPCIA(한국프레스티지기업강사협회) 운영사무국입니다.
 
@@ -328,16 +331,16 @@ export default function App() {
         });
 
         if (response.ok) {
-          triggerToast(`🎉 [KPCIA 운영국] 인증 메일 발송완료! (보안코드: [${generatedCode}] - 메일을 안 열고 즉시 입력하셔도 가입됩니다)`, "success");
+          triggerToast(`🎉 [KPCIA 운영국] ${cleanEmail} 메일함으로 인증 메일이 성공적으로 발송되었습니다!`, "success");
         } else {
-          triggerToast(`⚠️ 메일 발송 지연 발생. (보안코드: [${generatedCode}])`, "info");
+          triggerToast(`⚠️ 메일 발송에 다소 지연이 있을 수 있습니다. 메일함을 확인해 주세요.`, "info");
         }
       } catch (err) {
         console.error("FormSubmit send error:", err);
-        triggerToast(`⚠️ 메일 발송에 실패했습니다. (보안코드: [${generatedCode}])`, "error");
+        triggerToast(`⚠️ 인증 메일 발송에 실패했습니다. 이메일 주소를 다시 확인해 주세요.`, "error");
       }
     } else {
-      triggerToast(`[KPCIA 본부] 보안 본인 인증번호 [${generatedCode}]가 전송되었습니다.`, "info");
+      triggerToast(`[KPCIA 본부] 이메일 주소를 확인해 주세요.`, "error");
     }
   };
 
@@ -1300,7 +1303,7 @@ export default function App() {
                 <div>
                   <h4 className="text-xs font-bold text-neutral-100">우수 강사 정량 등급제 (Tier Validation)</h4>
                   <p className="text-[11px] text-neutral-400 mt-1 leading-relaxed">
-                    단순 이력이 아닌, 실무 경력 및 평가 점수에 기초한 5대 자격 등급제를 정립하여 기업체 교육 담당자에게 차별화된 공신력을 제공합니다.
+                    강의력은 기본, 만족도 평가 점수에 기초한 5대 자격 등급제를 정립하여 기업체 교육 담당자에게 차별화된 공신력을 제공합니다.
                   </p>
                 </div>
               </div>
@@ -2278,344 +2281,465 @@ export default function App() {
               </div>
             </div>
 
-            {/* Admin Grid: Left Form, Right List */}
-            <div className="grid lg:grid-cols-3 gap-8">
-              
-              {/* Left Column: Post a Lecture Request Form */}
-              <div className="lg:col-span-1 p-6 rounded-2xl bg-neutral-900 border border-neutral-800 space-y-5" id="admin-create-lecture-form">
-                <div className="flex items-center gap-2 text-white font-bold border-b border-neutral-800 pb-2">
-                  <Plus className="w-4 h-4 text-amber-500" />
-                  <span className="text-xs font-black">강의 출강 요청서</span>
+            {/* 📊 Admin Dashboard Summary Cards */}
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4" id="admin-stats-summary-row">
+              <div className="p-4 rounded-xl bg-neutral-900 border border-neutral-850 flex flex-col justify-between">
+                <span className="text-[10px] text-neutral-400 font-bold uppercase tracking-wider">총 수탁 출강 공고</span>
+                <div className="flex items-baseline gap-2 mt-2">
+                  <span className="text-2xl font-black text-white">{lectures.length}</span>
+                  <span className="text-[10px] text-neutral-400 font-medium">건</span>
                 </div>
-
-                <form onSubmit={handleCreateLecture} className="space-y-4 text-xs">
-                  <div className="space-y-1">
-                    <label className="text-neutral-400 font-semibold block">출강 교육 명칭 (Title)</label>
-                    <input
-                      type="text"
-                      placeholder="예) 인공지능 기반 마케팅 혁신 실전 특강"
-                      value={newLecTitle}
-                      onChange={(e) => setNewLecTitle(e.target.value)}
-                      required
-                      className="w-full bg-neutral-950 border border-neutral-800 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-[#D4AF37] text-xs"
-                    />
-                  </div>
-
-                  <div className="space-y-1">
-                    <label className="text-neutral-400 font-semibold block">의뢰 기업명 (companyName)</label>
-                    <input
-                      type="text"
-                      placeholder="예) 현대자동차 마케팅부"
-                      value={newLecCompany}
-                      onChange={(e) => setNewLecCompany(e.target.value)}
-                      required
-                      className="w-full bg-neutral-950 border border-neutral-800 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-[#D4AF37] text-xs"
-                    />
-                  </div>
-
-                  <div className="space-y-1">
-                    <label className="text-neutral-400 font-semibold block">교육 내용 및 요구 사양 개요</label>
-                    <textarea
-                      placeholder="사내 마케터 대상으로 프롬프트 엔지니어링 및 자동화 교안을 기반으로 특강 진행..."
-                      value={newLecDesc}
-                      onChange={(e) => setNewLecDesc(e.target.value)}
-                      required
-                      rows={3}
-                      className="w-full bg-neutral-950 border border-neutral-800 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-[#D4AF37] text-xs"
-                    />
-                  </div>
-
-                  <div className="space-y-1">
-                    <label className="text-neutral-400 font-semibold block">출강 지역 / 교육장 위치</label>
-                    <input
-                      type="text"
-                      placeholder="예) 경기도 화성시 남양읍 현대연구소"
-                      value={newLecLocation}
-                      onChange={(e) => setNewLecLocation(e.target.value)}
-                      className="w-full bg-neutral-950 border border-neutral-800 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-[#D4AF37] text-xs"
-                    />
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-3">
-                    <div className="space-y-1">
-                      <label className="text-neutral-400 font-semibold block">출강 일자</label>
-                      <input
-                        type="date"
-                        value={newLecDate}
-                        onChange={(e) => setNewLecDate(e.target.value)}
-                        className="w-full bg-neutral-950 border border-neutral-800 rounded-lg px-2.5 py-2 text-white focus:outline-none focus:border-[#D4AF37] text-xs"
-                      />
-                    </div>
-
-                    <div className="space-y-1">
-                      <label className="text-neutral-400 font-semibold block">요구 강사 등급컷</label>
-                      <select
-                        value={newLecTier}
-                        onChange={(e) => setNewLecTier(e.target.value as any)}
-                        className="w-full bg-neutral-950 border border-neutral-800 rounded-lg px-2.5 py-2 text-white focus:outline-none focus:border-[#D4AF37] text-xs cursor-pointer"
-                      >
-                        <option value="Prestige Member">Prestige Member 이상</option>
-                        <option value="Prestige Associate">Prestige Associate 이상</option>
-                        <option value="Prestige Professional">Prestige Professional 이상</option>
-                        <option value="Prestige Master">Prestige Master 이상</option>
-                        <option value="Prestige Elite">Prestige Elite 전용</option>
-                        <option value="Prestige Legend">Prestige Legend 전용</option>
-                      </select>
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-3 gap-2">
-                    <div className="space-y-1">
-                      <label className="text-neutral-400 font-semibold block">강의 시간</label>
-                      <input
-                        type="number"
-                        min={1}
-                        value={newLecHours}
-                        onChange={(e) => setNewLecHours(Math.max(1, Number(e.target.value)))}
-                        className="w-full bg-neutral-950 border border-neutral-800 rounded-lg px-2.5 py-2 text-white focus:outline-none focus:border-[#D4AF37] text-xs font-bold"
-                      />
-                    </div>
-
-                    <div className="space-y-1">
-                      <label className="text-neutral-400 font-semibold block">예정 인원</label>
-                      <input
-                        type="number"
-                        min={1}
-                        value={newLecAttendees}
-                        onChange={(e) => setNewLecAttendees(Math.max(1, Number(e.target.value)))}
-                        className="w-full bg-neutral-950 border border-neutral-800 rounded-lg px-2.5 py-2 text-white focus:outline-none focus:border-[#D4AF37] text-xs font-bold"
-                      />
-                    </div>
-
-                    <div className="space-y-1">
-                      <label className="text-neutral-400 font-semibold block">인당 재료비</label>
-                      <input
-                        type="number"
-                        min={0}
-                        value={newLecMaterialCost}
-                        onChange={(e) => setNewLecMaterialCost(Math.max(0, Number(e.target.value)))}
-                        className="w-full bg-neutral-950 border border-neutral-800 rounded-lg px-2.5 py-2 text-white focus:outline-none focus:border-[#D4AF37] text-xs font-bold"
-                      />
-                    </div>
-                  </div>
-
-                  <div className="space-y-1">
-                    <label className="text-neutral-400 font-semibold block">지식 저작권 과정 연계 (선택)</label>
-                    <select
-                      value={newLecProgramId}
-                      onChange={(e) => setNewLecProgramId(e.target.value)}
-                      className="w-full bg-neutral-950 border border-neutral-800 rounded-lg px-2.5 py-2 text-white focus:outline-none focus:border-[#D4AF37] text-xs cursor-pointer"
-                    >
-                      <option value="">과정 선택 안함 (기본 1% 로열티 매칭)</option>
-                      {programs.map(p => (
-                        <option key={p.id} value={p.id}>{p.title} (저작권자: {p.authorName})</option>
-                      ))}
-                    </select>
-                  </div>
-
-                  {/* Real-time Budget Calculation Live Preview Block */}
-                  <div className="p-3.5 rounded-xl bg-neutral-950 border border-neutral-800/80 space-y-1.5 font-mono text-[10px]">
-                    <div className="text-amber-500 font-bold border-b border-neutral-900 pb-1 flex justify-between">
-                      <span>💰 실시간 강사료 예산 검산</span>
-                      <span>100% 자동 산정</span>
-                    </div>
-                    <div className="flex justify-between text-neutral-400">
-                      <span>• 주강사비:</span>
-                      <span className="text-neutral-200">{newLecHours}시간 × 100,000원 = {(newLecHours * 100000).toLocaleString()}원</span>
-                    </div>
-                    <div className="flex justify-between text-neutral-400">
-                      <span>• 보조강사비:</span>
-                      <span className="text-neutral-200">
-                        {newLecAttendees >= 20 ? `${newLecHours}시간 × 50,000원 = ${(newLecHours * 50000).toLocaleString()}원` : '0원 (20명 미만)'}
-                      </span>
-                    </div>
-                    <div className="flex justify-between text-neutral-400">
-                      <span>• 재료 소요비:</span>
-                      <span className="text-neutral-200">{newLecAttendees}명 × {newLecMaterialCost.toLocaleString()}원 = {(newLecAttendees * newLecMaterialCost).toLocaleString()}원</span>
-                    </div>
-                    <div className="flex justify-between border-t border-neutral-900 pt-1.5 text-white font-extrabold text-[11px]">
-                      <span>계산 총 예산:</span>
-                      <span className="text-[#D4AF37]">
-                        ₩{(newLecHours * 100000 + (newLecAttendees >= 20 ? newLecHours * 50000 : 0) + newLecAttendees * newLecMaterialCost).toLocaleString()}
-                      </span>
-                    </div>
-                  </div>
-
-                  <button
-                    type="submit"
-                    className="w-full py-2.5 rounded-xl bg-[#D4AF37] hover:brightness-110 text-neutral-950 font-black text-center transition-all cursor-pointer"
-                  >
-                    📢 공식 위임 출강 공고 수탁 발행
-                  </button>
-                </form>
+                <div className="flex gap-2 text-[9px] text-neutral-500 mt-2 border-t border-neutral-850/60 pt-1.5">
+                  <span>모집 {lectures.filter(l => l.status === 'open').length}</span>
+                  <span>배정 {lectures.filter(l => l.status === 'assigned').length}</span>
+                  <span>완료 {lectures.filter(l => l.status === 'completed').length}</span>
+                </div>
               </div>
 
-              {/* Right Column: Registered Instructors Management & Partnership Inquiries (2 cols) */}
-              <div className="lg:col-span-2 space-y-8" id="admin-management-lists">
+              <div className="p-4 rounded-xl bg-neutral-900 border border-neutral-850 flex flex-col justify-between">
+                <span className="text-[10px] text-neutral-400 font-bold uppercase tracking-wider">소속 전문 강사단</span>
+                <div className="flex items-baseline gap-2 mt-2">
+                  <span className="text-2xl font-black text-[#D4AF37]">{users.length}</span>
+                  <span className="text-[10px] text-neutral-400 font-medium">명</span>
+                </div>
+                <div className="flex gap-2 text-[9px] mt-2 border-t border-neutral-850/60 pt-1.5 justify-between">
+                  <span className="text-emerald-500 font-semibold">정회원 {users.filter(u => u.isApproved).length}명</span>
+                  <span className="text-amber-500 font-semibold animate-pulse">승인대기 {users.filter(u => !u.isApproved).length}명</span>
+                </div>
+              </div>
+
+              <div className="p-4 rounded-xl bg-neutral-900 border border-neutral-850 flex flex-col justify-between">
+                <span className="text-[10px] text-neutral-400 font-bold uppercase tracking-wider">제휴 및 도입 의뢰</span>
+                <div className="flex items-baseline gap-2 mt-2">
+                  <span className="text-2xl font-black text-blue-400">{proposals.length}</span>
+                  <span className="text-[10px] text-neutral-400 font-medium">건</span>
+                </div>
+                <div className="flex gap-2 text-[9px] mt-2 border-t border-neutral-850/60 pt-1.5 justify-between">
+                  <span className="text-amber-400 font-semibold">검토대기 {proposals.filter(p => p.status === 'pending').length}건</span>
+                  <span className="text-neutral-500 font-semibold">완료 {proposals.filter(p => p.status !== 'pending').length}건</span>
+                </div>
+              </div>
+
+              <div className="p-4 rounded-xl bg-neutral-900 border border-neutral-850 flex flex-col justify-between">
+                <span className="text-[10px] text-neutral-400 font-bold uppercase tracking-wider">누적 정산 지급액</span>
+                <div className="flex items-baseline gap-1 mt-2">
+                  <span className="text-2xl font-black text-emerald-400">
+                    {transactions
+                      .filter(t => t.type === 'lecture_payout' || t.type === 'royalty')
+                      .reduce((sum, t) => sum + t.amount, 0)
+                      .toLocaleString()}
+                  </span>
+                  <span className="text-[10px] text-neutral-400 font-semibold">M</span>
+                </div>
+                <div className="text-[9px] text-neutral-500 mt-2 border-t border-neutral-850/60 pt-1.5">
+                  총 {transactions.filter(t => t.type === 'lecture_payout' || t.type === 'royalty').length}회 정산 트랜잭션 기록
+                </div>
+              </div>
+            </div>
+
+            {/* 📁 Sub-Tab Navigation Bar */}
+            <div className="flex border-b border-neutral-900 gap-1 overflow-x-auto pb-px">
+              <button
+                onClick={() => setAdminSubTab('lectures')}
+                className={`px-5 py-3 text-xs font-black transition-all border-b-2 shrink-0 flex items-center gap-1.5 cursor-pointer ${
+                  adminSubTab === 'lectures'
+                    ? 'border-[#D4AF37] text-[#D4AF37] bg-amber-500/5'
+                    : 'border-transparent text-neutral-400 hover:text-neutral-200 hover:bg-neutral-950/40'
+                }`}
+              >
+                <span>📢 출강 통제 및 공고 발행</span>
+                <span className="px-1.5 py-0.5 rounded-full bg-neutral-950 text-neutral-400 border border-neutral-850 text-[9px]">
+                  {lectures.length}
+                </span>
+              </button>
+
+              <button
+                onClick={() => setAdminSubTab('instructors')}
+                className={`px-5 py-3 text-xs font-black transition-all border-b-2 shrink-0 flex items-center gap-1.5 cursor-pointer ${
+                  adminSubTab === 'instructors'
+                    ? 'border-[#D4AF37] text-[#D4AF37] bg-amber-500/5'
+                    : 'border-transparent text-neutral-400 hover:text-neutral-200 hover:bg-neutral-950/40'
+                }`}
+              >
+                <span>👥 소속 강사단 관리</span>
+                {users.filter(u => !u.isApproved).length > 0 ? (
+                  <span className="px-1.5 py-0.5 rounded-full bg-amber-500/10 text-amber-500 border border-amber-500/20 text-[9px] animate-pulse font-bold">
+                    승인대기 {users.filter(u => !u.isApproved).length}
+                  </span>
+                ) : (
+                  <span className="px-1.5 py-0.5 rounded-full bg-neutral-950 text-neutral-400 border border-neutral-850 text-[9px]">
+                    {users.length}
+                  </span>
+                )}
+              </button>
+
+              <button
+                onClick={() => setAdminSubTab('proposals')}
+                className={`px-5 py-3 text-xs font-black transition-all border-b-2 shrink-0 flex items-center gap-1.5 cursor-pointer ${
+                  adminSubTab === 'proposals'
+                    ? 'border-[#D4AF37] text-[#D4AF37] bg-amber-500/5'
+                    : 'border-transparent text-neutral-400 hover:text-neutral-200 hover:bg-neutral-950/40'
+                }`}
+              >
+                <span>📧 외부 제휴 의뢰 수신함</span>
+                {proposals.filter(p => p.status === 'pending').length > 0 ? (
+                  <span className="px-1.5 py-0.5 rounded-full bg-blue-500/10 text-blue-400 border border-blue-500/20 text-[9px] font-bold animate-pulse">
+                    신규 {proposals.filter(p => p.status === 'pending').length}
+                  </span>
+                ) : (
+                  <span className="px-1.5 py-0.5 rounded-full bg-neutral-950 text-neutral-400 border border-neutral-850 text-[9px]">
+                    {proposals.length}
+                  </span>
+                )}
+              </button>
+            </div>
+
+            {/* Admin Grid: Left Form, Right List */}
+            {adminSubTab === 'lectures' && (
+              <div className="grid lg:grid-cols-3 gap-8 animate-in fade-in duration-200">
                 
-                {/* 👑 KPCIA Lecture Assignment & Settlement Control Room */}
-                <div className="p-6 rounded-2xl bg-[#0e0e10] border border-neutral-800 space-y-4">
-                  <h3 className="text-sm font-black text-white border-b border-neutral-800 pb-2.5 flex justify-between items-center">
-                    <span className="flex items-center gap-1.5">
-                      <span className="text-[#D4AF37]">👑</span> KPCIA 출강 수탁 배정 및 정산 통제실 ({lectures.length}건)
-                    </span>
-                    <span className="text-[10px] text-amber-500 font-bold">마스터 전용</span>
-                  </h3>
-
-                  <div className="space-y-4">
-                    {lectures.map(lecture => {
-                      return (
-                        <div key={lecture.id} className="p-4 rounded-xl bg-neutral-900/60 border border-neutral-800/80 space-y-3.5 text-[11px]">
-                          <div className="flex justify-between items-start gap-3">
-                            <div>
-                              <span className="text-[10px] text-neutral-400 font-semibold block">{lecture.companyName}</span>
-                              <strong className="text-white text-xs block mt-0.5">{lecture.title}</strong>
-                              <span className="text-neutral-500 text-[10px] block mt-1">🗓️ {lecture.date} | ⏱️ {lecture.duration} | 📍 {lecture.location}</span>
-                            </div>
-                            <span className={`text-[9px] font-black px-2 py-0.5 rounded ${
-                              lecture.status === 'open' 
-                                ? 'bg-amber-500/10 text-[#D4AF37] border border-[#D4AF37]/20' 
-                                : lecture.status === 'assigned'
-                                ? 'bg-blue-500/10 text-blue-400 border border-blue-500/20 animate-pulse'
-                                : 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'
-                            }`}>
-                              {lecture.status === 'open' ? '모집 중' : lecture.status === 'assigned' ? '배정 완료' : '출강 완료'}
-                            </span>
-                          </div>
-
-                          {/* Applicants List Preview */}
-                          {lecture.status === 'open' && (
-                            <div className="bg-neutral-950 p-2.5 rounded-lg border border-neutral-800/50">
-                              <span className="text-[10px] font-extrabold text-neutral-400 block mb-1">🙋 실시간 출강 신청 강사 ({lecture.applicants?.length || 0}명)</span>
-                              {lecture.applicants && lecture.applicants.length > 0 ? (
-                                <div className="flex flex-wrap gap-1.5 mt-1">
-                                  {lecture.applicants.map(uid => {
-                                    const appInst = users.find(u => u.uid === uid);
-                                    return appInst ? (
-                                      <span key={uid} className="px-2 py-0.5 rounded bg-neutral-900 text-white border border-neutral-800 font-semibold text-[10px]">
-                                        👤 {appInst.name} 강사님 ({appInst.tier})
-                                      </span>
-                                    ) : null;
-                                  })}
-                                </div>
-                              ) : (
-                                <span className="text-neutral-500 text-[10px]">출강 신청자가 아직 없습니다.</span>
-                              )}
-                            </div>
-                          )}
-
-                          {/* Assignment & Complete Actions */}
-                          {lecture.status === 'open' && (
-                            <div className="flex flex-col md:flex-row gap-3 items-end pt-2 border-t border-neutral-800/60">
-                              <div className="grid grid-cols-2 gap-3 w-full">
-                                <div className="space-y-1">
-                                  <label className="text-[10px] text-neutral-400 font-semibold block">주강사 최종 배정 *</label>
-                                  <select 
-                                    id={`admin-assign-main-master-${lecture.id}`}
-                                    className="w-full bg-neutral-950 border border-neutral-800 rounded-lg px-2.5 py-2 text-[11px] text-white focus:outline-none focus:border-[#D4AF37] cursor-pointer"
-                                  >
-                                    <option value="">주강사 선택...</option>
-                                    {users.map(u => (
-                                      <option key={u.uid} value={u.uid}>{u.name} 강사 ({u.tier})</option>
-                                    ))}
-                                  </select>
-                                </div>
-
-                                <div className="space-y-1">
-                                  <label className="text-[10px] text-neutral-400 font-semibold block">보조강사 배정 (선택)</label>
-                                  <select 
-                                    id={`admin-assign-assist-master-${lecture.id}`}
-                                    className="w-full bg-neutral-950 border border-neutral-800 rounded-lg px-2.5 py-2 text-[11px] text-white focus:outline-none focus:border-[#D4AF37] cursor-pointer"
-                                  >
-                                    <option value="">보조강사 선택...</option>
-                                    {users.map(u => (
-                                      <option key={u.uid} value={u.uid}>{u.name} 강사 ({u.tier})</option>
-                                    ))}
-                                  </select>
-                                </div>
-                              </div>
-
-                              <button
-                                onClick={() => {
-                                  const mainSelect = document.getElementById(`admin-assign-main-master-${lecture.id}`) as HTMLSelectElement;
-                                  const assistSelect = document.getElementById(`admin-assign-assist-master-${lecture.id}`) as HTMLSelectElement;
-                                  if (mainSelect && mainSelect.value) {
-                                    handleAssignLecturers(lecture.id, mainSelect.value, assistSelect?.value);
-                                  } else {
-                                    triggerToast("주강사를 지정해 주세요.", "error");
-                                  }
-                                }}
-                                className="px-4 py-2 rounded-lg bg-[#D4AF37] hover:brightness-110 text-neutral-950 text-[11px] font-black transition-all cursor-pointer shrink-0"
-                              >
-                                배정 승인 완료
-                              </button>
-                            </div>
-                          )}
-
-                          {lecture.status === 'assigned' && (
-                            <div className="space-y-3 pt-2.5 border-t border-neutral-800/60">
-                              <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-2 text-[11px] text-neutral-300">
-                                <div>
-                                  배정 상태: <strong>{lecture.assignedName || '알 수 없음'}</strong> (주강사) / <strong>{lecture.assistantName || '없음'}</strong> (보조강사)
-                                </div>
-                                <div className="flex items-center gap-1.5 bg-neutral-950 px-2 py-1 rounded border border-neutral-800">
-                                  <span className="text-amber-500 font-bold">⭐ 만족도 점수 입력:</span>
-                                  <select
-                                    value={adminLectureRatings[lecture.id] || 5.0}
-                                    onChange={(e) => setAdminLectureRatings({
-                                      ...adminLectureRatings,
-                                      [lecture.id]: parseFloat(e.target.value)
-                                    })}
-                                    className="bg-neutral-900 text-white rounded px-1.5 py-0.5 border border-neutral-800 focus:outline-none focus:border-[#D4AF37] text-[10px]"
-                                  >
-                                    <option value="5.0">5.0 (최우수)</option>
-                                    <option value="4.8">4.8 (우수)</option>
-                                    <option value="4.5">4.5 (우수/양호)</option>
-                                    <option value="4.0">4.0 (양호)</option>
-                                    <option value="3.5">3.5 (보통)</option>
-                                    <option value="3.0">3.0 (미흡)</option>
-                                    <option value="2.0">2.0 (매우 미흡)</option>
-                                  </select>
-                                </div>
-                              </div>
-                              <div className="flex justify-end">
-                                <button
-                                  onClick={() => handleCompleteLectureAndSettle(lecture.id, adminLectureRatings[lecture.id] || 5.0)}
-                                  className="px-3.5 py-1.5 rounded-lg bg-emerald-500 hover:bg-emerald-400 text-neutral-950 font-black transition-all cursor-pointer text-xs flex items-center gap-1"
-                                >
-                                  💰 만족도 등록 및 실시간 정산·출강 완료
-                                </button>
-                              </div>
-                            </div>
-                          )}
-
-                          {lecture.status === 'completed' && (
-                            <div className="pt-2 border-t border-neutral-850 text-[10px] text-neutral-500 space-y-1">
-                              <div>
-                                이 출강 건은 완전히 종료되었으며, 주강사 <strong>{lecture.assignedName}</strong> 및 보조강사 정산 지급이 완료되었습니다.
-                              </div>
-                              {lecture.lectureRating !== undefined && (
-                                <div className="text-amber-400 font-bold flex items-center gap-1">
-                                  <span>⭐ 등록된 강의 만족도 평점:</span>
-                                  <span className="bg-amber-500/10 border border-amber-500/20 px-1.5 py-0.5 rounded text-[10px]">
-                                    {lecture.lectureRating.toFixed(1)} / 5.0
-                                  </span>
-                                </div>
-                              )}
-                            </div>
-                          )}
-                        </div>
-                      );
-                    })}
-                    {lectures.length === 0 && (
-                      <div className="text-neutral-500 text-center py-4">등록된 출강 건이 없습니다.</div>
-                    )}
+                {/* Left Column: Post a Lecture Request Form */}
+                <div className="lg:col-span-1 p-6 rounded-2xl bg-neutral-900 border border-neutral-800 space-y-5" id="admin-create-lecture-form">
+                  <div className="flex items-center gap-2 text-white font-bold border-b border-neutral-800 pb-2">
+                    <Plus className="w-4 h-4 text-amber-500" />
+                    <span className="text-xs font-black">강의 출강 요청서</span>
                   </div>
+
+                  <form onSubmit={handleCreateLecture} className="space-y-4 text-xs">
+                    <div className="space-y-1">
+                      <label className="text-neutral-400 font-semibold block">출강 교육 명칭 (Title)</label>
+                      <input
+                        type="text"
+                        placeholder="예) 인공지능 기반 마케팅 혁신 실전 특강"
+                        value={newLecTitle}
+                        onChange={(e) => setNewLecTitle(e.target.value)}
+                        required
+                        className="w-full bg-neutral-950 border border-neutral-800 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-[#D4AF37] text-xs"
+                      />
+                    </div>
+
+                    <div className="space-y-1">
+                      <label className="text-neutral-400 font-semibold block">의뢰 기업명 (companyName)</label>
+                      <input
+                        type="text"
+                        placeholder="예) 현대자동차 마케팅부"
+                        value={newLecCompany}
+                        onChange={(e) => setNewLecCompany(e.target.value)}
+                        required
+                        className="w-full bg-neutral-950 border border-neutral-800 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-[#D4AF37] text-xs"
+                      />
+                    </div>
+
+                    <div className="space-y-1">
+                      <label className="text-neutral-400 font-semibold block">교육 내용 및 요구 사양 개요</label>
+                      <textarea
+                        placeholder="사내 마케터 대상으로 프롬프트 엔지니어링 및 자동화 교안을 기반으로 특강 진행..."
+                        value={newLecDesc}
+                        onChange={(e) => setNewLecDesc(e.target.value)}
+                        required
+                        rows={3}
+                        className="w-full bg-neutral-950 border border-neutral-800 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-[#D4AF37] text-xs"
+                      />
+                    </div>
+
+                    <div className="space-y-1">
+                      <label className="text-neutral-400 font-semibold block">출강 지역 / 교육장 위치</label>
+                      <input
+                        type="text"
+                        placeholder="예) 경기도 화성시 남양읍 현대연구소"
+                        value={newLecLocation}
+                        onChange={(e) => setNewLecLocation(e.target.value)}
+                        className="w-full bg-neutral-950 border border-neutral-800 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-[#D4AF37] text-xs"
+                      />
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-3">
+                      <div className="space-y-1">
+                        <label className="text-neutral-400 font-semibold block">출강 일자</label>
+                        <input
+                          type="date"
+                          value={newLecDate}
+                          onChange={(e) => setNewLecDate(e.target.value)}
+                          className="w-full bg-neutral-950 border border-neutral-800 rounded-lg px-2.5 py-2 text-white focus:outline-none focus:border-[#D4AF37] text-xs"
+                        />
+                      </div>
+
+                      <div className="space-y-1">
+                        <label className="text-neutral-400 font-semibold block">요구 강사 등급컷</label>
+                        <select
+                          value={newLecTier}
+                          onChange={(e) => setNewLecTier(e.target.value as any)}
+                          className="w-full bg-neutral-950 border border-neutral-800 rounded-lg px-2.5 py-2 text-white focus:outline-none focus:border-[#D4AF37] text-xs cursor-pointer"
+                        >
+                          <option value="Prestige Member">Prestige Member 이상</option>
+                          <option value="Prestige Associate">Prestige Associate 이상</option>
+                          <option value="Prestige Professional">Prestige Professional 이상</option>
+                          <option value="Prestige Master">Prestige Master 이상</option>
+                          <option value="Prestige Elite">Prestige Elite 전용</option>
+                          <option value="Prestige Legend">Prestige Legend 전용</option>
+                        </select>
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-3 gap-2">
+                      <div className="space-y-1">
+                        <label className="text-neutral-400 font-semibold block">강의 시간</label>
+                        <input
+                          type="number"
+                          min={1}
+                          value={newLecHours}
+                          onChange={(e) => setNewLecHours(Math.max(1, Number(e.target.value)))}
+                          className="w-full bg-neutral-950 border border-neutral-800 rounded-lg px-2.5 py-2 text-white focus:outline-none focus:border-[#D4AF37] text-xs font-bold"
+                        />
+                      </div>
+
+                      <div className="space-y-1">
+                        <label className="text-neutral-400 font-semibold block">예정 인원</label>
+                        <input
+                          type="number"
+                          min={1}
+                          value={newLecAttendees}
+                          onChange={(e) => setNewLecAttendees(Math.max(1, Number(e.target.value)))}
+                          className="w-full bg-neutral-950 border border-neutral-800 rounded-lg px-2.5 py-2 text-white focus:outline-none focus:border-[#D4AF37] text-xs font-bold"
+                        />
+                      </div>
+
+                      <div className="space-y-1">
+                        <label className="text-neutral-400 font-semibold block">인당 재료비</label>
+                        <input
+                          type="number"
+                          min={0}
+                          value={newLecMaterialCost}
+                          onChange={(e) => setNewLecMaterialCost(Math.max(0, Number(e.target.value)))}
+                          className="w-full bg-neutral-950 border border-neutral-800 rounded-lg px-2.5 py-2 text-white focus:outline-none focus:border-[#D4AF37] text-xs font-bold"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="space-y-1">
+                      <label className="text-neutral-400 font-semibold block">지식 저작권 과정 연계 (선택)</label>
+                      <select
+                        value={newLecProgramId}
+                        onChange={(e) => setNewLecProgramId(e.target.value)}
+                        className="w-full bg-neutral-950 border border-neutral-800 rounded-lg px-2.5 py-2 text-white focus:outline-none focus:border-[#D4AF37] text-xs cursor-pointer"
+                      >
+                        <option value="">과정 선택 안함 (로열티 없음)</option>
+                        {programs.map(p => (
+                          <option key={p.id} value={p.id}>{p.title} (저작권자: {p.authorName})</option>
+                        ))}
+                      </select>
+                    </div>
+
+                    {/* Real-time Budget Calculation Live Preview Block */}
+                    <div className="p-3.5 rounded-xl bg-neutral-950 border border-neutral-800/80 space-y-1.5 font-mono text-[10px]">
+                      <div className="text-amber-500 font-bold border-b border-neutral-900 pb-1 flex justify-between">
+                        <span>💰 실시간 강사료 예산 검산</span>
+                        <span>100% 자동 산정</span>
+                      </div>
+                      <div className="flex justify-between text-neutral-400">
+                        <span>• 주강사비:</span>
+                        <span className="text-neutral-200">{newLecHours}시간 × 100,000원 = {(newLecHours * 100000).toLocaleString()}원</span>
+                      </div>
+                      <div className="flex justify-between text-neutral-400">
+                        <span>• 보조강사비:</span>
+                        <span className="text-neutral-200">
+                          {newLecAttendees >= 20 ? `${newLecHours}시간 × 50,000원 = ${(newLecHours * 50000).toLocaleString()}원` : '0원 (20명 미만)'}
+                        </span>
+                      </div>
+                      <div className="flex justify-between text-neutral-400">
+                        <span>• 재료 소요비:</span>
+                        <span className="text-neutral-200">{newLecAttendees}명 × {newLecMaterialCost.toLocaleString()}원 = {(newLecAttendees * newLecMaterialCost).toLocaleString()}원</span>
+                      </div>
+                      <div className="flex justify-between border-t border-neutral-900 pt-1.5 text-white font-extrabold text-[11px]">
+                        <span>계산 총 예산:</span>
+                        <span className="text-[#D4AF37]">
+                          ₩{(newLecHours * 100000 + (newLecAttendees >= 20 ? newLecHours * 50000 : 0) + newLecAttendees * newLecMaterialCost).toLocaleString()}
+                        </span>
+                      </div>
+                    </div>
+
+                    <button
+                      type="submit"
+                      className="w-full py-2.5 rounded-xl bg-[#D4AF37] hover:brightness-110 text-neutral-950 font-black text-center transition-all cursor-pointer"
+                    >
+                      📢 공식 위임 출강 공고 수탁 발행
+                    </button>
+                  </form>
                 </div>
 
+                {/* Right Column: Registered Instructors Management & Partnership Inquiries (2 cols) */}
+                <div className="lg:col-span-2 space-y-8" id="admin-management-lists">
+                  
+                  {/* 👑 KPCIA Lecture Assignment & Settlement Control Room */}
+                  <div className="p-6 rounded-2xl bg-[#0e0e10] border border-neutral-800 space-y-4">
+                    <h3 className="text-sm font-black text-white border-b border-neutral-800 pb-2.5 flex justify-between items-center">
+                      <span className="flex items-center gap-1.5">
+                        <span className="text-[#D4AF37]">👑</span> KPCIA 출강 수탁 배정 및 정산 통제실 ({lectures.length}건)
+                      </span>
+                      <span className="text-[10px] text-amber-500 font-bold">마스터 전용</span>
+                    </h3>
+
+                    <div className="space-y-4">
+                      {lectures.map(lecture => {
+                        return (
+                          <div key={lecture.id} className="p-4 rounded-xl bg-neutral-900/60 border border-neutral-800/80 space-y-3.5 text-[11px]">
+                            <div className="flex justify-between items-start gap-3">
+                              <div>
+                                <span className="text-[10px] text-neutral-400 font-semibold block">{lecture.companyName}</span>
+                                <strong className="text-white text-xs block mt-0.5">{lecture.title}</strong>
+                                <span className="text-neutral-500 text-[10px] block mt-1">🗓️ {lecture.date} | ⏱️ {lecture.duration} | 📍 {lecture.location}</span>
+                              </div>
+                              <span className={`text-[9px] font-black px-2 py-0.5 rounded ${
+                                lecture.status === 'open' 
+                                  ? 'bg-amber-500/10 text-[#D4AF37] border border-[#D4AF37]/20' 
+                                  : lecture.status === 'assigned'
+                                  ? 'bg-blue-500/10 text-blue-400 border border-blue-500/20 animate-pulse'
+                                  : 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'
+                              }`}>
+                                {lecture.status === 'open' ? '모집 중' : lecture.status === 'assigned' ? '배정 완료' : '출강 완료'}
+                              </span>
+                            </div>
+
+                            {/* Applicants List Preview */}
+                            {lecture.status === 'open' && (
+                              <div className="bg-neutral-950 p-2.5 rounded-lg border border-neutral-800/50">
+                                <span className="text-[10px] font-extrabold text-neutral-400 block mb-1">🙋 실시간 출강 신청 강사 ({lecture.applicants?.length || 0}명)</span>
+                                {lecture.applicants && lecture.applicants.length > 0 ? (
+                                  <div className="flex flex-wrap gap-1.5 mt-1">
+                                    {lecture.applicants.map(uid => {
+                                      const appInst = users.find(u => u.uid === uid);
+                                      return appInst ? (
+                                        <span key={uid} className="px-2 py-0.5 rounded bg-neutral-900 text-white border border-neutral-800 font-semibold text-[10px]">
+                                          👤 {appInst.name} 강사님 ({appInst.tier})
+                                        </span>
+                                      ) : null;
+                                    })}
+                                  </div>
+                                ) : (
+                                  <span className="text-neutral-500 text-[10px]">출강 신청자가 아직 없습니다.</span>
+                                )}
+                              </div>
+                            )}
+
+                            {/* Assignment & Complete Actions */}
+                            {lecture.status === 'open' && (
+                              <div className="flex flex-col md:flex-row gap-3 items-end pt-2 border-t border-neutral-800/60">
+                                <div className="grid grid-cols-2 gap-3 w-full">
+                                  <div className="space-y-1">
+                                    <label className="text-[10px] text-neutral-400 font-semibold block">주강사 최종 배정 *</label>
+                                    <select 
+                                      id={`admin-assign-main-master-${lecture.id}`}
+                                      className="w-full bg-neutral-950 border border-neutral-800 rounded-lg px-2.5 py-2 text-[11px] text-white focus:outline-none focus:border-[#D4AF37] cursor-pointer"
+                                    >
+                                      <option value="">주강사 선택...</option>
+                                      {users.map(u => (
+                                        <option key={u.uid} value={u.uid}>{u.name} 강사 ({u.tier})</option>
+                                      ))}
+                                    </select>
+                                  </div>
+
+                                  <div className="space-y-1">
+                                    <label className="text-[10px] text-neutral-400 font-semibold block">보조강사 배정 (선택)</label>
+                                    <select 
+                                      id={`admin-assign-assist-master-${lecture.id}`}
+                                      className="w-full bg-neutral-950 border border-neutral-800 rounded-lg px-2.5 py-2 text-[11px] text-white focus:outline-none focus:border-[#D4AF37] cursor-pointer"
+                                    >
+                                      <option value="">보조강사 선택...</option>
+                                      {users.map(u => (
+                                        <option key={u.uid} value={u.uid}>{u.name} 강사 ({u.tier})</option>
+                                      ))}
+                                    </select>
+                                  </div>
+                                </div>
+
+                                <button
+                                  onClick={() => {
+                                    const mainSelect = document.getElementById(`admin-assign-main-master-${lecture.id}`) as HTMLSelectElement;
+                                    const assistSelect = document.getElementById(`admin-assign-assist-master-${lecture.id}`) as HTMLSelectElement;
+                                    if (mainSelect && mainSelect.value) {
+                                      handleAssignLecturers(lecture.id, mainSelect.value, assistSelect?.value);
+                                    } else {
+                                      triggerToast("주강사를 지정해 주세요.", "error");
+                                    }
+                                  }}
+                                  className="px-4 py-2 rounded-lg bg-[#D4AF37] hover:brightness-110 text-neutral-950 text-[11px] font-black transition-all cursor-pointer shrink-0"
+                                >
+                                  배정 승인 완료
+                                </button>
+                              </div>
+                            )}
+
+                            {lecture.status === 'assigned' && (
+                              <div className="space-y-3 pt-2.5 border-t border-neutral-800/60">
+                                <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-2 text-[11px] text-neutral-300">
+                                  <div>
+                                    배정 상태: <strong>{lecture.assignedName || '알 수 없음'}</strong> (주강사) / <strong>{lecture.assistantName || '없음'}</strong> (보조강사)
+                                  </div>
+                                  <div className="flex items-center gap-1.5 bg-neutral-950 px-2 py-1 rounded border border-neutral-800">
+                                    <span className="text-amber-500 font-bold">⭐ 만족도 점수 입력:</span>
+                                    <select
+                                      value={adminLectureRatings[lecture.id] || 5.0}
+                                      onChange={(e) => setAdminLectureRatings({
+                                        ...adminLectureRatings,
+                                        [lecture.id]: parseFloat(e.target.value)
+                                      })}
+                                      className="bg-neutral-900 text-white rounded px-1.5 py-0.5 border border-neutral-800 focus:outline-none focus:border-[#D4AF37] text-[10px]"
+                                    >
+                                      <option value="5.0">5.0 (최우수)</option>
+                                      <option value="4.8">4.8 (우수)</option>
+                                      <option value="4.5">4.5 (우수/양호)</option>
+                                      <option value="4.0">4.0 (양호)</option>
+                                      <option value="3.5">3.5 (보통)</option>
+                                      <option value="3.0">3.0 (미흡)</option>
+                                      <option value="2.0">2.0 (매우 미흡)</option>
+                                    </select>
+                                  </div>
+                                </div>
+                                <div className="flex justify-end">
+                                  <button
+                                    onClick={() => handleCompleteLectureAndSettle(lecture.id, adminLectureRatings[lecture.id] || 5.0)}
+                                    className="px-3.5 py-1.5 rounded-lg bg-emerald-500 hover:bg-emerald-400 text-neutral-950 font-black transition-all cursor-pointer text-xs flex items-center gap-1"
+                                  >
+                                    💰 만족도 등록 및 실시간 정산·출강 완료
+                                  </button>
+                                </div>
+                              </div>
+                            )}
+
+                            {lecture.status === 'completed' && (
+                              <div className="pt-2 border-t border-neutral-850 text-[10px] text-neutral-500 space-y-1">
+                                <div>
+                                  이 출강 건은 완전히 종료되었으며, 주강사 <strong>{lecture.assignedName}</strong> 및 보조강사 정산 지급이 완료되었습니다.
+                                </div>
+                                {lecture.lectureRating !== undefined && (
+                                  <div className="text-amber-400 font-bold flex items-center gap-1">
+                                    <span>⭐ 등록된 강의 만족도 평점:</span>
+                                    <span className="bg-amber-500/10 border border-amber-500/20 px-1.5 py-0.5 rounded text-[10px]">
+                                      {lecture.lectureRating.toFixed(1)} / 5.0
+                                    </span>
+                                  </div>
+                                )}
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })}
+                      {lectures.length === 0 && (
+                        <div className="text-neutral-500 text-center py-4">등록된 출강 건이 없습니다.</div>
+                      )}
+                    </div>
+                  </div>
+
+                </div>
+              </div>
+            )}
+
+            {adminSubTab === 'instructors' && (
+              <div className="animate-in fade-in duration-200 space-y-6">
+                
                 {/* 1. Registered Instructors Controller */}
                 <div className="p-6 rounded-2xl bg-neutral-900 border border-neutral-800 space-y-4">
-                  <h3 className="text-xs font-bold text-white border-b border-neutral-800 pb-2 flex justify-between items-center">
+                  <h3 className="text-sm font-black text-white border-b border-neutral-800 pb-2.5 flex justify-between items-center">
                     <span>👥 소속 강사단 자격 등급 및 활동 제어반 ({users.length}명)</span>
                     <span className="text-[10px] text-neutral-400 font-medium">상호 평가 및 정량 실적 기반 자동 업그레이드</span>
                   </h3>
@@ -2703,10 +2827,17 @@ export default function App() {
                   </div>
                 </div>
 
+              </div>
+            )}
+
+            {adminSubTab === 'proposals' && (
+              <div className="animate-in fade-in duration-200 space-y-6">
+                
                 {/* 2. Partnership Inquiries Control Room */}
                 <div className="p-6 rounded-2xl bg-neutral-900 border border-neutral-800 space-y-4">
-                  <h3 className="text-xs font-bold text-white border-b border-neutral-800 pb-2">
-                    📧 외부 기업 제휴 및 프로그램 도입 의뢰서 관리 ({proposals.length}건)
+                  <h3 className="text-sm font-black text-white border-b border-neutral-800 pb-2.5 flex justify-between items-center">
+                    <span>📧 외부 기업 제휴 및 프로그램 도입 의뢰서 관리 ({proposals.length}건)</span>
+                    <span className="text-[10px] text-neutral-400 font-medium">B2B 파트너십 실시간 접수 현황</span>
                   </h3>
 
                   <div className="space-y-4">
@@ -2757,8 +2888,7 @@ export default function App() {
                 </div>
 
               </div>
-
-            </div>
+            )}
 
           </div>
         )}
@@ -3174,20 +3304,6 @@ export default function App() {
                               className="px-3 py-1.5 rounded bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-[10px] cursor-pointer shrink-0"
                             >
                               인증확인
-                            </button>
-                          </div>
-                          <div className="flex justify-between items-center bg-neutral-900/60 p-2 rounded border border-neutral-850 text-[10px] gap-2">
-                            <span className="text-neutral-400">보안 인증코드: <strong className="text-amber-400 font-mono text-xs select-all">{sentVerificationCode}</strong></span>
-                            <button
-                              type="button"
-                              onClick={() => {
-                                setRegVerificationCode(sentVerificationCode);
-                                setIsVerified(true);
-                                triggerToast("🎉 보안코드 즉시 인증 및 승인이 성공적으로 완료되었습니다!", "success");
-                              }}
-                              className="px-2 py-1 rounded bg-[#D4AF37]/10 hover:bg-[#D4AF37]/20 border border-[#D4AF37]/30 text-[#D4AF37] font-black text-[9px] cursor-pointer transition-all shrink-0"
-                            >
-                              ⚡ 즉시 인증완료
                             </button>
                           </div>
                         </div>
