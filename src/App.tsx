@@ -39,7 +39,13 @@ import {
   Lock,
   Settings,
   Star,
-  Home
+  Home,
+  Leaf,
+  Wind,
+  Palette,
+  Calendar,
+  Clock,
+  Download
 } from 'lucide-react';
 
 export default function App() {
@@ -54,6 +60,11 @@ export default function App() {
   const [lectures, setLectures] = useState<LectureRequest[]>([]);
   const [programs, setPrograms] = useState<EducationalProgram[]>([]);
   const [transactions, setTransactions] = useState<MileageTransaction[]>([]);
+
+  // Helper: Check if a user has registered a curriculum in KPCIA Premium Self-Developed Training Process
+  const hasRegisteredCurriculum = (userId: string) => {
+    return programs.some(p => p.authorId === userId);
+  };
   const [proposals, setProposals] = useState<PartnershipProposal[]>([]);
 
   // Modals & Active Forms
@@ -107,6 +118,8 @@ export default function App() {
   const [newLecDesc, setNewLecDesc] = useState<string>('');
   const [newLecTier, setNewLecTier] = useState<InstructorTier>('Prestige Member');
   const [newLecDate, setNewLecDate] = useState<string>('2026-07-20');
+  const [newLecStartTime, setNewLecStartTime] = useState<string>('10:00');
+  const [newLecEndTime, setNewLecEndTime] = useState<string>('12:00');
   const [newLecLocation, setNewLecLocation] = useState<string>('');
   const [newLecManagerName, setNewLecManagerName] = useState<string>('');
   const [newLecManagerPhone, setNewLecManagerPhone] = useState<string>('');
@@ -140,6 +153,17 @@ export default function App() {
   const [editInstTitle, setEditInstTitle] = useState<string>('');
   const [editInstBio, setEditInstBio] = useState<string>('');
   const [editInstSpecialties, setEditInstSpecialties] = useState<string>('');
+
+  // New Admin-Only Instructor Detail View & Inline Edit States
+  const [viewingInstructorDetail, setViewingInstructorDetail] = useState<UserProfile | null>(null);
+  const [isEditingDetail, setIsEditingDetail] = useState<boolean>(false);
+  const [editInstOrgName, setEditInstOrgName] = useState<string>('');
+  const [editInstPhone, setEditInstPhone] = useState<string>('');
+  const [editInstEmail, setEditInstEmail] = useState<string>('');
+  const [editInstPassword, setEditInstPassword] = useState<string>('');
+  const [editInstRegion, setEditInstRegion] = useState<string>('');
+  const [editInstBankAccount, setEditInstBankAccount] = useState<string>('');
+  const [editInstSnsLink, setEditInstSnsLink] = useState<string>('');
 
   // Search & Filters
   const [searchInstructor, setSearchInstructor] = useState<string>('');
@@ -628,7 +652,7 @@ export default function App() {
       programId: newLecProgramId || undefined,
       programTitle: assocProgram ? assocProgram.title : undefined,
       date: newLecDate,
-      time: "14:00 - 17:00",
+      time: `${newLecStartTime}~${newLecEndTime}`,
       duration: `${newLecHours}시간`,
       location: cleanLocation || "기업 연수원 혹은 사내 교육장",
       attendees: newLecAttendees,
@@ -656,6 +680,78 @@ export default function App() {
     setNewLecManagerName('');
     setNewLecManagerPhone('');
     setNewLecProgramId('');
+  };
+
+  const handleDownloadExcel = (lecture?: LectureRequest) => {
+    // If a specific lecture is provided, download only that one. Otherwise, download all.
+    const targets = lecture ? [lecture] : lectures;
+    
+    // CSV Header (UTF-8)
+    const headers = [
+      "공고번호",
+      "출강기업/기관명",
+      "출강 교육명칭",
+      "상세 내용 및 사양",
+      "요구 강사등급",
+      "출강 일자",
+      "강의 시간 범위",
+      "총 시간",
+      "교육 장소",
+      "예정 인원",
+      "총 정산예산(원)",
+      "마일리지 로열티(M)",
+      "담당자명",
+      "담당자 연락처",
+      "매칭 상태"
+    ];
+
+    const rows = targets.map((l) => [
+      l.id,
+      l.companyName || "익명 기업",
+      l.title.replace(/"/g, '""'),
+      l.description.replace(/\n/g, ' ').replace(/"/g, '""'),
+      l.targetTier,
+      l.date,
+      l.time,
+      l.duration || `${l.mainHours || 0}시간`,
+      (l.location || "").replace(/"/g, '""'),
+      l.attendees || 0,
+      l.budget,
+      l.mileageRoyalty || 0,
+      l.managerName || "",
+      l.managerPhone || "",
+      l.status === 'completed' ? '출강 완료(정산완료)' : l.status === 'assigned' ? '강사배정 완료' : '강사모집 중'
+    ]);
+
+    // Build CSV content
+    const csvContent = [
+      headers.join(","),
+      ...rows.map(row => row.map(val => {
+        const str = String(val);
+        // Wrap with quotes if containing comma, newline or quotes
+        if (str.includes(",") || str.includes("\n") || str.includes('"')) {
+          return `"${str}"`;
+        }
+        return str;
+      }).join(","))
+    ].join("\n");
+
+    // Add UTF-8 BOM to prevent Excel encoding/corruption issues with Korean characters
+    const BOM = "\uFEFF";
+    const blob = new Blob([BOM + csvContent], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    
+    const link = document.createElement("a");
+    link.setAttribute("href", url);
+    const fileName = lecture 
+      ? `KPCIA_출강상세_${lecture.companyName || "공고"}_${lecture.id}.csv` 
+      : `KPCIA_실시간출강공고_전체목록_${new Date().toISOString().substring(0, 10)}.csv`;
+    link.setAttribute("download", fileName);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    
+    triggerToast("📊 엑셀 저장 완료! 다운로드 폴더를 확인해 주세요.", "success");
   };
 
   // Helper: Display Tier badge styling
@@ -1124,6 +1220,82 @@ export default function App() {
     setEditingInstructor(null);
   };
 
+  // 9b. View & Save Instructor Full Registration Details (Admin Portal)
+  const handleViewInstructorFullDetails = (u: UserProfile) => {
+    setViewingInstructorDetail(u);
+    setIsEditingDetail(false);
+    // Initialize all edit states with user's current values
+    setEditInstName(u.name || '');
+    setEditInstTier(u.tier || 'Prestige Member');
+    setEditInstMileage(u.mileage || 0);
+    setEditInstTitle(u.profileCard?.title || '');
+    setEditInstBio(u.profileCard?.bio || '');
+    setEditInstSpecialties(u.profileCard?.specialties ? u.profileCard.specialties.join(', ') : '');
+    setEditInstOrgName(u.organizationName || '');
+    setEditInstPhone(u.profileCard?.contactPhone || '');
+    setEditInstEmail(u.email || '');
+    setEditInstPassword(u.password || '');
+    setEditInstRegion(u.profileCard?.region || '');
+    setEditInstBankAccount(u.profileCard?.bankAccount || '');
+    setEditInstSnsLink(u.profileCard?.websiteUrl || '');
+  };
+
+  const handleSaveInstructorFullDetailEdit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!viewingInstructorDetail) return;
+
+    const cleanName = sanitizeString(editInstName);
+    const cleanTitle = sanitizeString(editInstTitle);
+    const cleanBio = sanitizeString(editInstBio);
+    const cleanSpecialties = sanitizeString(editInstSpecialties).split(',').map(s => s.trim()).filter(Boolean);
+    const cleanOrgName = sanitizeString(editInstOrgName);
+    const cleanPhone = sanitizeString(editInstPhone);
+    const cleanEmail = sanitizeString(editInstEmail);
+    const cleanPassword = sanitizeString(editInstPassword);
+    const cleanRegion = sanitizeString(editInstRegion);
+    const cleanBankAccount = sanitizeString(editInstBankAccount);
+    const cleanSnsLink = sanitizeString(editInstSnsLink);
+
+    if (!cleanName) {
+      triggerToast("강사 성함을 입력해 주세요.", "error");
+      return;
+    }
+
+    const updatedUser: UserProfile = {
+      ...viewingInstructorDetail,
+      name: cleanName,
+      tier: editInstTier,
+      mileage: editInstMileage,
+      email: cleanEmail,
+      password: cleanPassword,
+      organizationName: cleanOrgName,
+      profileCard: {
+        ...viewingInstructorDetail.profileCard,
+        title: cleanTitle || `${editInstTier} 소속 프로 강사`,
+        bio: cleanBio,
+        specialties: cleanSpecialties,
+        contactPhone: cleanPhone,
+        contactEmail: cleanEmail,
+        region: cleanRegion,
+        bankAccount: cleanBankAccount,
+        websiteUrl: cleanSnsLink
+      },
+      updatedAt: new Date().toISOString()
+    };
+
+    const updatedUsers = users.map(u => u.uid === viewingInstructorDetail.uid ? updatedUser : u);
+    setUsers(updatedUsers);
+    await StorageService.saveUser(updatedUser);
+
+    if (currentUser?.uid === viewingInstructorDetail.uid) {
+      setCurrentUser(updatedUser);
+    }
+
+    triggerToast(`✨ ${cleanName} 강사님의 회원 정보가 성공적으로 업데이트되었습니다.`, "success");
+    setViewingInstructorDetail(updatedUser); // Update modal view state
+    setIsEditingDetail(false);
+  };
+
   // Sub-navigation: Render dynamic components of page
   return (
     <div className="min-h-screen bg-[#09090B] text-neutral-100 font-sans antialiased selection:bg-amber-500/20 selection:text-amber-300">
@@ -1194,7 +1366,11 @@ export default function App() {
                 >
                   <User className="w-3.5 h-3.5 text-[#D4AF37]" />
                   <span className="font-bold">{currentUser.name} 강사님</span>
-                  <span className="text-[9px] bg-amber-500/10 text-[#D4AF37] px-1.5 py-0.5 rounded-full border border-amber-500/20">{currentUser.mileage.toLocaleString()} M</span>
+                  {hasRegisteredCurriculum(currentUser.uid) && (
+                    <span className="text-[9px] bg-amber-500/10 text-[#D4AF37] px-1.5 py-0.5 rounded-full border border-amber-500/20">
+                      {currentUser.mileage.toLocaleString()} M
+                    </span>
+                  )}
                 </button>
                 
                 {/* Popover Dropdown Menu on Hover */}
@@ -1255,27 +1431,39 @@ export default function App() {
       {activeTab === 'home' && (
         <section className="relative overflow-hidden pt-12 pb-24 border-b border-neutral-900" id="hero-panel">
           {/* Ambient golden glow gradients */}
-          <div className="absolute top-1/4 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[500px] h-[500px] bg-[#D4AF37]/5 rounded-full blur-[100px] pointer-events-none"></div>
+          <div className="absolute top-1/4 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[500px] h-[500px] bg-amber-500/5 rounded-full blur-[100px] pointer-events-none"></div>
           
           <div className="max-w-7xl mx-auto px-6 grid md:grid-cols-2 gap-12 items-center relative z-10">
             {/* Left Core Value Statements */}
             <div className="space-y-6">
               <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-amber-500/10 border border-[#D4AF37]/20 text-[#D4AF37] text-[10px] font-bold tracking-widest uppercase">
                 <Sparkles className="w-3 h-3 animate-pulse" />
-                <span>Premium Business Education Association</span>
+                <span>Premium Mind Wellness & ESG Therapy</span>
               </div>
-              <h2 className="text-3xl md:text-5xl font-black tracking-tight leading-tight text-white font-sans">
-                대한민국 초일류 <br />
-                <span className="text-transparent bg-clip-text bg-gradient-to-r from-amber-200 via-[#D4AF37] to-amber-400">
-                  기업 교육의 기준, KPCIA
+              
+              <div className="space-y-4">
+                <span className="text-xs md:text-sm text-amber-400 font-extrabold tracking-wide block">
+                  "식물의 생명력, 향기의 치유력, 손끝의 창조력으로 기업 교육의 격을 높입니다."
                 </span>
-              </h2>
-              <p className="text-neutral-400 text-sm leading-relaxed max-w-lg">
-                한국프레스티지기업강사협회(KPCIA)는 고도의 강사 검증 및 등급(Tier) 평가를 통과한 우수 사외 기업교육 전문가들의 최고 권위 연합체입니다. 혁신적인 AI 워크플로우 실무부터 차세대 리더십, 기업 맞춤형 커리큘럼까지 최고 수준의 교육 품질을 약속합니다.
-              </p>
+                <h2 className="text-2xl md:text-4xl font-black tracking-tight leading-tight text-white font-sans animate-fade-in">
+                  대한민국 대기업 및 공공기관의 <br />
+                  <span className="text-transparent bg-clip-text bg-gradient-to-r from-amber-200 via-[#D4AF37] to-amber-400">
+                    프리미엄 교육 파트너, KPCIA
+                  </span>
+                </h2>
+              </div>
+
+              <div className="text-neutral-400 text-xs md:text-sm leading-relaxed space-y-3 max-w-lg font-medium">
+                <p>
+                  한국 프레스티지 기업 강사 협회는 대한민국 대기업 및 공공기관의 ESG 경영, 임직원 소양, 마인드 웰니스를 선도하는 프리미엄 교육 파트너입니다.
+                </p>
+                <p>
+                  우리는 정형화된 이론 교육을 넘어, 자연과 감각을 깨우는 3대 시그니처 테라피 프로그램을 통해 조직에 건강한 활력과 지속 가능한 변화를 불어넣습니다.
+                </p>
+              </div>
 
               {/* Action Buttons */}
-              <div className="flex flex-wrap items-center gap-3 pt-4">
+              <div className="flex flex-wrap items-center gap-3 pt-2">
                 <button 
                   onClick={() => setActiveTab('lectures')}
                   className="px-5 py-3 rounded-xl bg-neutral-900 border border-neutral-800 hover:border-[#D4AF37]/50 text-neutral-200 hover:text-[#D4AF37] transition-all text-xs font-bold cursor-pointer"
@@ -1294,40 +1482,51 @@ export default function App() {
 
             {/* Right Association Vision Pillars Card */}
             <div className="p-8 rounded-2xl bg-neutral-900/40 border border-neutral-900 backdrop-blur-md space-y-6">
-              <h3 className="text-xs font-extrabold text-[#D4AF37] uppercase tracking-widest font-display border-b border-neutral-800/80 pb-3">KPCIA 협회 3대 핵심 기둥</h3>
+              <h3 className="text-xs font-extrabold text-[#D4AF37] uppercase tracking-widest font-display border-b border-neutral-800/80 pb-3 flex items-center gap-1.5">
+                <span>🌱</span> <span>3대 시그니처 테라피 솔루션</span>
+              </h3>
               
               <div className="flex gap-4">
-                <div className="p-3 rounded-xl bg-neutral-950 border border-neutral-800 text-[#D4AF37] h-11 w-11 shrink-0 flex items-center justify-center">
-                  <Award className="w-5 h-5" />
+                <div className="p-3 rounded-xl bg-neutral-950 border border-neutral-800 text-amber-400 h-11 w-11 shrink-0 flex items-center justify-center">
+                  <Wind className="w-5 h-5 animate-pulse" />
                 </div>
                 <div>
-                  <h4 className="text-xs font-bold text-neutral-100">우수 강사 정량 등급제 (Tier Validation)</h4>
+                  <h4 className="text-xs font-bold text-neutral-100 flex flex-wrap items-center gap-1.5">
+                    <span>아로마 테라피 (Aroma Therapy)</span>
+                    <span className="text-[10px] text-amber-500/80 font-normal">| 감각의 치유</span>
+                  </h4>
                   <p className="text-[11px] text-neutral-400 mt-1 leading-relaxed">
-                    강의력은 기본, 만족도 평가 점수에 기초한 5대 자격 등급제를 정립하여 기업체 교육 담당자에게 차별화된 공신력을 제공합니다.
+                    천연 에센셜 오일을 통해 스트레스를 완화하고, 지친 임직원의 마음을 과학적으로 치유하여 업무 몰입도를 극대화합니다.
                   </p>
                 </div>
               </div>
 
               <div className="flex gap-4">
-                <div className="p-3 rounded-xl bg-neutral-950 border border-neutral-800 text-[#D4AF37] h-11 w-11 shrink-0 flex items-center justify-center">
-                  <BookOpen className="w-5 h-5" />
+                <div className="p-3 rounded-xl bg-neutral-950 border border-neutral-800 text-emerald-400 h-11 w-11 shrink-0 flex items-center justify-center">
+                  <Leaf className="w-5 h-5" />
                 </div>
                 <div>
-                  <h4 className="text-xs font-bold text-neutral-100">투명한 강사 로열티 마일리지 모델</h4>
+                  <h4 className="text-xs font-bold text-neutral-100 flex flex-wrap items-center gap-1.5">
+                    <span>원예 테라피 (Horticultural Therapy)</span>
+                    <span className="text-[10px] text-emerald-500/80 font-normal">| 생명과 ESG</span>
+                  </h4>
                   <p className="text-[11px] text-neutral-400 mt-1 leading-relaxed">
-                    강사가 개발한 명품 교안이 동료 출강에 활용될 때마다 정직한 로열티가 마일리지(M)로 환원되어, 우수한 지식 지적 재산권을 보호하고 격려합니다.
+                    살아있는 식물을 만지며 생명의 소중함을 배우고, 탄소중립과 환경(E)을 생각하는 친환경 ESG 가치를 일상에서 체득합니다.
                   </p>
                 </div>
               </div>
 
               <div className="flex gap-4">
-                <div className="p-3 rounded-xl bg-neutral-950 border border-neutral-800 text-[#D4AF37] h-11 w-11 shrink-0 flex items-center justify-center">
-                  <GraduationCap className="w-5 h-5" />
+                <div className="p-3 rounded-xl bg-neutral-950 border border-neutral-800 text-orange-400 h-11 w-11 shrink-0 flex items-center justify-center">
+                  <Palette className="w-5 h-5" />
                 </div>
                 <div>
-                  <h4 className="text-xs font-bold text-neutral-100">기업 교육 최적화 매칭 보드 운영</h4>
+                  <h4 className="text-xs font-bold text-neutral-100 flex flex-wrap items-center gap-1.5">
+                    <span>공예 테라피 (Craft Therapy)</span>
+                    <span className="text-[10px] text-orange-500/80 font-normal">| 몰입과 창조</span>
+                  </h4>
                   <p className="text-[11px] text-neutral-400 mt-1 leading-relaxed">
-                    기업 연수원, 사내 인재원 등 유수의 파트너사들이 출강 공고를 게시하면, AI 자격 등급에 필적하는 우수 강사 군단이 실시간으로 지원하고 매칭됩니다.
+                    캘리그라피, 드로잉, 팝아트 등 감성 친화적 도구와 소재를 활용해 손끝으로 무언가를 완성해 나가는 과정에서 깊은 몰입과 성취감, 창의적 영감을 얻습니다.
                   </p>
                 </div>
               </div>
@@ -1347,10 +1546,10 @@ export default function App() {
             <div className="grid md:grid-cols-3 gap-6" id="home-features-grid">
               <div className="p-6 rounded-2xl bg-[#121214] border border-neutral-900 hover:border-neutral-800 transition-all flex flex-col justify-between" id="card-feat-1">
                 <div className="space-y-3">
-                  <span className="text-2xl">🤖</span>
-                  <h4 className="text-xs font-bold text-neutral-100">최신 생성형 AI 실무 생산성</h4>
+                  <span className="text-2xl">🌸</span>
+                  <h4 className="text-xs font-bold text-neutral-100">스트레스 해소 및 마인드 웰니스</h4>
                   <p className="text-[11px] text-neutral-400 leading-relaxed">
-                    임직원들의 기획안 및 프레젠테이션, 자료 조사 업무에 생성형 AI 엔진을 녹여내는 핵심 노하우를 가장 앞서 보급합니다.
+                    임직원들의 지친 마음을 과학적인 천연 향기 테라피로 치유하고, 긍정적인 정서 조절을 통해 업무 몰입도를 극대화합니다.
                   </p>
                 </div>
                 <button onClick={() => setActiveTab('programs')} className="text-[10px] text-[#D4AF37] font-bold mt-4 flex items-center gap-1 hover:underline">
@@ -1360,10 +1559,10 @@ export default function App() {
 
               <div className="p-6 rounded-2xl bg-[#121214] border border-neutral-900 hover:border-neutral-800 transition-all flex flex-col justify-between" id="card-feat-2">
                 <div className="space-y-3">
-                  <span className="text-2xl">👥</span>
-                  <h4 className="text-xs font-bold text-neutral-100">MZ 세대 피드백 및 감성 코칭</h4>
+                  <span className="text-2xl">🌿</span>
+                  <h4 className="text-xs font-bold text-neutral-100">생명 존중과 탄소중립 ESG 가치</h4>
                   <p className="text-[11px] text-neutral-400 leading-relaxed">
-                    기업의 허리가 되는 팀장 및 중간관리자들의 실전 소통 스킬과 리더십 시뮬레이션을 전방위 전수합니다.
+                    살아있는 식물과 소통하며 생명의 소중함을 배우고, 조직 내에 탄소중립과 환경(E)을 생각하는 ESG 상생 가치를 전파합니다.
                   </p>
                 </div>
                 <button onClick={() => setActiveTab('programs')} className="text-[10px] text-[#D4AF37] font-bold mt-4 flex items-center gap-1 hover:underline">
@@ -1373,14 +1572,14 @@ export default function App() {
 
               <div className="p-6 rounded-2xl bg-[#121214] border border-neutral-900 hover:border-neutral-800 transition-all flex flex-col justify-between" id="card-feat-3">
                 <div className="space-y-3">
-                  <span className="text-2xl">💼</span>
-                  <h4 className="text-xs font-bold text-neutral-100">수요자 맞춤 기업 교육 개발</h4>
+                  <span className="text-2xl">🎨</span>
+                  <h4 className="text-xs font-bold text-neutral-100">깊은 몰입과 성취의 공예 창조</h4>
                   <p className="text-[11px] text-neutral-400 leading-relaxed">
-                    기업의 당면한 과제(ESG, 미래 신성장 동력, 조직문화 융합)에 맞춘 완전 주문 제작형 프로그램을 수립합니다.
+                    캘리그라피, 드로잉, 팝아트 등 감성 친화적 도구와 소재를 활용해 무언가를 완성해 나가는 과정에서 깊은 성취감과 창의적 영감을 얻습니다.
                   </p>
                 </div>
-                <button onClick={() => setActiveTab('partnership')} className="text-[10px] text-[#D4AF37] font-bold mt-4 flex items-center gap-1 hover:underline">
-                  제휴 문의하기 <ArrowRight className="w-3 h-3" />
+                <button onClick={() => setActiveTab('programs')} className="text-[10px] text-[#D4AF37] font-bold mt-4 flex items-center gap-1 hover:underline cursor-pointer">
+                  교육과정 더보기 <ArrowRight className="w-3 h-3" />
                 </button>
               </div>
             </div>
@@ -1502,7 +1701,14 @@ export default function App() {
                 <h2 className="text-xl md:text-2xl font-black text-white">KPCIA 실시간 출강 요청 매칭 공고</h2>
                 <p className="text-xs text-neutral-400 mt-1">기업, 기관, 단체에서 접수된 사외 전문 특강 출강 요청 현황판입니다.</p>
               </div>
-              <div className="flex items-center gap-2">
+              <div className="flex flex-wrap items-center gap-3">
+                <button
+                  onClick={() => handleDownloadExcel()}
+                  className="px-3 py-1.5 rounded-lg bg-neutral-900 hover:bg-neutral-850 border border-neutral-800 text-neutral-300 text-[10px] font-bold transition-all cursor-pointer flex items-center gap-1.5 shadow-md"
+                >
+                  <Download className="w-3.5 h-3.5 text-emerald-400" />
+                  <span>전체 공고 엑셀 다운로드 (.csv)</span>
+                </button>
                 <span className="text-xs text-neutral-500">자격 등급 충족 시 즉각 지원 가능</span>
               </div>
             </div>
@@ -1543,12 +1749,18 @@ export default function App() {
             {/* Lectures List with Pagination */}
             <div id="lecture-notices-list" className="space-y-6">
               {(() => {
-                const filteredLectures = lectures.filter(l => {
-                  const queryText = searchLecture.toLowerCase();
-                  const titleMatch = l.title.toLowerCase().includes(queryText) || (l.companyName && l.companyName.toLowerCase().includes(queryText));
-                  const tierMatch = filterLecTier === 'all' || l.targetTier === filterLecTier;
-                  return titleMatch && tierMatch;
-                });
+                const filteredLectures = lectures
+                  .filter(l => {
+                    const queryText = searchLecture.toLowerCase();
+                    const titleMatch = l.title.toLowerCase().includes(queryText) || (l.companyName && l.companyName.toLowerCase().includes(queryText));
+                    const tierMatch = filterLecTier === 'all' || l.targetTier === filterLecTier;
+                    return titleMatch && tierMatch;
+                  })
+                  .sort((a, b) => {
+                    const dateA = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+                    const dateB = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+                    return dateB - dateA;
+                  });
                 
                 const itemsPerPage = 5;
                 const totalPages = Math.ceil(filteredLectures.length / itemsPerPage) || 1;
@@ -1571,57 +1783,78 @@ export default function App() {
                         return (
                           <div 
                             key={lecture.id}
-                            className="p-6 rounded-2xl bg-[#121214] border border-neutral-900 hover:border-neutral-800 transition-all relative overflow-hidden flex flex-col gap-6"
+                            className="p-4 sm:p-6 rounded-2xl bg-[#121214] border border-neutral-900 hover:border-neutral-800 transition-all relative overflow-hidden flex flex-col gap-4 sm:gap-5 text-left"
                           >
-                            {/* Top Header Row (Always clear and visible!) */}
-                            <div className="flex flex-wrap items-center justify-between gap-4 border-b border-neutral-800/60 pb-3">
-                              <div className="flex flex-wrap items-center gap-2">
-                                <span className="text-[10px] font-extrabold bg-[#D4AF37]/10 text-[#D4AF37] px-2 py-1 rounded border border-[#D4AF37]/20 uppercase tracking-wider">
+                            {/* Top Header Row - Responsive wrapping */}
+                            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-neutral-800/60 pb-3">
+                              <div className="flex flex-wrap items-center gap-1.5 sm:gap-2">
+                                <span className="text-[9px] sm:text-[10px] font-extrabold bg-[#D4AF37]/10 text-[#D4AF37] px-2 py-0.5 rounded border border-[#D4AF37]/20 uppercase tracking-wider">
                                   {lecture.companyName || "익명 기업"}
                                 </span>
-                                <span className={`text-[9px] font-black px-2 py-1 rounded ${getTierColor(lecture.targetTier)}`}>
+                                <span className={`text-[9px] font-black px-2 py-0.5 rounded ${getTierColor(lecture.targetTier)}`}>
                                   지원 자격: {lecture.targetTier}
                                 </span>
-                                <span className="text-[10px] text-neutral-500 font-bold">
-                                  📅 {lecture.date} ({lecture.time})
-                                </span>
                               </div>
-                              <div className="flex items-center gap-2">
-                                <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
+                              <div className="flex items-center gap-2 self-start sm:self-center">
+                                <span className={`text-[9px] sm:text-[10px] font-bold px-2 py-0.5 rounded-full ${
                                   lecture.status === 'completed' 
                                     ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' 
                                     : lecture.status === 'assigned'
                                     ? 'bg-blue-500/10 text-blue-400 border border-blue-500/20'
                                     : 'bg-amber-500/10 text-[#D4AF37] border border-[#D4AF37]/20'
-                                }}`}>
+                                }`}>
                                   {lecture.status === 'completed' ? '출강 완료(정산완료)' : lecture.status === 'assigned' ? '강사배정 완료' : '강사모집 중'}
                                 </span>
                               </div>
+                            </div>
+
+                            {/* Date/Time Banner - Bold & highly visible */}
+                            <div className="flex flex-col xs:flex-row xs:items-center gap-2 text-neutral-300 font-bold text-[10px] sm:text-xs">
+                              <span className="bg-neutral-950 border border-neutral-900 rounded-lg px-2.5 py-1.5 flex items-center gap-1.5 w-full xs:w-auto justify-center sm:justify-start">
+                                <Calendar className="w-3.5 h-3.5 text-amber-400 shrink-0" />
+                                <span>{lecture.date}</span>
+                              </span>
+                              <span className="hidden xs:inline text-neutral-800">|</span>
+                              <span className="bg-neutral-950 border border-neutral-900 rounded-lg px-2.5 py-1.5 flex items-center gap-1.5 w-full xs:w-auto justify-center sm:justify-start">
+                                <Clock className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+                                <span>{lecture.time}</span>
+                              </span>
                             </div>
 
                             {/* Content Area: Blurred if restricted */}
                             <div className="relative">
                               <div className={`space-y-4 ${isRestricted ? 'blur-md select-none pointer-events-none' : ''}`}>
                                 <div className="space-y-2">
-                                  <h3 className="text-base font-black text-white">{lecture.title}</h3>
-                                  <p className="text-[11px] text-neutral-400 leading-relaxed max-w-4xl">{lecture.description}</p>
+                                  <h3 className="text-sm sm:text-base font-black text-white leading-snug">{lecture.title}</h3>
+                                  <p className="text-[10px] sm:text-[11px] text-neutral-400 leading-relaxed whitespace-pre-wrap">{lecture.description}</p>
                                 </div>
 
-                                <div className="flex flex-wrap items-center gap-x-6 gap-y-2 text-[11px] text-neutral-400 bg-neutral-950/40 p-3.5 rounded-xl border border-neutral-900">
-                                  <span>📍 장소: <strong className="text-neutral-200">{lecture.location}</strong></span>
-                                  <span>•</span>
-                                  <span>👥 예정인원: <strong className="text-neutral-200">{lecture.attendees}명</strong></span>
-                                  <span>•</span>
-                                  <span>⏱️ 시간: <strong className="text-neutral-200">{lecture.duration || '3시간'}</strong></span>
-                                  <span>•</span>
-                                  <span>💰 총예산: <strong className="text-amber-400">₩{lecture.budget.toLocaleString()}</strong></span>
-                                  <span>•</span>
-                                  <span>🪙 마일리지: <strong className="text-emerald-400">{lecture.mileageRoyalty} M</strong></span>
+                                <div className="grid grid-cols-2 md:grid-cols-5 gap-2 text-[10px] sm:text-[11px] text-neutral-400 bg-neutral-950/40 p-3 sm:p-4 rounded-xl border border-neutral-900">
+                                  <div className="space-y-0.5">
+                                    <span className="text-neutral-500 font-bold block text-[9px] uppercase">📍 장소</span>
+                                    <span className="text-neutral-200 font-semibold block truncate" title={lecture.location}>{lecture.location}</span>
+                                  </div>
+                                  <div className="space-y-0.5">
+                                    <span className="text-neutral-500 font-bold block text-[9px] uppercase">👥 예정인원</span>
+                                    <span className="text-neutral-200 font-bold block">{lecture.attendees}명</span>
+                                  </div>
+                                  <div className="space-y-0.5">
+                                    <span className="text-neutral-500 font-bold block text-[9px] uppercase">⏱️ 시간</span>
+                                    <span className="text-neutral-200 font-bold block">{lecture.duration || '3시간'}</span>
+                                  </div>
+                                  <div className="space-y-0.5">
+                                    <span className="text-neutral-500 font-bold block text-[9px] uppercase">💰 총예산</span>
+                                    <span className="text-amber-400 font-extrabold block">₩{lecture.budget.toLocaleString()}</span>
+                                  </div>
+                                  <div className="space-y-0.5 col-span-2 md:col-span-1">
+                                    <span className="text-neutral-500 font-bold block text-[9px] uppercase">🪙 마일리지</span>
+                                    <span className="text-emerald-400 font-extrabold block">{lecture.mileageRoyalty} M</span>
+                                  </div>
                                 </div>
 
                                 {/* Extra info for assigned lecture */}
                                 {(lecture.assignedName || lecture.assistantName) && (
-                                  <div className="text-[11px] text-neutral-400 flex items-center gap-3">
+                                  <div className="text-[10px] sm:text-[11px] text-neutral-400 flex flex-wrap gap-x-4 gap-y-1 bg-neutral-950/20 p-2.5 rounded-lg border border-neutral-900/40">
                                     {lecture.assignedName && (
                                       <span>👤 주강사: <strong className="text-white">{lecture.assignedName}</strong></span>
                                     )}
@@ -1634,12 +1867,12 @@ export default function App() {
 
                               {/* Restricted / Lock Overlay */}
                               {isRestricted && (
-                                <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/40 backdrop-blur-sm rounded-xl p-4 text-center border border-neutral-900">
-                                  <div className="h-10 w-10 rounded-full bg-neutral-900 border border-neutral-800 flex items-center justify-center mb-2.5">
+                                <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/55 backdrop-blur-md rounded-xl p-4 text-center border border-neutral-900">
+                                  <div className="h-9 w-9 rounded-full bg-neutral-900 border border-neutral-800 flex items-center justify-center mb-2">
                                     <Lock className="w-4 h-4 text-amber-500 animate-pulse" />
                                   </div>
-                                  <h4 className="text-xs font-bold text-[#D4AF37] tracking-tight">🔒 등급별 출강정보 접근제한 구역</h4>
-                                  <p className="text-[10px] text-neutral-400 max-w-md mt-1.5 leading-relaxed">
+                                  <h4 className="text-[11px] sm:text-xs font-bold text-[#D4AF37] tracking-tight">🔒 등급별 출강정보 접근제한 구역</h4>
+                                  <p className="text-[9px] sm:text-[10px] text-neutral-400 max-w-sm mt-1 leading-normal">
                                     이 공고는 <span className="text-amber-400 font-bold">{lecture.targetTier}</span> 등급 전용 매칭 공고입니다.<br />
                                     로그인 후 승격 요건을 완수하여 등급 상향 시 전체 열람 및 즉시 지원이 가능합니다.
                                   </p>
@@ -1652,6 +1885,14 @@ export default function App() {
                               <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pt-3 border-t border-neutral-900/60">
                                 {/* Left Actions / Info */}
                                 <div className="flex flex-wrap items-center gap-2">
+                                  <button
+                                    onClick={() => handleDownloadExcel(lecture)}
+                                    className="px-3 py-1.5 rounded-lg bg-neutral-950 hover:bg-neutral-900 border border-neutral-850 text-neutral-300 text-[10px] font-bold transition-all cursor-pointer flex items-center gap-1.5"
+                                  >
+                                    <Download className="w-3 h-3 text-emerald-400" />
+                                    <span>강의상세 엑셀 다운로드</span>
+                                  </button>
+
                                   {/* Certificate download triggers if matching active or completed */}
                                   {(lecture.status === 'assigned' || lecture.status === 'completed') && (currentUser?.isAdmin || isMainLecturer || isAssistantLecturer) && (
                                     <div className="flex gap-1.5">
@@ -2083,15 +2324,22 @@ export default function App() {
                 </div>
 
                 {/* Mileage counter */}
-                <div className="bg-neutral-950/60 p-4 rounded-xl border border-neutral-800 flex justify-between items-center">
-                  <div className="space-y-0.5">
+                {hasRegisteredCurriculum(currentUser.uid) ? (
+                  <div className="bg-neutral-950/60 p-4 rounded-xl border border-neutral-800 flex justify-between items-center">
+                    <div className="space-y-0.5">
+                      <span className="text-[10px] text-neutral-500 font-bold block">나의 교육 마일리지</span>
+                      <span className="text-lg font-black text-[#D4AF37]">{currentUser.mileage.toLocaleString()} M</span>
+                    </div>
+                    <div className="h-10 w-10 rounded-lg bg-amber-500/10 border border-amber-500/20 flex items-center justify-center text-[#D4AF37]">
+                      <Coins className="w-5 h-5" />
+                    </div>
+                  </div>
+                ) : (
+                  <div className="bg-neutral-950/40 p-4 rounded-xl border border-neutral-900 text-center">
                     <span className="text-[10px] text-neutral-500 font-bold block">나의 교육 마일리지</span>
-                    <span className="text-lg font-black text-[#D4AF37]">{currentUser.mileage.toLocaleString()} M</span>
+                    <span className="text-xs text-neutral-400 block mt-1.5 font-medium">교안 미등록 회원은 마일리지가 공개되지 않습니다.</span>
                   </div>
-                  <div className="h-10 w-10 rounded-lg bg-amber-500/10 border border-amber-500/20 flex items-center justify-center text-[#D4AF37]">
-                    <Coins className="w-5 h-5" />
-                  </div>
-                </div>
+                )}
 
                 {/* Active Digital Badge cabinet */}
                 <div className="space-y-3">
@@ -2453,31 +2701,64 @@ export default function App() {
                       />
                     </div>
 
-                    <div className="grid grid-cols-2 gap-3">
-                      <div className="space-y-1">
-                        <label className="text-neutral-400 font-semibold block">출강 일자</label>
-                        <input
-                          type="date"
-                          value={newLecDate}
-                          onChange={(e) => setNewLecDate(e.target.value)}
-                          className="w-full bg-neutral-950 border border-neutral-800 rounded-lg px-2.5 py-2 text-white focus:outline-none focus:border-[#D4AF37] text-xs"
-                        />
+                    <div className="space-y-3 p-3.5 bg-neutral-950/60 rounded-xl border border-neutral-850">
+                      <div className="grid grid-cols-2 gap-3">
+                        <div className="space-y-1">
+                          <label className="text-neutral-400 font-bold flex items-center gap-1.5">
+                            <Calendar className="w-3.5 h-3.5 text-amber-400 animate-pulse" />
+                            <span>출강 일자</span>
+                          </label>
+                          <input
+                            type="date"
+                            value={newLecDate}
+                            onChange={(e) => setNewLecDate(e.target.value)}
+                            className="w-full bg-neutral-950 border border-neutral-800 rounded-lg px-2.5 py-2 text-white focus:outline-none focus:border-[#D4AF37] text-xs"
+                          />
+                        </div>
+
+                        <div className="space-y-1">
+                          <label className="text-neutral-400 font-bold flex items-center gap-1.5">
+                            <Clock className="w-3.5 h-3.5 text-emerald-400 animate-pulse" />
+                            <span>강의 시간 (시작 ~ 종료)</span>
+                          </label>
+                          <div className="flex items-center gap-1">
+                            <input
+                              type="time"
+                              value={newLecStartTime}
+                              onChange={(e) => setNewLecStartTime(e.target.value)}
+                              className="w-full bg-neutral-950 border border-neutral-800 rounded-lg px-1.5 py-2 text-white focus:outline-none focus:border-[#D4AF37] text-[11px] font-bold text-center"
+                            />
+                            <span className="text-neutral-600 font-black">~</span>
+                            <input
+                              type="time"
+                              value={newLecEndTime}
+                              onChange={(e) => setNewLecEndTime(e.target.value)}
+                              className="w-full bg-[#09090b] border border-neutral-800 rounded-lg px-1.5 py-2 text-white focus:outline-none focus:border-[#D4AF37] text-[11px] font-bold text-center"
+                            />
+                          </div>
+                        </div>
                       </div>
 
-                      <div className="space-y-1">
-                        <label className="text-neutral-400 font-semibold block">요구 강사 등급컷</label>
-                        <select
-                          value={newLecTier}
-                          onChange={(e) => setNewLecTier(e.target.value as any)}
-                          className="w-full bg-neutral-950 border border-neutral-800 rounded-lg px-2.5 py-2 text-white focus:outline-none focus:border-[#D4AF37] text-xs cursor-pointer"
-                        >
-                          <option value="Prestige Member">Prestige Member 이상</option>
-                          <option value="Prestige Associate">Prestige Associate 이상</option>
-                          <option value="Prestige Professional">Prestige Professional 이상</option>
-                          <option value="Prestige Master">Prestige Master 이상</option>
-                          <option value="Prestige Elite">Prestige Elite 전용</option>
-                          <option value="Prestige Legend">Prestige Legend 전용</option>
-                        </select>
+                      <div className="grid grid-cols-2 gap-3">
+                        <div className="space-y-1">
+                          <label className="text-neutral-400 font-semibold block">요구 강사 등급컷</label>
+                          <select
+                            value={newLecTier}
+                            onChange={(e) => setNewLecTier(e.target.value as any)}
+                            className="w-full bg-[#09090b] border border-neutral-800 rounded-lg px-2.5 py-2 text-white focus:outline-none focus:border-[#D4AF37] text-xs cursor-pointer"
+                          >
+                            <option value="Prestige Member">Prestige Member 이상</option>
+                            <option value="Prestige Associate">Prestige Associate 이상</option>
+                            <option value="Prestige Professional">Prestige Professional 이상</option>
+                            <option value="Prestige Master">Prestige Master 이상</option>
+                            <option value="Prestige Elite">Prestige Elite 전용</option>
+                            <option value="Prestige Legend">Prestige Legend 전용</option>
+                          </select>
+                        </div>
+                        <div className="space-y-1 flex flex-col justify-end text-right">
+                          <span className="text-[10px] text-neutral-500 font-bold">예시 입력 도움:</span>
+                          <span className="text-[11px] text-[#D4AF37] font-extrabold tracking-wider">10:00 ~ 12:00</span>
+                        </div>
                       </div>
                     </div>
 
@@ -2760,9 +3041,15 @@ export default function App() {
                       <tbody className="divide-y divide-neutral-800/50 text-neutral-300">
                         {users.map(u => (
                           <tr key={u.uid} className="hover:bg-neutral-950/40">
-                            <td className="py-3 font-bold text-white">
-                              <div>{u.name}</div>
-                              <div className="text-[9px] text-neutral-500 font-normal">{u.profileCard?.title || '소속 강사'}</div>
+                            <td 
+                              className="py-3 font-bold text-white cursor-pointer hover:text-[#D4AF37] group transition-colors"
+                              onClick={() => handleViewInstructorFullDetails(u)}
+                            >
+                              <div className="flex items-center gap-1.5">
+                                <span className="group-hover:translate-x-0.5 transition-transform">👤</span>
+                                <span className="underline decoration-[#D4AF37]/30 underline-offset-4 group-hover:decoration-[#D4AF37]">{u.name}</span>
+                              </div>
+                              <div className="text-[9px] text-neutral-500 font-normal mt-0.5">{u.profileCard?.title || '소속 강사'}</div>
                             </td>
                             <td className="py-3">
                               <span className={`text-[9px] font-black px-1.5 py-0.5 rounded ${getTierColor(u.tier)}`}>
@@ -2771,7 +3058,9 @@ export default function App() {
                             </td>
                             <td className="py-3 font-mono font-bold text-neutral-200">{u.lectureCount || 0}회</td>
                             <td className="py-3 font-mono font-bold text-amber-400">⭐ {u.averageRating || '4.50'}</td>
-                            <td className="py-3 font-mono font-bold text-emerald-400">{u.mileage.toLocaleString()}M</td>
+                            <td className="py-3 font-mono font-bold text-emerald-400">
+                              {hasRegisteredCurriculum(u.uid) ? `${u.mileage.toLocaleString()} M` : '비공개'}
+                            </td>
                             <td className="py-3">
                               <button
                                 onClick={() => handleToggleUserApproval(u.uid)}
@@ -2786,20 +3075,6 @@ export default function App() {
                             </td>
                             <td className="py-3 text-right">
                               <div className="flex items-center justify-end gap-1.5">
-                                <button
-                                  onClick={() => {
-                                    setEditingInstructor(u);
-                                    setEditInstName(u.name);
-                                    setEditInstTier(u.tier);
-                                    setEditInstMileage(u.mileage);
-                                    setEditInstTitle(u.profileCard?.title || '');
-                                    setEditInstBio(u.profileCard?.bio || '');
-                                    setEditInstSpecialties(u.profileCard?.specialties ? u.profileCard.specialties.join(', ') : '');
-                                  }}
-                                  className="px-2 py-1 rounded bg-blue-500/10 hover:bg-blue-500/20 text-blue-400 border border-blue-500/20 font-bold transition-all text-[9px] cursor-pointer"
-                                >
-                                  ✏️ 정보수정
-                                </button>
                                 <button
                                   onClick={() => handleAutoUpgradeUser(u.uid)}
                                   className="px-2 py-1 rounded bg-[#D4AF37]/10 hover:bg-[#D4AF37]/20 text-[#D4AF37] border border-[#D4AF37]/20 font-bold transition-all text-[9px] cursor-pointer"
@@ -3408,113 +3683,363 @@ export default function App() {
         </div>
       )}
 
-      {/* 👑 ADMIN ONLY: INSTRUCTOR PROFILE EDIT MODAL */}
-      {editingInstructor && (
-        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 overflow-y-auto animate-in fade-in duration-200">
-          <div className="bg-neutral-900 border border-neutral-800 rounded-2xl w-full max-w-md overflow-hidden shadow-2xl relative my-auto font-sans">
+      {/* 👑 ADMIN ONLY: MEMBER REGISTRATION DETAIL VIEW & EDIT MODAL */}
+      {viewingInstructorDetail && (
+        <div className="fixed inset-0 z-50 bg-black/85 backdrop-blur-md flex items-center justify-center p-4 overflow-y-auto animate-in fade-in duration-200">
+          <div className="bg-neutral-900 border border-neutral-800 rounded-3xl w-full max-w-2xl overflow-hidden shadow-2xl relative my-auto font-sans">
             
             {/* Modal Header */}
-            <div className="p-4 border-b border-neutral-800 bg-neutral-950/50 flex justify-between items-center">
-              <span className="font-bold text-xs text-[#D4AF37] tracking-widest font-display uppercase">강사 정보 관리 및 편집기</span>
+            <div className="p-5 border-b border-neutral-800 bg-neutral-950/60 flex justify-between items-center">
+              <div className="text-left">
+                <span className="font-extrabold text-[9px] text-[#D4AF37] tracking-widest font-display uppercase block">KPCIA 강사 상세 관리 포탈</span>
+                <h3 className="text-sm font-bold text-neutral-200 mt-0.5">
+                  👤 {viewingInstructorDetail.name} 강사의 가입 정보 및 자격 조절
+                </h3>
+              </div>
               <button 
-                onClick={() => setEditingInstructor(null)}
-                className="text-neutral-400 hover:text-neutral-200 transition-colors cursor-pointer"
+                onClick={() => {
+                  setViewingInstructorDetail(null);
+                  setIsEditingDetail(false);
+                }}
+                className="text-neutral-400 hover:text-neutral-200 transition-colors cursor-pointer p-1"
               >
-                <X className="w-4 h-4" />
+                <X className="w-5 h-5" />
               </button>
             </div>
 
-            {/* Modal Body Form */}
-            <form onSubmit={handleSaveInstructorEdit} className="p-6 space-y-4 text-xs text-left">
-              <div className="space-y-1">
-                <label className="text-neutral-400 font-semibold block">강사 성함 *</label>
-                <input
-                  type="text"
-                  value={editInstName}
-                  onChange={(e) => setEditInstName(e.target.value)}
-                  required
-                  className="w-full bg-neutral-950 border border-neutral-800 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-[#D4AF37] text-[11px]"
-                />
-              </div>
+            {/* Modal Body */}
+            <div className="p-6 max-h-[75vh] overflow-y-auto space-y-6 text-xs text-left">
+              
+              {!isEditingDetail ? (
+                // VIEW MODE: Show all registration details
+                <div className="space-y-6">
+                  {/* Status Banner */}
+                  <div className="p-3.5 rounded-xl bg-neutral-950 border border-neutral-850 flex justify-between items-center">
+                    <div className="flex items-center gap-2">
+                      <span className="text-[10px] text-neutral-400 font-bold">승인 현황:</span>
+                      <span className={`px-2 py-0.5 rounded text-[10px] font-black ${
+                        viewingInstructorDetail.isApproved 
+                          ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' 
+                          : 'bg-amber-500/10 text-amber-400 border border-amber-500/20'
+                      }`}>
+                        {viewingInstructorDetail.isApproved ? '정회원 승인 완료' : '가입 승인 대기'}
+                      </span>
+                    </div>
+                    <div className="text-[10px] text-neutral-500">
+                      가입 일자: {viewingInstructorDetail.createdAt ? new Date(viewingInstructorDetail.createdAt).toLocaleDateString() : '미지정'}
+                    </div>
+                  </div>
 
-              <div className="grid grid-cols-2 gap-3">
-                <div className="space-y-1">
-                  <label className="text-neutral-400 font-semibold block">자격 등급 *</label>
-                  <select
-                    value={editInstTier}
-                    onChange={(e) => setEditInstTier(e.target.value as InstructorTier)}
-                    className="w-full bg-neutral-950 border border-neutral-800 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-[#D4AF37] text-[11px] cursor-pointer"
-                  >
-                    <option value="Prestige Member">Prestige Member</option>
-                    <option value="Prestige Associate">Prestige Associate</option>
-                    <option value="Prestige Professional">Prestige Professional</option>
-                    <option value="Prestige Master">Prestige Master</option>
-                    <option value="Prestige Elite">Prestige Elite</option>
-                    <option value="Prestige Legend">Prestige Legend</option>
-                  </select>
+                  {/* Primary Info Grid */}
+                  <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                    <div className="space-y-1 bg-neutral-950/50 p-3 rounded-xl border border-neutral-850">
+                      <span className="text-neutral-500 text-[10px] font-bold block">강사 성함</span>
+                      <span className="text-neutral-200 font-extrabold text-xs">{viewingInstructorDetail.name}</span>
+                    </div>
+                    <div className="space-y-1 bg-neutral-950/50 p-3 rounded-xl border border-neutral-850">
+                      <span className="text-neutral-500 text-[10px] font-bold block">로그인 ID</span>
+                      <span className="text-neutral-300 font-mono font-bold text-xs">{viewingInstructorDetail.loginId || '미지정'}</span>
+                    </div>
+                    <div className="space-y-1 bg-neutral-950/50 p-3 rounded-xl border border-neutral-850">
+                      <span className="text-neutral-500 text-[10px] font-bold block">로그인 비밀번호</span>
+                      <span className="text-neutral-300 font-mono text-xs">{viewingInstructorDetail.password || '••••'}</span>
+                    </div>
+                    <div className="space-y-1 bg-neutral-950/50 p-3 rounded-xl border border-neutral-850">
+                      <span className="text-neutral-500 text-[10px] font-bold block">소속 기관/기업/공방</span>
+                      <span className="text-neutral-200 font-bold text-xs">{viewingInstructorDetail.organizationName || '개인 자격'}</span>
+                    </div>
+                    <div className="space-y-1 bg-neutral-950/50 p-3 rounded-xl border border-neutral-850">
+                      <span className="text-neutral-500 text-[10px] font-bold block">연락처</span>
+                      <span className="text-neutral-200 font-bold text-xs">{viewingInstructorDetail.profileCard?.contactPhone || '미지정'}</span>
+                    </div>
+                    <div className="space-y-1 bg-neutral-950/50 p-3 rounded-xl border border-neutral-850">
+                      <span className="text-neutral-500 text-[10px] font-bold block">공식 이메일</span>
+                      <span className="text-neutral-200 font-bold text-xs">{viewingInstructorDetail.email}</span>
+                    </div>
+                  </div>
+
+                  {/* Association Milestones / Balance */}
+                  <div className="p-4 rounded-xl bg-[#0e0e10] border border-neutral-850 grid grid-cols-3 gap-3 text-center">
+                    <div>
+                      <span className="text-neutral-500 text-[10px] font-bold block">자격 등급</span>
+                      <span className={`inline-block mt-1 text-[9px] font-black px-2 py-0.5 rounded ${getTierColor(viewingInstructorDetail.tier)}`}>
+                        {viewingInstructorDetail.tier}
+                      </span>
+                    </div>
+                    <div>
+                      <span className="text-neutral-500 text-[10px] font-bold block">출강 실적</span>
+                      <span className="text-neutral-200 font-mono font-black text-xs block mt-1">{viewingInstructorDetail.lectureCount || 0}회</span>
+                    </div>
+                    <div>
+                      <span className="text-neutral-500 text-[10px] font-bold block">마일리지</span>
+                      <span className="text-emerald-400 font-mono font-black text-xs block mt-1">{(viewingInstructorDetail.mileage || 0).toLocaleString()} M</span>
+                    </div>
+                  </div>
+
+                  {/* Profile Details */}
+                  <div className="space-y-3">
+                    <h4 className="text-xs font-extrabold text-neutral-400 border-b border-neutral-800 pb-1 flex items-center gap-1.5">
+                      <span>🪪 프로필 프리젠테이션 정보</span>
+                    </h4>
+                    <div className="space-y-2.5">
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div className="bg-neutral-950/40 p-3 rounded-xl border border-neutral-850 space-y-1">
+                          <span className="text-neutral-500 text-[9px] font-bold block">직함 및 전문 타이틀</span>
+                          <span className="text-neutral-200 font-bold text-xs block">{viewingInstructorDetail.profileCard?.title || '미지정'}</span>
+                        </div>
+                        <div className="bg-neutral-950/40 p-3 rounded-xl border border-neutral-850 space-y-1">
+                          <span className="text-neutral-500 text-[9px] font-bold block">활동 지역 및 계좌</span>
+                          <div className="text-neutral-200 font-bold text-xs space-y-0.5">
+                            <div>📍 지역: {viewingInstructorDetail.profileCard?.region || '미지정'}</div>
+                            <div>💳 계좌: {viewingInstructorDetail.profileCard?.bankAccount || '미등록'}</div>
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="bg-neutral-950/40 p-3 rounded-xl border border-neutral-850 space-y-1">
+                        <span className="text-neutral-500 text-[9px] font-bold block">대표 전문 키워드</span>
+                        <div className="flex flex-wrap gap-1.5 mt-1">
+                          {viewingInstructorDetail.profileCard?.specialties && viewingInstructorDetail.profileCard.specialties.length > 0 ? (
+                            viewingInstructorDetail.profileCard.specialties.map((spec, idx) => (
+                              <span key={idx} className="px-2 py-0.5 rounded bg-neutral-900 border border-neutral-800 text-neutral-300 text-[10px] font-semibold">
+                                #{spec}
+                              </span>
+                            ))
+                          ) : (
+                            <span className="text-neutral-500">등록된 키워드가 없습니다.</span>
+                          )}
+                        </div>
+                      </div>
+
+                      <div className="bg-neutral-950/40 p-3 rounded-xl border border-neutral-850 space-y-1">
+                        <span className="text-neutral-500 text-[9px] font-bold block">간략 프로필 소개 (Bio)</span>
+                        <p className="text-neutral-300 leading-relaxed whitespace-pre-wrap">{viewingInstructorDetail.profileCard?.bio || '한줄 소개가 존재하지 않습니다.'}</p>
+                      </div>
+
+                      <div className="bg-neutral-950/40 p-3 rounded-xl border border-neutral-850 space-y-1">
+                        <span className="text-neutral-500 text-[9px] font-bold block">SNS 및 포트폴리오 블로그 링크</span>
+                        {viewingInstructorDetail.profileCard?.websiteUrl ? (
+                          <a 
+                            href={viewingInstructorDetail.profileCard.websiteUrl} 
+                            target="_blank" 
+                            rel="noopener noreferrer" 
+                            className="text-[#D4AF37] hover:underline font-bold break-all flex items-center gap-1.5"
+                          >
+                            <span>🔗 {viewingInstructorDetail.profileCard.websiteUrl}</span>
+                          </a>
+                        ) : (
+                          <span className="text-neutral-500">등록된 외부 포트폴리오 채널이 없습니다.</span>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Actions Block */}
+                  <div className="flex gap-3 pt-4 border-t border-neutral-800">
+                    <button
+                      type="button"
+                      onClick={() => handleToggleUserApproval(viewingInstructorDetail.uid)}
+                      className={`flex-1 py-2.5 rounded-xl border text-[11px] font-bold text-center transition-all cursor-pointer ${
+                        viewingInstructorDetail.isApproved
+                          ? 'border-red-950 bg-red-500/5 hover:bg-red-500/10 text-red-400'
+                          : 'border-emerald-950 bg-emerald-500/5 hover:bg-emerald-500/10 text-emerald-400'
+                      }`}
+                    >
+                      {viewingInstructorDetail.isApproved ? '⏳ 정회원 승인 취소하기' : '✅ 즉시 정회원 가입 승인'}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setIsEditingDetail(true)}
+                      className="flex-1 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-bold text-center transition-all cursor-pointer text-[11px] flex items-center justify-center gap-1.5"
+                    >
+                      <span>✏️ 이 회원 정보 수정하기</span>
+                    </button>
+                  </div>
                 </div>
+              ) : (
+                // EDIT MODE: Form to update everything
+                <form onSubmit={handleSaveInstructorFullDetailEdit} className="space-y-4">
+                  <div className="bg-blue-500/5 p-3 rounded-xl border border-blue-500/10 text-[10px] text-neutral-400 leading-normal mb-2">
+                    💡 <strong>실시간 프로필 마스터 편집실:</strong> 해당 강사의 가입 계정 정보 및 프로필 카드 사양을 직접 교정합니다. 저장 시 즉시 데이터베이스에 반영됩니다.
+                  </div>
 
-                <div className="space-y-1">
-                  <label className="text-neutral-400 font-semibold block">마일리지 (M)</label>
-                  <input
-                    type="number"
-                    value={editInstMileage}
-                    onChange={(e) => setEditInstMileage(Number(e.target.value))}
-                    min={0}
-                    className="w-full bg-neutral-950 border border-neutral-800 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-[#D4AF37] text-[11px]"
-                  />
-                </div>
-              </div>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="space-y-1 text-left">
+                      <label className="text-neutral-400 font-semibold block">강사 성함 *</label>
+                      <input
+                        type="text"
+                        value={editInstName}
+                        onChange={(e) => setEditInstName(e.target.value)}
+                        required
+                        className="w-full bg-neutral-950 border border-neutral-800 rounded-lg px-2.5 py-2 text-white focus:outline-none focus:border-[#D4AF37] text-xs font-bold"
+                      />
+                    </div>
+                    <div className="space-y-1 text-left">
+                      <label className="text-neutral-400 font-semibold block">소속 기관/공방 이름</label>
+                      <input
+                        type="text"
+                        value={editInstOrgName}
+                        onChange={(e) => setEditInstOrgName(e.target.value)}
+                        className="w-full bg-neutral-950 border border-neutral-800 rounded-lg px-2.5 py-2 text-white focus:outline-none focus:border-[#D4AF37] text-xs"
+                      />
+                    </div>
+                  </div>
 
-              <div className="space-y-1">
-                <label className="text-neutral-400 font-semibold block">직함 및 전문 타이틀</label>
-                <input
-                  type="text"
-                  value={editInstTitle}
-                  onChange={(e) => setEditInstTitle(e.target.value)}
-                  placeholder="예) 차세대 AI 실무 생산성 전문 강사"
-                  className="w-full bg-neutral-950 border border-neutral-800 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-[#D4AF37] text-[11px]"
-                />
-              </div>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="space-y-1 text-left">
+                      <label className="text-neutral-400 font-semibold block">가입 로그인 ID</label>
+                      <div className="w-full bg-neutral-950 border border-neutral-850 rounded-lg px-2.5 py-2 text-neutral-500 font-mono text-xs select-none">
+                        {viewingInstructorDetail.loginId || '미설정'} (아이디 변경 불가)
+                      </div>
+                    </div>
+                    <div className="space-y-1 text-left">
+                      <label className="text-neutral-400 font-semibold block">비밀번호 재설정</label>
+                      <input
+                        type="text"
+                        value={editInstPassword}
+                        onChange={(e) => setEditInstPassword(e.target.value)}
+                        placeholder="새로운 비밀번호"
+                        className="w-full bg-neutral-950 border border-neutral-800 rounded-lg px-2.5 py-2 text-white focus:outline-none focus:border-[#D4AF37] text-xs font-mono"
+                      />
+                    </div>
+                  </div>
 
-              <div className="space-y-1">
-                <label className="text-neutral-400 font-semibold block">대표 키워드 (쉼표 구분)</label>
-                <input
-                  type="text"
-                  value={editInstSpecialties}
-                  onChange={(e) => setEditInstSpecialties(e.target.value)}
-                  placeholder="예) AI 툴, 피드백 코칭, 중간 관리자"
-                  className="w-full bg-neutral-950 border border-neutral-800 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-[#D4AF37] text-[11px]"
-                />
-              </div>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="space-y-1 text-left">
+                      <label className="text-neutral-400 font-semibold block">연락처 *</label>
+                      <input
+                        type="text"
+                        value={editInstPhone}
+                        onChange={(e) => setEditInstPhone(e.target.value)}
+                        required
+                        className="w-full bg-neutral-950 border border-neutral-800 rounded-lg px-2.5 py-2 text-white focus:outline-none focus:border-[#D4AF37] text-xs font-bold"
+                      />
+                    </div>
+                    <div className="space-y-1 text-left">
+                      <label className="text-neutral-400 font-semibold block">공식 이메일 주소 *</label>
+                      <input
+                        type="email"
+                        value={editInstEmail}
+                        onChange={(e) => setEditInstEmail(e.target.value)}
+                        required
+                        className="w-full bg-neutral-950 border border-neutral-800 rounded-lg px-2.5 py-2 text-white focus:outline-none focus:border-[#D4AF37] text-xs font-bold"
+                      />
+                    </div>
+                  </div>
 
-              <div className="space-y-1">
-                <label className="text-neutral-400 font-semibold block">한줄 프로필 소개 (Bio)</label>
-                <textarea
-                  value={editInstBio}
-                  onChange={(e) => setEditInstBio(e.target.value)}
-                  rows={3}
-                  className="w-full bg-neutral-950 border border-neutral-800 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-[#D4AF37] text-[11px]"
-                />
-              </div>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="space-y-1 text-left">
+                      <label className="text-neutral-400 font-semibold block">강사 자격 등급 *</label>
+                      <select
+                        value={editInstTier}
+                        onChange={(e) => setEditInstTier(e.target.value as InstructorTier)}
+                        className="w-full bg-neutral-950 border border-neutral-800 rounded-lg px-2.5 py-2 text-white focus:outline-none focus:border-[#D4AF37] text-xs cursor-pointer font-bold text-[#D4AF37]"
+                      >
+                        <option value="Prestige Member">Prestige Member</option>
+                        <option value="Prestige Associate">Prestige Associate</option>
+                        <option value="Prestige Professional">Prestige Professional</option>
+                        <option value="Prestige Master">Prestige Master</option>
+                        <option value="Prestige Elite">Prestige Elite</option>
+                        <option value="Prestige Legend">Prestige Legend</option>
+                      </select>
+                    </div>
+                    <div className="space-y-1 text-left">
+                      <label className="text-neutral-400 font-semibold block">보유 마일리지 잔액 (M)</label>
+                      <input
+                        type="number"
+                        value={editInstMileage}
+                        onChange={(e) => setEditInstMileage(Number(e.target.value))}
+                        min={0}
+                        className="w-full bg-neutral-950 border border-neutral-800 rounded-lg px-2.5 py-2 text-white focus:outline-none focus:border-[#D4AF37] text-xs font-mono font-bold"
+                      />
+                    </div>
+                  </div>
 
-              <div className="flex gap-2.5 pt-2">
-                <button
-                  type="button"
-                  onClick={() => setEditingInstructor(null)}
-                  className="w-1/3 py-2.5 rounded-xl border border-neutral-800 text-neutral-400 font-bold hover:bg-neutral-800 text-center transition-all cursor-pointer"
-                >
-                  취소
-                </button>
-                <button
-                  type="submit"
-                  className="w-2/3 py-2.5 rounded-xl bg-[#D4AF37] text-neutral-950 font-black text-center transition-all cursor-pointer"
-                >
-                  ✨ 수정 사항 영구 저장
-                </button>
-              </div>
-            </form>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="space-y-1 text-left">
+                      <label className="text-neutral-400 font-semibold block">활동 주요 지형/지역</label>
+                      <input
+                        type="text"
+                        value={editInstRegion}
+                        onChange={(e) => setEditInstRegion(e.target.value)}
+                        placeholder="예) 서울, 경기, 대전 등"
+                        className="w-full bg-neutral-950 border border-neutral-800 rounded-lg px-2.5 py-2 text-white focus:outline-none focus:border-[#D4AF37] text-xs"
+                      />
+                    </div>
+                    <div className="space-y-1 text-left">
+                      <label className="text-neutral-400 font-semibold block">정산 계좌 정보</label>
+                      <input
+                        type="text"
+                        value={editInstBankAccount}
+                        onChange={(e) => setEditInstBankAccount(e.target.value)}
+                        placeholder="예) 신한은행 110-234-567890"
+                        className="w-full bg-neutral-950 border border-neutral-800 rounded-lg px-2.5 py-2 text-white focus:outline-none focus:border-[#D4AF37] text-xs"
+                      />
+                    </div>
+                  </div>
 
+                  <div className="space-y-1 text-left">
+                    <label className="text-neutral-400 font-semibold block">직함 및 전문 타이틀</label>
+                    <input
+                      type="text"
+                      value={editInstTitle}
+                      onChange={(e) => setEditInstTitle(e.target.value)}
+                      placeholder="예) 웰니스 감성 힐링 테라피 전문 전임강사"
+                      className="w-full bg-neutral-950 border border-neutral-800 rounded-lg px-2.5 py-2 text-white focus:outline-none focus:border-[#D4AF37] text-xs font-bold"
+                    />
+                  </div>
+
+                  <div className="space-y-1 text-left">
+                    <label className="text-neutral-400 font-semibold block">대표 키워드 (쉼표 구분)</label>
+                    <input
+                      type="text"
+                      value={editInstSpecialties}
+                      onChange={(e) => setEditInstSpecialties(e.target.value)}
+                      placeholder="예) 원예치료, 아로마힐링, 팝아트"
+                      className="w-full bg-neutral-950 border border-neutral-800 rounded-lg px-2.5 py-2 text-white focus:outline-none focus:border-[#D4AF37] text-xs"
+                    />
+                  </div>
+
+                  <div className="space-y-1 text-left">
+                    <label className="text-neutral-400 font-semibold block">SNS 또는 블로그 포트폴리오 URL</label>
+                    <input
+                      type="url"
+                      value={editInstSnsLink}
+                      onChange={(e) => setEditInstSnsLink(e.target.value)}
+                      placeholder="https://..."
+                      className="w-full bg-neutral-950 border border-neutral-800 rounded-lg px-2.5 py-2 text-white focus:outline-none focus:border-[#D4AF37] text-xs"
+                    />
+                  </div>
+
+                  <div className="space-y-1 text-left">
+                    <label className="text-neutral-400 font-semibold block">한줄 프로필 소개 (Bio)</label>
+                    <textarea
+                      value={editInstBio}
+                      onChange={(e) => setEditInstBio(e.target.value)}
+                      rows={3}
+                      className="w-full bg-neutral-950 border border-neutral-800 rounded-lg px-2.5 py-2 text-white focus:outline-none focus:border-[#D4AF37] text-xs leading-normal"
+                    />
+                  </div>
+
+                  <div className="flex gap-2.5 pt-3">
+                    <button
+                      type="button"
+                      onClick={() => setIsEditingDetail(false)}
+                      className="w-1/3 py-2.5 rounded-xl border border-neutral-800 text-neutral-400 font-bold hover:bg-neutral-800 text-center transition-all cursor-pointer text-xs"
+                    >
+                      돌아가기
+                    </button>
+                    <button
+                      type="submit"
+                      className="w-2/3 py-2.5 rounded-xl bg-gradient-to-r from-amber-600 to-[#D4AF37] text-neutral-950 font-black text-center transition-all cursor-pointer text-xs"
+                    >
+                      💾 모든 회원 정보 저장 완료
+                    </button>
+                  </div>
+                </form>
+              )}
+
+            </div>
           </div>
         </div>
       )}
