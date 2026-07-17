@@ -69,6 +69,7 @@ export interface LectureRequest {
   id: string;
   title: string;
   companyName?: string; // Company / Institution Name
+  partnerCompany?: string; // Partner Company Name
   description: string;
   targetTier: InstructorTier; // Minimum tier required
   budget: number; // Lecture fee in KRW
@@ -95,6 +96,7 @@ export interface LectureRequest {
   assistantName?: string;
   assistantEvaluated?: boolean;
   lectureRating?: number;
+  surveyUrl?: string;
 }
 
 export interface EducationalProgram {
