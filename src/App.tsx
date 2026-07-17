@@ -45,7 +45,10 @@ import {
   Palette,
   Calendar,
   Clock,
-  Download
+  Download,
+  MapPin,
+  Users,
+  Building
 } from 'lucide-react';
 
 export default function App() {
@@ -138,12 +141,14 @@ export default function App() {
   const [evaluationLectureId, setEvaluationLectureId] = useState<string>('');
   const [evaluationRating, setEvaluationRating] = useState<number>(5);
   const [evaluationComment, setEvaluationComment] = useState<string>('');
+  const [showTermsModal, setShowTermsModal] = useState<boolean>(false);
 
   // Admin Lecture Ratings Map (lectureId -> rating value)
   const [adminLectureRatings, setAdminLectureRatings] = useState<Record<string, number>>({});
 
-  // Admin Sub-tab (lectures, instructors, proposals)
-  const [adminSubTab, setAdminSubTab] = useState<'lectures' | 'instructors' | 'proposals'>('lectures');
+  // Admin Sub-tab (lectures, instructors, proposals, programs)
+  const [adminSubTab, setAdminSubTab] = useState<'lectures' | 'instructors' | 'proposals' | 'programs'>('lectures');
+  const [adminProgRoyalties, setAdminProgRoyalties] = useState<Record<string, number>>({});
 
   // Instructor Profile Editing (Admin Only)
   const [editingInstructor, setEditingInstructor] = useState<UserProfile | null>(null);
@@ -252,6 +257,22 @@ export default function App() {
       });
     };
   }, []);
+
+  // Automatically calculate lecture hours (newLecHours) based on newLecStartTime and newLecEndTime
+  useEffect(() => {
+    if (!newLecStartTime || !newLecEndTime) return;
+    const [startH, startM] = newLecStartTime.split(':').map(Number);
+    const [endH, endM] = newLecEndTime.split(':').map(Number);
+    if (!isNaN(startH) && !isNaN(startM) && !isNaN(endH) && !isNaN(endM)) {
+      const startMinutes = startH * 60 + startM;
+      const endMinutes = endH * 60 + endM;
+      const diffMinutes = endMinutes - startMinutes;
+      if (diffMinutes > 0) {
+        const calculatedHours = Math.max(1, Math.round((diffMinutes / 60) * 10) / 10);
+        setNewLecHours(calculatedHours);
+      }
+    }
+  }, [newLecStartTime, newLecEndTime]);
 
   // Authentication: Login
   const handleLogin = async (e: React.FormEvent) => {
@@ -551,18 +572,18 @@ export default function App() {
       description: cleanDesc,
       authorId: currentUser.uid,
       authorName: currentUser.name,
-      royaltyRate: Number(newProgRoyalty) || 100,
+      royaltyRate: 0, // Admin/master will determine and set this upon approval
       curriculum: cleanCurr.length > 0 ? cleanCurr : ["과정 오리엔테이션", "이론 및 핵심 역량 실습", "종합 워크숍 및 질의응답"],
       targetAudience: cleanAudience || "전사 임직원 및 기업 실무 교육 대상자",
       createdAt: new Date().toISOString(),
-      isApproved: true // Auto-approved for fast editing
+      isApproved: false // Requires admin master room approval!
     };
 
     const updatedProgs = [...programs, newProg];
     setPrograms(updatedProgs);
     await StorageService.saveProgram(newProg);
 
-    triggerToast("🚀 회원님이 설계하신 명품 기업 교육 제안서가 성공적으로 공식 카탈로그에 등록되었습니다!", "success");
+    triggerToast("🚀 설계하신 교육 과정 제안서가 성공적으로 임시 등록되었습니다! 마스터실 승인 및 마일리지 로열티 비율 결정 후 정식 카탈로그에 최종 반영됩니다.", "success");
     
     // Clear Form & close modal or navigate
     setNewProgTitle('');
@@ -570,6 +591,36 @@ export default function App() {
     setNewProgAudience('');
     setNewProgCurriculum('');
     setNewProgRoyalty(100);
+  };
+
+  // Feature: Approve proposed Educational Program with decided royaltyRate (Admin Only)
+  const handleApproveProgram = async (programId: string, royaltyRate: number) => {
+    const prog = programs.find(p => p.id === programId);
+    if (!prog) return;
+
+    const updatedProg: EducationalProgram = {
+      ...prog,
+      royaltyRate: Number(royaltyRate) || 0,
+      isApproved: true
+    };
+
+    const updatedProgs = programs.map(p => p.id === programId ? updatedProg : p);
+    setPrograms(updatedProgs);
+    await StorageService.saveProgram(updatedProg);
+
+    triggerToast(`💎 "${prog.title}" 과정이 정식 승인되어 카탈로그에 등록되었습니다! (지정 로열티 비율: 총 예산의 ${royaltyRate}%)`, "success");
+  };
+
+  // Feature: Reject or Delete proposed Educational Program (Admin Only)
+  const handleRejectProgram = async (programId: string) => {
+    const prog = programs.find(p => p.id === programId);
+    if (!prog) return;
+
+    const updatedProgs = programs.filter(p => p.id !== programId);
+    setPrograms(updatedProgs);
+    await StorageService.deleteProgram(programId);
+
+    triggerToast(`❌ "${prog.title}" 과정이 반려 및 목록에서 제외되었습니다.`, "info");
   };
 
   // Feature: Submit Partnership & Inquiries
@@ -639,7 +690,7 @@ export default function App() {
     const computedBudget = mainFee + assistantFee + materialFee;
 
     const assocProgram = programs.find(p => p.id === newLecProgramId);
-    const computedRoyalty = assocProgram ? assocProgram.royaltyRate : 0;
+    const computedRoyalty = assocProgram ? Math.round((computedBudget * (assocProgram.royaltyRate || 0)) / 100) : 0;
 
     const newLec: LectureRequest = {
       id: `lect_${Date.now()}`,
@@ -683,6 +734,15 @@ export default function App() {
   };
 
   const handleDownloadExcel = (lecture?: LectureRequest) => {
+    // If a specific lecture is provided, check if the currentUser has applied or is admin
+    if (lecture) {
+      const hasApplied = currentUser && lecture.applicants.includes(currentUser.uid);
+      if (!currentUser?.isAdmin && !hasApplied) {
+        triggerToast("🔒 이 강의 공고에 출강 지원을 신청한 강사님만 상세 엑셀 다운로드가 가능합니다.", "error");
+        return;
+      }
+    }
+
     // If a specific lecture is provided, download only that one. Otherwise, download all.
     const targets = lecture ? [lecture] : lectures;
     
@@ -918,20 +978,23 @@ export default function App() {
       if (prog) {
         const author = users.find(u => u.uid === prog.authorId);
         if (author) {
+          // Calculate actual royalty payout: (budget * royaltyRate%)
+          const actualRoyaltyPayout = lect.mileageRoyalty || Math.round((lect.budget * (prog.royaltyRate || 0)) / 100);
+
           const royaltyTx: MileageTransaction = {
             id: `tx_royalty_${Date.now()}_3`,
             userId: author.uid,
             userName: author.name,
             type: 'royalty',
-            amount: prog.royaltyRate,
-            description: `[KPCIA 지식저작권] 제안 과정 '${prog.title}' 출강 활용에 따른 마일리지 로열티 지급`,
+            amount: actualRoyaltyPayout,
+            description: `[KPCIA 지식저작권] 제안 과정 '${prog.title}' 출강 활용에 따른 로열티 마일리지 지급 (총 예산의 ${prog.royaltyRate}%)`,
             relatedId: prog.id,
             createdAt: new Date().toISOString()
           };
 
           const updatedAuthor: UserProfile = {
             ...author,
-            mileage: author.mileage + prog.royaltyRate,
+            mileage: author.mileage + actualRoyaltyPayout,
             updatedAt: new Date().toISOString()
           };
 
@@ -1526,8 +1589,22 @@ export default function App() {
                     <span className="text-[10px] text-orange-500/80 font-normal">| 몰입과 창조</span>
                   </h4>
                   <p className="text-[11px] text-neutral-400 mt-1 leading-relaxed">
-                    캘리그라피, 드로잉, 팝아트 등 감성 친화적 도구와 소재를 활용해 손끝으로 무언가를 완성해 나가는 과정에서 깊은 몰입과 성취감, 창의적 영감을 얻습니다.
+                    캘리, 드로잉, 팝아트 등 감성 친화적 예술 도구와 소재를 활용해 손끝으로 아름다운 작품을 완성해 나가는 과정에서 깊은 성취감과 창의적 영감을 얻습니다.
                   </p>
+                  <button 
+                    onClick={() => {
+                      if (currentUser && currentUser.isApproved) {
+                        setActiveTab('programs');
+                      } else {
+                        setActiveTab('lectures');
+                        triggerToast("ℹ️ 출강 정보센터에서 관련 매칭 공고를 즉시 확인하실 수 있습니다. (정회원 승인 후 고품격 교육과정 전체 열람 가능)", "info");
+                      }
+                    }}
+                    className="mt-2.5 text-[#D4AF37] hover:text-amber-300 font-black text-[10px] inline-flex items-center gap-1 transition-all cursor-pointer group/btn"
+                  >
+                    <span>🎨 공예/캘리/팝아트 교육과정 더보기</span>
+                    <ArrowRight className="w-3 h-3 transition-transform group-hover/btn:translate-x-1" />
+                  </button>
                 </div>
               </div>
             </div>
@@ -1702,13 +1779,6 @@ export default function App() {
                 <p className="text-xs text-neutral-400 mt-1">기업, 기관, 단체에서 접수된 사외 전문 특강 출강 요청 현황판입니다.</p>
               </div>
               <div className="flex flex-wrap items-center gap-3">
-                <button
-                  onClick={() => handleDownloadExcel()}
-                  className="px-3 py-1.5 rounded-lg bg-neutral-900 hover:bg-neutral-850 border border-neutral-800 text-neutral-300 text-[10px] font-bold transition-all cursor-pointer flex items-center gap-1.5 shadow-md"
-                >
-                  <Download className="w-3.5 h-3.5 text-emerald-400" />
-                  <span>전체 공고 엑셀 다운로드 (.csv)</span>
-                </button>
                 <span className="text-xs text-neutral-500">자격 등급 충족 시 즉각 지원 가능</span>
               </div>
             </div>
@@ -1769,7 +1839,7 @@ export default function App() {
 
                 return (
                   <>
-                    <div className="space-y-4">
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                       {paginatedLectures.map(lecture => {
                         const hasApplied = currentUser && lecture.applicants.includes(currentUser.uid);
                         const userRank = currentUser ? getTierRank(currentUser.tier) : 0;
@@ -1783,83 +1853,135 @@ export default function App() {
                         return (
                           <div 
                             key={lecture.id}
-                            className="p-4 sm:p-6 rounded-2xl bg-[#121214] border border-neutral-900 hover:border-neutral-800 transition-all relative overflow-hidden flex flex-col gap-4 sm:gap-5 text-left"
+                            className="p-5 sm:p-6 rounded-2xl bg-[#121214] border border-neutral-900/80 hover:border-neutral-800/80 hover:shadow-xl hover:shadow-black/10 transition-all duration-300 relative overflow-hidden flex flex-col gap-4 sm:gap-5 text-left"
                           >
                             {/* Top Header Row - Responsive wrapping */}
-                            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-neutral-800/60 pb-3">
-                              <div className="flex flex-wrap items-center gap-1.5 sm:gap-2">
-                                <span className="text-[9px] sm:text-[10px] font-extrabold bg-[#D4AF37]/10 text-[#D4AF37] px-2 py-0.5 rounded border border-[#D4AF37]/20 uppercase tracking-wider">
-                                  {lecture.companyName || "익명 기업"}
-                                </span>
-                                <span className={`text-[9px] font-black px-2 py-0.5 rounded ${getTierColor(lecture.targetTier)}`}>
+                            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-neutral-900 pb-3.5">
+                              <div className="flex flex-wrap items-center gap-2">
+                                <div className="flex items-center gap-1.5 bg-neutral-950 border border-neutral-850 rounded-lg px-2.5 py-1 text-[10px] text-neutral-400 font-bold">
+                                  <Building className="w-3.5 h-3.5 text-[#D4AF37] shrink-0" />
+                                  <span>{lecture.companyName || "익명 기업"}</span>
+                                </div>
+                                <span className={`text-[10px] font-black px-2.5 py-1 rounded-lg border ${getTierColor(lecture.targetTier)}`}>
                                   지원 자격: {lecture.targetTier}
                                 </span>
                               </div>
-                              <div className="flex items-center gap-2 self-start sm:self-center">
-                                <span className={`text-[9px] sm:text-[10px] font-bold px-2 py-0.5 rounded-full ${
+                              <div className="shrink-0">
+                                <span className={`text-[10px] font-black px-2.5 py-1 rounded-full flex items-center gap-1.5 ${
                                   lecture.status === 'completed' 
                                     ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' 
                                     : lecture.status === 'assigned'
                                     ? 'bg-blue-500/10 text-blue-400 border border-blue-500/20'
                                     : 'bg-amber-500/10 text-[#D4AF37] border border-[#D4AF37]/20'
                                 }`}>
+                                  <span className={`w-1.5 h-1.5 rounded-full ${
+                                    lecture.status === 'completed' 
+                                      ? 'bg-emerald-400' 
+                                      : lecture.status === 'assigned'
+                                      ? 'bg-blue-400'
+                                      : 'bg-amber-400 animate-pulse'
+                                  }`} />
                                   {lecture.status === 'completed' ? '출강 완료(정산완료)' : lecture.status === 'assigned' ? '강사배정 완료' : '강사모집 중'}
                                 </span>
                               </div>
                             </div>
 
-                            {/* Date/Time Banner - Bold & highly visible */}
-                            <div className="flex flex-col xs:flex-row xs:items-center gap-2 text-neutral-300 font-bold text-[10px] sm:text-xs">
-                              <span className="bg-neutral-950 border border-neutral-900 rounded-lg px-2.5 py-1.5 flex items-center gap-1.5 w-full xs:w-auto justify-center sm:justify-start">
-                                <Calendar className="w-3.5 h-3.5 text-amber-400 shrink-0" />
-                                <span>{lecture.date}</span>
-                              </span>
-                              <span className="hidden xs:inline text-neutral-800">|</span>
-                              <span className="bg-neutral-950 border border-neutral-900 rounded-lg px-2.5 py-1.5 flex items-center gap-1.5 w-full xs:w-auto justify-center sm:justify-start">
-                                <Clock className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
-                                <span>{lecture.time}</span>
-                              </span>
-                            </div>
-
                             {/* Content Area: Blurred if restricted */}
-                            <div className="relative">
-                              <div className={`space-y-4 ${isRestricted ? 'blur-md select-none pointer-events-none' : ''}`}>
-                                <div className="space-y-2">
-                                  <h3 className="text-sm sm:text-base font-black text-white leading-snug">{lecture.title}</h3>
-                                  <p className="text-[10px] sm:text-[11px] text-neutral-400 leading-relaxed whitespace-pre-wrap">{lecture.description}</p>
+                            <div className="relative flex-1 flex flex-col gap-4">
+                              <div className={`space-y-4 flex-1 flex flex-col justify-between ${isRestricted ? 'blur-md select-none pointer-events-none' : ''}`}>
+                                <div className="space-y-3">
+                                  {/* Associated Program Information with beautiful accent */}
+                                  {lecture.programTitle && (
+                                    <div className="flex items-center gap-2 bg-amber-500/[0.03] border border-amber-500/10 rounded-xl px-3 py-2 text-xs text-neutral-300">
+                                      <span className="shrink-0 bg-amber-500/10 text-[#D4AF37] font-extrabold text-[9px] px-1.5 py-0.5 rounded-md border border-amber-500/20 tracking-wider">
+                                        지식 IP 연계 과정
+                                      </span>
+                                      <span className="font-extrabold truncate text-neutral-200">
+                                        {lecture.programTitle}
+                                      </span>
+                                    </div>
+                                  )}
+
+                                  <h3 className="text-base sm:text-lg font-black text-white leading-snug tracking-tight hover:text-[#D4AF37] transition-colors">
+                                    {lecture.title}
+                                  </h3>
+                                  
+                                  <p className="text-xs text-neutral-400 leading-relaxed whitespace-pre-wrap bg-neutral-950/30 p-3 rounded-xl border border-neutral-900/50">
+                                    {lecture.description}
+                                  </p>
                                 </div>
 
-                                <div className="grid grid-cols-2 md:grid-cols-5 gap-2 text-[10px] sm:text-[11px] text-neutral-400 bg-neutral-950/40 p-3 sm:p-4 rounded-xl border border-neutral-900">
-                                  <div className="space-y-0.5">
-                                    <span className="text-neutral-500 font-bold block text-[9px] uppercase">📍 장소</span>
-                                    <span className="text-neutral-200 font-semibold block truncate" title={lecture.location}>{lecture.location}</span>
+                                {/* Premium Parameter Bento Box Grid */}
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mt-1">
+                                  {/* Section 1: 일정 및 장소 정보 */}
+                                  <div className="p-3 bg-neutral-950/40 rounded-xl border border-neutral-900/60 space-y-2">
+                                    <h4 className="text-[10px] font-black text-neutral-500 uppercase tracking-wider pb-1 border-b border-neutral-900/40 flex items-center gap-1.5">
+                                      <Calendar className="w-3.5 h-3.5 text-neutral-500" />
+                                      <span>출강 일정 및 장소</span>
+                                    </h4>
+                                    <div className="space-y-1.5 text-xs text-neutral-300 font-medium">
+                                      <div className="flex items-center gap-2">
+                                        <span className="text-neutral-500 w-12 text-[10px] font-bold">일정</span>
+                                        <span className="text-white font-extrabold">{lecture.date}</span>
+                                      </div>
+                                      <div className="flex items-center gap-2">
+                                        <span className="text-neutral-500 w-12 text-[10px] font-bold">시간</span>
+                                        <span className="text-emerald-400 font-extrabold">{lecture.time} <span className="text-neutral-500 font-medium">({lecture.duration || '3시간'})</span></span>
+                                      </div>
+                                      <div className="flex items-center gap-2">
+                                        <span className="text-neutral-500 w-12 text-[10px] font-bold">장소</span>
+                                        <span className="text-neutral-200 truncate" title={lecture.location}>{lecture.location}</span>
+                                      </div>
+                                      <div className="flex items-center gap-2">
+                                        <span className="text-neutral-500 w-12 text-[10px] font-bold">인원</span>
+                                        <span className="text-neutral-200 font-extrabold">{lecture.attendees || 30}명 예정</span>
+                                      </div>
+                                    </div>
                                   </div>
-                                  <div className="space-y-0.5">
-                                    <span className="text-neutral-500 font-bold block text-[9px] uppercase">👥 예정인원</span>
-                                    <span className="text-neutral-200 font-bold block">{lecture.attendees}명</span>
-                                  </div>
-                                  <div className="space-y-0.5">
-                                    <span className="text-neutral-500 font-bold block text-[9px] uppercase">⏱️ 시간</span>
-                                    <span className="text-neutral-200 font-bold block">{lecture.duration || '3시간'}</span>
-                                  </div>
-                                  <div className="space-y-0.5">
-                                    <span className="text-neutral-500 font-bold block text-[9px] uppercase">💰 총예산</span>
-                                    <span className="text-amber-400 font-extrabold block">₩{lecture.budget.toLocaleString()}</span>
-                                  </div>
-                                  <div className="space-y-0.5 col-span-2 md:col-span-1">
-                                    <span className="text-neutral-500 font-bold block text-[9px] uppercase">🪙 마일리지</span>
-                                    <span className="text-emerald-400 font-extrabold block">{lecture.mileageRoyalty} M</span>
+
+                                  {/* Section 2: 정산 및 로열티 정보 */}
+                                  <div className="p-3 bg-amber-500/[0.01] rounded-xl border border-neutral-900/60 space-y-2 flex flex-col justify-between">
+                                    <div className="space-y-2">
+                                      <h4 className="text-[10px] font-black text-[#D4AF37] uppercase tracking-wider pb-1 border-b border-neutral-900/40 flex items-center gap-1.5">
+                                        <Coins className="w-3.5 h-3.5 text-amber-500" />
+                                        <span>정산 및 저작권 수익</span>
+                                      </h4>
+                                      <div className="space-y-1.5 text-xs font-medium">
+                                        <div className="flex items-center justify-between">
+                                          <span className="text-neutral-500 text-[10px] font-bold">출강 총 예산</span>
+                                          <span className="text-white font-black text-sm">₩{lecture.budget.toLocaleString()} 원</span>
+                                        </div>
+                                        <div className="flex items-center justify-between pt-1 border-t border-neutral-900/20">
+                                          <span className="text-[#D4AF37] text-[10px] font-extrabold flex items-center gap-1">
+                                            <Sparkles className="w-3 h-3 text-[#D4AF37] animate-pulse" />
+                                            <span>지식 IP 로열티 (5%)</span>
+                                          </span>
+                                          <span className="text-amber-400 font-black text-sm">
+                                            {(lecture.mileageRoyalty || Math.round(lecture.budget * 0.05)).toLocaleString()} M
+                                          </span>
+                                        </div>
+                                      </div>
+                                    </div>
+                                    <div className="text-[9px] text-neutral-500 font-semibold text-right mt-1 leading-normal">
+                                      출강 매칭 완료 시 저작권자에게 즉시 적립 (1 M = ₩1 상당)
+                                    </div>
                                   </div>
                                 </div>
 
                                 {/* Extra info for assigned lecture */}
                                 {(lecture.assignedName || lecture.assistantName) && (
-                                  <div className="text-[10px] sm:text-[11px] text-neutral-400 flex flex-wrap gap-x-4 gap-y-1 bg-neutral-950/20 p-2.5 rounded-lg border border-neutral-900/40">
+                                  <div className="text-[10px] sm:text-[11px] text-neutral-400 flex flex-wrap gap-x-4 gap-y-1.5 bg-neutral-950/30 p-3 rounded-xl border border-neutral-900/50">
                                     {lecture.assignedName && (
-                                      <span>👤 주강사: <strong className="text-white">{lecture.assignedName}</strong></span>
+                                      <span className="flex items-center gap-1.5">
+                                        <span className="text-[9px] font-bold bg-blue-500/10 text-blue-400 px-1.5 py-0.5 rounded uppercase tracking-wider">주강사</span>
+                                        <strong className="text-white font-extrabold">{lecture.assignedName}</strong>
+                                      </span>
                                     )}
                                     {lecture.assistantName && (
-                                      <span>👥 보조강사: <strong className="text-white">{lecture.assistantName}</strong></span>
+                                      <span className="flex items-center gap-1.5">
+                                        <span className="text-[9px] font-bold bg-purple-500/10 text-purple-400 px-1.5 py-0.5 rounded uppercase tracking-wider">보조강사</span>
+                                        <strong className="text-white font-extrabold">{lecture.assistantName}</strong>
+                                      </span>
                                     )}
                                   </div>
                                 )}
@@ -1867,14 +1989,16 @@ export default function App() {
 
                               {/* Restricted / Lock Overlay */}
                               {isRestricted && (
-                                <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/55 backdrop-blur-md rounded-xl p-4 text-center border border-neutral-900">
-                                  <div className="h-9 w-9 rounded-full bg-neutral-900 border border-neutral-800 flex items-center justify-center mb-2">
-                                    <Lock className="w-4 h-4 text-amber-500 animate-pulse" />
+                                <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/60 backdrop-blur-md rounded-2xl p-4 text-center border border-neutral-900">
+                                  <div className="h-10 w-10 rounded-full bg-neutral-950 border border-neutral-850 flex items-center justify-center mb-3 shadow-lg shadow-black/40">
+                                    <Lock className="w-4.5 h-4.5 text-amber-500 animate-pulse" />
                                   </div>
-                                  <h4 className="text-[11px] sm:text-xs font-bold text-[#D4AF37] tracking-tight">🔒 등급별 출강정보 접근제한 구역</h4>
-                                  <p className="text-[9px] sm:text-[10px] text-neutral-400 max-w-sm mt-1 leading-normal">
-                                    이 공고는 <span className="text-amber-400 font-bold">{lecture.targetTier}</span> 등급 전용 매칭 공고입니다.<br />
-                                    로그인 후 승격 요건을 완수하여 등급 상향 시 전체 열람 및 즉시 지원이 가능합니다.
+                                  <h4 className="text-xs sm:text-sm font-black text-[#D4AF37] tracking-tight flex items-center gap-1.5">
+                                    <span>🔒 등급별 출강정보 접근제한 구역</span>
+                                  </h4>
+                                  <p className="text-[10px] sm:text-xs text-neutral-400 max-w-sm mt-2 leading-relaxed">
+                                    본 매칭 공고는 <span className="text-amber-400 font-extrabold">{lecture.targetTier}</span> 등급 전용 특별 매칭입니다.<br />
+                                    활동 실적 정산을 통해 등급을 충족하시면 즉시 열람 및 매칭 지원이 가능합니다.
                                   </p>
                                 </div>
                               )}
@@ -1885,13 +2009,24 @@ export default function App() {
                               <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pt-3 border-t border-neutral-900/60">
                                 {/* Left Actions / Info */}
                                 <div className="flex flex-wrap items-center gap-2">
-                                  <button
-                                    onClick={() => handleDownloadExcel(lecture)}
-                                    className="px-3 py-1.5 rounded-lg bg-neutral-950 hover:bg-neutral-900 border border-neutral-850 text-neutral-300 text-[10px] font-bold transition-all cursor-pointer flex items-center gap-1.5"
-                                  >
-                                    <Download className="w-3 h-3 text-emerald-400" />
-                                    <span>강의상세 엑셀 다운로드</span>
-                                  </button>
+                                  {hasApplied || currentUser?.isAdmin ? (
+                                    <button
+                                      onClick={() => handleDownloadExcel(lecture)}
+                                      className="px-3 py-1.5 rounded-lg bg-neutral-950 hover:bg-neutral-900 border border-neutral-850 text-neutral-300 text-[10px] font-bold transition-all cursor-pointer flex items-center gap-1.5"
+                                    >
+                                      <Download className="w-3 h-3 text-emerald-400" />
+                                      <span>강의상세 엑셀 다운로드</span>
+                                    </button>
+                                  ) : (
+                                    <button
+                                      onClick={() => triggerToast("🔒 이 강의 공고에 출강 지원을 신청한 강사님만 상세 엑셀 다운로드가 가능합니다.", "error")}
+                                      className="px-3 py-1.5 rounded-lg bg-neutral-950/40 border border-neutral-900 text-neutral-500 text-[10px] font-bold cursor-pointer flex items-center gap-1.5"
+                                      title="출강 신청 강사님 전용 다운로드"
+                                    >
+                                      <Lock className="w-3 h-3 text-neutral-600" />
+                                      <span>강의상세 (지원자 전용)</span>
+                                    </button>
+                                  )}
 
                                   {/* Certificate download triggers if matching active or completed */}
                                   {(lecture.status === 'assigned' || lecture.status === 'completed') && (currentUser?.isAdmin || isMainLecturer || isAssistantLecturer) && (
@@ -2034,7 +2169,7 @@ export default function App() {
                 <p className="text-xs text-neutral-400 mt-1">소속 우수 강사들이 직접 기획/설계하고 협회가 공인한 명작 커리큘럼입니다.</p>
               </div>
               <div className="text-xs text-neutral-400">
-                출강 시 프로그램 저작자에게 <strong className="text-[#D4AF37]">마일리지 로열티</strong> 지급
+                출강 시 프로그램 저작자에게 <strong className="text-[#D4AF37]">지식 IP 로열티 (총 예산의 % 비율)</strong> 지급
               </div>
             </div>
 
@@ -2106,15 +2241,7 @@ export default function App() {
                       />
                     </div>
 
-                    <div className="space-y-1">
-                      <label className="text-neutral-400 font-semibold block">희망 마일리지 로열티 (출강당 지급 M)</label>
-                      <input
-                        type="number"
-                        value={newProgRoyalty}
-                        onChange={(e) => setNewProgRoyalty(Number(e.target.value))}
-                        className="w-full bg-[#09090B] border border-neutral-800 rounded-lg px-3 py-2.5 text-white focus:outline-none focus:border-[#D4AF37] text-xs font-bold"
-                      />
-                    </div>
+
 
                     <button
                       type="submit"
@@ -2129,7 +2256,7 @@ export default function App() {
               {/* Programs Catalog (Right Side - 2 Cols) */}
               <div className="md:col-span-2 space-y-6" id="programs-catalog-container">
                 <div className="grid gap-6">
-                  {programs.map(prog => (
+                  {programs.filter(prog => prog.isApproved).map(prog => (
                     <div 
                       key={prog.id}
                       className="p-6 rounded-2xl bg-[#121214] border border-neutral-900 flex flex-col justify-between gap-4"
@@ -2138,7 +2265,7 @@ export default function App() {
                         <div className="flex justify-between items-start gap-4">
                           <h3 className="text-base font-black text-white">{prog.title}</h3>
                           <span className="text-[10px] font-bold text-amber-400 bg-amber-500/10 px-2 py-1 rounded border border-amber-500/20 whitespace-nowrap">
-                            로열티: {prog.royaltyRate} M / 회당
+                            로열티: 총 예산의 {prog.royaltyRate}%
                           </span>
                         </div>
                         
@@ -2640,6 +2767,26 @@ export default function App() {
                   </span>
                 )}
               </button>
+
+              <button
+                onClick={() => setAdminSubTab('programs')}
+                className={`px-5 py-3 text-xs font-black transition-all border-b-2 shrink-0 flex items-center gap-1.5 cursor-pointer ${
+                  adminSubTab === 'programs'
+                    ? 'border-[#D4AF37] text-[#D4AF37] bg-amber-500/5'
+                    : 'border-transparent text-neutral-400 hover:text-neutral-200 hover:bg-neutral-950/40'
+                }`}
+              >
+                <span>💎 명품 교육과정 승인대기</span>
+                {programs.filter(p => !p.isApproved).length > 0 ? (
+                  <span className="px-1.5 py-0.5 rounded-full bg-amber-500/10 text-amber-500 border border-amber-500/20 text-[9px] font-bold animate-pulse">
+                    대기 {programs.filter(p => !p.isApproved).length}
+                  </span>
+                ) : (
+                  <span className="px-1.5 py-0.5 rounded-full bg-neutral-950 text-neutral-400 border border-neutral-850 text-[9px]">
+                    {programs.length}
+                  </span>
+                )}
+              </button>
             </div>
 
             {/* Admin Grid: Left Form, Right List */}
@@ -2702,50 +2849,50 @@ export default function App() {
                     </div>
 
                     <div className="space-y-3 p-3.5 bg-neutral-950/60 rounded-xl border border-neutral-850">
-                      <div className="grid grid-cols-2 gap-3">
-                        <div className="space-y-1">
-                          <label className="text-neutral-400 font-bold flex items-center gap-1.5">
-                            <Calendar className="w-3.5 h-3.5 text-amber-400 animate-pulse" />
+                      <div className="space-y-3.5">
+                        <div className="space-y-1.5">
+                          <label className="text-neutral-400 font-bold flex items-center gap-1.5 text-xs">
+                            <Calendar className="w-3.5 h-3.5 text-amber-400 shrink-0" />
                             <span>출강 일자</span>
                           </label>
                           <input
                             type="date"
                             value={newLecDate}
                             onChange={(e) => setNewLecDate(e.target.value)}
-                            className="w-full bg-neutral-950 border border-neutral-800 rounded-lg px-2.5 py-2 text-white focus:outline-none focus:border-[#D4AF37] text-xs"
+                            className="w-full bg-neutral-950 border border-neutral-800 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-[#D4AF37] text-xs"
                           />
                         </div>
 
-                        <div className="space-y-1">
-                          <label className="text-neutral-400 font-bold flex items-center gap-1.5">
-                            <Clock className="w-3.5 h-3.5 text-emerald-400 animate-pulse" />
+                        <div className="space-y-1.5">
+                          <label className="text-neutral-400 font-bold flex items-center gap-1.5 text-xs">
+                            <Clock className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
                             <span>강의 시간 (시작 ~ 종료)</span>
                           </label>
-                          <div className="flex items-center gap-1">
+                          <div className="flex items-center gap-2">
                             <input
                               type="time"
                               value={newLecStartTime}
                               onChange={(e) => setNewLecStartTime(e.target.value)}
-                              className="w-full bg-neutral-950 border border-neutral-800 rounded-lg px-1.5 py-2 text-white focus:outline-none focus:border-[#D4AF37] text-[11px] font-bold text-center"
+                              className="flex-1 bg-neutral-950 border border-neutral-800 rounded-lg px-2 py-2 text-white focus:outline-none focus:border-[#D4AF37] text-xs font-bold text-center"
                             />
-                            <span className="text-neutral-600 font-black">~</span>
+                            <span className="text-neutral-600 font-black shrink-0">~</span>
                             <input
                               type="time"
                               value={newLecEndTime}
                               onChange={(e) => setNewLecEndTime(e.target.value)}
-                              className="w-full bg-[#09090b] border border-neutral-800 rounded-lg px-1.5 py-2 text-white focus:outline-none focus:border-[#D4AF37] text-[11px] font-bold text-center"
+                              className="flex-1 bg-[#09090b] border border-neutral-800 rounded-lg px-2 py-2 text-white focus:outline-none focus:border-[#D4AF37] text-xs font-bold text-center"
                             />
                           </div>
                         </div>
                       </div>
 
-                      <div className="grid grid-cols-2 gap-3">
-                        <div className="space-y-1">
-                          <label className="text-neutral-400 font-semibold block">요구 강사 등급컷</label>
+                      <div className="space-y-3.5 pt-1.5">
+                        <div className="space-y-1.5">
+                          <label className="text-neutral-400 font-semibold block text-xs">요구 강사 등급컷</label>
                           <select
                             value={newLecTier}
                             onChange={(e) => setNewLecTier(e.target.value as any)}
-                            className="w-full bg-[#09090b] border border-neutral-800 rounded-lg px-2.5 py-2 text-white focus:outline-none focus:border-[#D4AF37] text-xs cursor-pointer"
+                            className="w-full bg-[#09090b] border border-neutral-800 rounded-lg px-2.5 py-2 text-white focus:outline-none focus:border-[#D4AF37] text-xs cursor-pointer font-medium"
                           >
                             <option value="Prestige Member">Prestige Member 이상</option>
                             <option value="Prestige Associate">Prestige Associate 이상</option>
@@ -2754,10 +2901,6 @@ export default function App() {
                             <option value="Prestige Elite">Prestige Elite 전용</option>
                             <option value="Prestige Legend">Prestige Legend 전용</option>
                           </select>
-                        </div>
-                        <div className="space-y-1 flex flex-col justify-end text-right">
-                          <span className="text-[10px] text-neutral-500 font-bold">예시 입력 도움:</span>
-                          <span className="text-[11px] text-[#D4AF37] font-extrabold tracking-wider">10:00 ~ 12:00</span>
                         </div>
                       </div>
                     </div>
@@ -2805,7 +2948,7 @@ export default function App() {
                         className="w-full bg-neutral-950 border border-neutral-800 rounded-lg px-2.5 py-2 text-white focus:outline-none focus:border-[#D4AF37] text-xs cursor-pointer"
                       >
                         <option value="">과정 선택 안함 (로열티 없음)</option>
-                        {programs.map(p => (
+                        {programs.filter(p => p.isApproved).map(p => (
                           <option key={p.id} value={p.id}>{p.title} (저작권자: {p.authorName})</option>
                         ))}
                       </select>
@@ -3158,6 +3301,119 @@ export default function App() {
                     ))}
                     {proposals.length === 0 && (
                       <div className="text-neutral-500 text-center py-4">접수된 외부 제휴 및 의뢰서가 존재하지 않습니다.</div>
+                    )}
+                  </div>
+                </div>
+
+              </div>
+            )}
+
+            {adminSubTab === 'programs' && (
+              <div className="animate-in fade-in duration-200 space-y-6">
+                
+                {/* Premium Curriculum Approval Room */}
+                <div className="p-6 rounded-2xl bg-neutral-900 border border-neutral-800 space-y-4">
+                  <h3 className="text-sm font-black text-white border-b border-neutral-800 pb-2.5 flex justify-between items-center">
+                    <span>💎 KPCIA 명품 자체 개발 교육 과정 승인 심사대</span>
+                    <span className="text-[10px] text-neutral-400 font-medium">소속 강사가 제안한 지식재산(IP) 교육과정 승인 관리</span>
+                  </h3>
+
+                  <div className="space-y-4">
+                    {programs.map(prog => {
+                      const royaltyValue = adminProgRoyalties[prog.id] ?? prog.royaltyRate;
+                      return (
+                        <div key={prog.id} className="p-5 rounded-xl bg-neutral-950 border border-neutral-850 space-y-3.5 text-xs text-left">
+                          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 border-b border-neutral-900 pb-2.5">
+                            <div>
+                              <h4 className="font-extrabold text-white text-sm">{prog.title}</h4>
+                              <span className="text-[10px] text-neutral-400 mt-1 block">
+                                제안자: <strong className="text-[#D4AF37]">{prog.authorName}</strong> | 등록일자: {new Date(prog.createdAt).toLocaleDateString()}
+                              </span>
+                            </div>
+                            <span className={`text-[10px] font-black px-2 py-0.5 rounded ${
+                              prog.isApproved 
+                                ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' 
+                                : 'bg-amber-500/10 text-[#D4AF37] border border-[#D4AF37]/20 animate-pulse'
+                            }`}>
+                              {prog.isApproved ? '✅ 정식승인 완료' : '⏳ 승인 대기중'}
+                            </span>
+                          </div>
+
+                          <div className="space-y-2 text-neutral-300">
+                            <p className="text-neutral-400 leading-relaxed text-[11px]">{prog.description}</p>
+                            <div className="text-[10px] text-neutral-500">
+                              🎯 주 교육대상: <span className="text-neutral-300 font-bold">{prog.targetAudience}</span>
+                            </div>
+                            
+                            <div className="bg-neutral-900/60 p-3 rounded-lg border border-neutral-850 space-y-1 mt-1">
+                              <span className="text-[9px] text-neutral-500 font-bold uppercase block mb-1">📖 제안 커리큘럼</span>
+                              {prog.curriculum.map((curr, idx) => (
+                                <div key={idx} className="text-[10.5px] text-neutral-300 pl-3 relative before:content-['•'] before:absolute before:left-0">
+                                  {curr}
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+
+                          {/* Approval and Royalty Rate Controls */}
+                          <div className="flex flex-col sm:flex-row items-center justify-between gap-4 pt-3.5 border-t border-neutral-900/60">
+                            <div className="flex items-center gap-2 w-full sm:w-auto">
+                              <label className="text-neutral-400 font-bold text-[10px] shrink-0">🪙 지식 IP 로열티 요율 결정 (총 예산의 % 비율):</label>
+                              <div className="flex items-center gap-1.5">
+                                <input
+                                  type="number"
+                                  placeholder="예) 10"
+                                  value={royaltyValue}
+                                  onChange={(e) => setAdminProgRoyalties({
+                                    ...adminProgRoyalties,
+                                    [prog.id]: Number(e.target.value)
+                                  })}
+                                  className="w-16 bg-neutral-900 border border-neutral-800 rounded px-2.5 py-1 text-white font-extrabold text-center focus:outline-none focus:border-[#D4AF37]"
+                                />
+                                <span className="text-white font-black text-xs">%</span>
+                              </div>
+                            </div>
+
+                            <div className="flex items-center gap-2 w-full sm:w-auto justify-end">
+                              {!prog.isApproved ? (
+                                <>
+                                  <button
+                                    onClick={() => handleRejectProgram(prog.id)}
+                                    className="px-3.5 py-1.5 rounded-lg bg-red-500/10 hover:bg-red-500/20 border border-red-500/20 text-red-400 font-bold transition-all cursor-pointer text-[11px]"
+                                  >
+                                    반려/삭제
+                                  </button>
+                                  <button
+                                    onClick={() => handleApproveProgram(prog.id, royaltyValue)}
+                                    className="px-4.5 py-1.5 rounded-lg bg-gradient-to-r from-amber-500 to-[#D4AF37] text-neutral-950 font-black hover:brightness-110 shadow-lg shadow-amber-500/10 transition-all cursor-pointer text-[11px]"
+                                  >
+                                    설정 적용 및 과정 승인
+                                  </button>
+                                </>
+                              ) : (
+                                <div className="flex items-center gap-2">
+                                  <button
+                                    onClick={() => handleApproveProgram(prog.id, royaltyValue)}
+                                    className="px-3.5 py-1.5 rounded-lg bg-neutral-900 hover:bg-neutral-800 border border-neutral-800 text-neutral-300 font-bold transition-all cursor-pointer text-[11px]"
+                                  >
+                                    로열티 비율만 수정
+                                  </button>
+                                  <button
+                                    onClick={() => handleRejectProgram(prog.id)}
+                                    className="px-3 py-1.5 rounded-lg bg-neutral-950 hover:bg-neutral-900 border border-neutral-850 text-neutral-500 hover:text-red-400 transition-all cursor-pointer text-[11px]"
+                                  >
+                                    과정 취소
+                                  </button>
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
+
+                    {programs.length === 0 && (
+                      <div className="text-neutral-500 text-center py-4">제안된 명품 교육 과정이 존재하지 않습니다.</div>
                     )}
                   </div>
                 </div>
@@ -3661,13 +3917,74 @@ export default function App() {
                       type="checkbox"
                       id="regTermsAccepted"
                       checked={regTermsAccepted}
-                      onChange={(e) => setRegTermsAccepted(e.target.checked)}
+                      onChange={(e) => {
+                        if (e.target.checked) {
+                          setShowTermsModal(true);
+                        } else {
+                          setRegTermsAccepted(false);
+                        }
+                      }}
                       className="mt-0.5 cursor-pointer accent-[#D4AF37] w-3.5 h-3.5"
                     />
-                    <label htmlFor="regTermsAccepted" className="cursor-pointer leading-normal select-none">
-                      KPCIA 한국프레스티지기업강사협회 정회원 가입 약관 및 개인정보 수집·이용 동의 (필수)
+                    <label 
+                      onClick={() => setShowTermsModal(true)}
+                      className="cursor-pointer leading-normal select-none text-neutral-300 hover:text-white transition-all font-bold"
+                    >
+                      KPCIA 한국프레스티지기업강사협회 정회원 가입 약관 및 개인정보 수집·이용 동의 (필수 - 클릭하여 약관 보기)
                     </label>
                   </div>
+
+                  {/* Terms Modal Popup */}
+                  {showTermsModal && (
+                    <div className="fixed inset-0 z-[1000] bg-black/90 backdrop-blur-md flex items-center justify-center p-4 animate-in fade-in duration-300">
+                      <div className="w-full max-w-lg bg-neutral-900 border border-neutral-800 rounded-2xl p-5 sm:p-6 space-y-4 text-left shadow-2xl">
+                        <h3 className="text-sm sm:text-base font-black text-white flex items-center gap-2 border-b border-neutral-800 pb-3">
+                          <span>📜 KPCIA 한국프레스티지기업강사협회 정회원 약관</span>
+                        </h3>
+                        
+                        <div className="h-64 overflow-y-auto bg-neutral-950 p-4 rounded-xl border border-neutral-850 text-[11px] text-neutral-300 space-y-3 leading-relaxed">
+                          <p className="font-extrabold text-[#D4AF37] text-xs">【 한국프레스티지기업강사협회 정회원 가입 약관 】</p>
+                          
+                          <div className="space-y-2">
+                            <p><strong>제 1 조 (목적)</strong><br />본 약관은 KPCIA 한국프레스티지기업강사협회(이하 &apos;협회&apos;)가 제공하는 명품 기업 강사 매칭, 디지털 출강 위임장 발행, 지식 저작권 교육과정 공유 및 마일리지 정산 시스템 등의 서비스 이용과 관련하여 협회와 소속 강사 회원 간의 권리, 의무 및 제반 절차를 규정함을 목적으로 합니다.</p>
+                            <p><strong>제 2 조 (정회원 가입 신청 및 승인)</strong><br />1. 모든 강사 회원은 본 약관 및 개인정보 수집·이용에 동의한 후 회원 가입을 신청할 수 있습니다.<br />2. 가입 신청 후 관리자(마스터실)의 이력 검토 및 소속 자격 심사 후 최종 승인(isApproved)이 완료되어야 정회원 혜택과 실시간 출강 요청 지원이 공식 활성화됩니다.</p>
+                            <p><strong>제 3 조 (자체 개발 교육과정 및 지식 IP 로열티)</strong><br />1. 정회원은 자신의 교육 창의력과 공예, 캘리, 팝아트 등 자연 친화적 지식재산을 활용해 설계한 자체 교육과정을 제안할 수 있습니다.<br />2. 제안된 교육과정은 마스터실의 승인 및 지정 로열티 비율(총 예산의 % 비율) 확정 후 정식 카탈로그에 노출되며, 해당 과정에 연계되어 다른 기업 출강 매칭 시 지정된 비율에 따른 로열티 마일리지가 지급됩니다.</p>
+                          </div>
+
+                          <p className="font-extrabold text-[#D4AF37] text-xs pt-1">【 개인정보 수집 및 이용 동의 (필수) 】</p>
+                          <div className="space-y-2 text-neutral-400">
+                            <p>1. 수집 항목: 성명, 아이디, 비밀번호, 성별, 생년월일, 연락처, 이메일, 전문 분야, 학력/이력 사항, SNS/블로그 링크, 프로필 한줄 소개 등<br />
+                            2. 수집 목적: 정회원 신원 확인, 등급 부여, 출강 공고 추천, 매칭 시 위임장/확약서 디지털 증서 발행, 마일리지 누적 및 정산 서비스 제공<br />
+                            3. 보유 기간: 회원 탈퇴 시까지 또는 법정 의무 보유 기간까지 보관합니다.</p>
+                          </div>
+                        </div>
+
+                        <div className="flex gap-2.5 pt-2">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setRegTermsAccepted(false);
+                              setShowTermsModal(false);
+                            }}
+                            className="flex-1 py-2 rounded-lg bg-neutral-950 border border-neutral-800 text-neutral-400 hover:text-white text-xs font-bold transition-all cursor-pointer text-center"
+                          >
+                            동의하지 않음
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setRegTermsAccepted(true);
+                              setShowTermsModal(false);
+                              triggerToast("📜 약관 및 개인정보 동의가 수락되었습니다.", "success");
+                            }}
+                            className="flex-1 py-2 rounded-lg bg-gradient-to-r from-amber-500 to-[#D4AF37] text-neutral-950 font-black text-xs transition-all cursor-pointer text-center"
+                          >
+                            동의 및 수락함
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  )}
 
                   <button
                     type="submit"
