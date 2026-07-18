@@ -15,6 +15,7 @@ import {
 import { getAuth } from 'firebase/auth';
 import { UserProfile, LectureRequest, EducationalProgram, MileageTransaction, InstructorTier, DigitalBadge, PartnershipProposal } from '../types';
 import firebaseConfig from '../../firebase-applet-config.json';
+import { getCompletedLectures } from '../data/completed_lectures';
 
 // Initialize Firebase with exact applet database ID configuration
 let app;
@@ -111,68 +112,7 @@ export const INITIAL_PROGRAMS: EducationalProgram[] = [
   }
 ];
 
-export const INITIAL_LECTURES: LectureRequest[] = [
-  {
-    id: "lect_samsung_ai",
-    title: "삼성전자 DS부문 초격차 AI 반도체 트렌드 특강",
-    description: "반도체 연구소 임직원을 대상으로 하는 초격차 생성형 AI 및 첨단 패키징 트렌드 명품 특강 출강입니다.",
-    targetTier: "Prestige Elite",
-    budget: 2500000,
-    mileageRoyalty: 125000,
-    programId: "prog_ai_innovation",
-    programTitle: "대기업 생성형 AI 워크플로우 생산성 혁신 솔루션",
-    date: "2026-07-20",
-    time: "13:00 - 16:00",
-    duration: "3시간",
-    location: "경기도 용인시 삼성인력개발원",
-    attendees: 120,
-    managerName: "박준영 수석연구원",
-    managerPhone: "010-4321-8765",
-    status: "open",
-    applicants: [],
-    createdAt: "2026-07-01T12:00:00Z"
-  },
-  {
-    id: "lect_naver_prompt",
-    title: "네이버 클라우드 부트캠프 생성형 AI 프롬프트 엔지니어링",
-    description: "네이버 제휴 파트너사 임직원 대상의 AI 기술 활용 업무 생산성 극대화 및 노코드 툴 실습 교육 매칭 공고입니다.",
-    targetTier: "Prestige Professional",
-    budget: 1200000,
-    mileageRoyalty: 60000,
-    programId: "prog_ai_innovation",
-    programTitle: "대기업 생성형 AI 워크플로우 생산성 혁신 솔루션",
-    date: "2026-07-25",
-    time: "14:00 - 17:00",
-    duration: "3시간",
-    location: "경기도 성남시 네이버 1784 사옥",
-    attendees: 45,
-    managerName: "이서연 매니저",
-    managerPhone: "010-8765-4321",
-    status: "open",
-    applicants: [],
-    createdAt: "2026-07-02T13:00:00Z"
-  },
-  {
-    id: "lect_skt_leadership",
-    title: "SK텔레콤 팀장급 글로벌 리더십 역량 강화 워크숍",
-    description: "글로벌 비즈니스 매너, 다문화 팀 빌딩 및 AI 기반 협업 의사결정 시뮬레이션 기획 특강 출강입니다.",
-    targetTier: "Prestige Associate",
-    budget: 800000,
-    mileageRoyalty: 40000,
-    programId: "prog_mz_leadership",
-    programTitle: "MZ 세대 소통 및 피드백 기반 성과 극대화 리더십",
-    date: "2026-07-18",
-    time: "10:00 - 12:00",
-    duration: "2시간",
-    location: "서울특별시 중구 SKT T-타워",
-    attendees: 30,
-    managerName: "정우진 부장",
-    managerPhone: "010-5678-1234",
-    status: "open",
-    applicants: [],
-    createdAt: "2026-07-03T14:00:00Z"
-  }
-];
+export const INITIAL_LECTURES: LectureRequest[] = getCompletedLectures();
 
 export const INITIAL_TRANSACTIONS: MileageTransaction[] = [];
 
@@ -348,10 +288,23 @@ export class StorageService {
   }
 
   static getLocalLectures(): LectureRequest[] {
-    if (this.getLocalItem('kpcia_lectures_cleared') === 'true') {
-      return this.getLocal<LectureRequest[]>('lectures', []);
-    }
-    return this.getLocal<LectureRequest[]>('lectures', INITIAL_LECTURES);
+    const raw = this.getLocalItem('kpcia_lectures_cleared') === 'true'
+      ? this.getLocal<LectureRequest[]>('lectures', [])
+      : this.getLocal<LectureRequest[]>('lectures', INITIAL_LECTURES);
+    
+    // Enrich with companyName from INITIAL_LECTURES if missing for historical items
+    const initialMap = new Map(INITIAL_LECTURES.map(l => [l.id, l]));
+    const enriched = raw.map(l => {
+      if (l.id.startsWith('lect_hist_') && (!l.companyName || l.companyName.trim() === '')) {
+        const initItem = initialMap.get(l.id);
+        if (initItem) {
+          return { ...l, companyName: initItem.companyName };
+        }
+      }
+      return l;
+    });
+
+    return enriched.filter(l => l.id !== 'lect_samsung_ai' && l.id !== 'lect_naver_prompt' && l.id !== 'lect_skt_leadership');
   }
 
   static getLocalPrograms(): EducationalProgram[] {
@@ -415,10 +368,25 @@ export class StorageService {
             }
           }
 
-          // 2. Seed lectures
-          const lecturesSnap = await getDocs(collection(db, 'lectures'));
-          if (lecturesSnap.empty && !lecturesExplicitlyCleared) {
-            console.log("Seeding lectures to Firestore...");
+          // 2. Seed lectures & Clean up old ones
+          const oldIds = ["lect_samsung_ai", "lect_naver_prompt", "lect_skt_leadership"];
+          for (const oldId of oldIds) {
+            try {
+              const oldDocRef = doc(db, 'lectures', oldId);
+              const oldDocSnap = await getDoc(oldDocRef);
+              if (oldDocSnap.exists()) {
+                console.log(`Deleting old default lecture: ${oldId}`);
+                await deleteDoc(oldDocRef);
+              }
+            } catch (e) {
+              console.warn(`Failed to delete old lecture ${oldId}:`, e);
+            }
+          }
+
+          const sampleHistRef = doc(db, 'lectures', 'lect_hist_1');
+          const sampleHistSnap = await getDoc(sampleHistRef);
+          if (!sampleHistSnap.exists() && !lecturesExplicitlyCleared) {
+            console.log("Seeding historical completed lectures to Firestore...");
             for (const l of INITIAL_LECTURES) {
               await setDoc(doc(db, 'lectures', l.id), this.cleanUndefined(l));
             }
@@ -822,7 +790,8 @@ export class StorageService {
 
       const getTimestamp = (item: any) => {
         const timeStr = item.updatedAt || item.createdAt || "2026-01-01T00:00:00Z";
-        return new Date(timeStr).getTime();
+        const parsed = new Date(timeStr).getTime();
+        return isNaN(parsed) ? 0 : parsed;
       };
 
       // Helper to perform the merge and push updates
@@ -839,8 +808,25 @@ export class StorageService {
         const mergedList: T[] = [];
 
         for (const id of allIds) {
-          const localItem = localMap.get(id);
-          const cloudItem = cloudMap.get(id);
+          let localItem = localMap.get(id);
+          let cloudItem = cloudMap.get(id);
+
+          // Enrich lectures with companyName if missing for historical items
+          if (colName === 'lectures') {
+            const initialMap = new Map(INITIAL_LECTURES.map(l => [l.id, l]));
+            if (localItem && id.startsWith('lect_hist_') && (!(localItem as any).companyName || !(localItem as any).companyName.trim())) {
+              const init = initialMap.get(id);
+              if (init) {
+                localItem = { ...localItem, companyName: init.companyName };
+              }
+            }
+            if (cloudItem && id.startsWith('lect_hist_') && (!(cloudItem as any).companyName || !(cloudItem as any).companyName.trim())) {
+              const init = initialMap.get(id);
+              if (init) {
+                cloudItem = { ...cloudItem, companyName: init.companyName };
+              }
+            }
+          }
 
           if (localItem && cloudItem) {
             const localTime = getTimestamp(localItem);

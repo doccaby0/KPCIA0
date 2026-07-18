@@ -4839,7 +4839,7 @@ export default function App() {
                             <div>
                               <h4 className="font-extrabold text-white text-sm">{prog.title}</h4>
                               <span className="text-[10px] text-neutral-400 mt-1 block">
-                                제안자: <strong className="text-[#D4AF37]">{prog.authorName}</strong> | 등록일자: {new Date(prog.createdAt).toLocaleDateString()}
+                                제안자: <strong className="text-[#D4AF37]">{prog.authorName}</strong> | 등록일자: {prog.createdAt && !isNaN(new Date(prog.createdAt).getTime()) ? new Date(prog.createdAt).toLocaleDateString() : '미지정'}
                               </span>
                             </div>
                             <span className={`text-[10px] font-black px-2 py-0.5 rounded ${
@@ -5727,7 +5727,7 @@ export default function App() {
                       </span>
                     </div>
                     <div className="text-[10px] text-neutral-500">
-                      가입 일자: {viewingInstructorDetail.createdAt ? new Date(viewingInstructorDetail.createdAt).toLocaleDateString() : '미지정'}
+                      가입 일자: {viewingInstructorDetail.createdAt && !isNaN(new Date(viewingInstructorDetail.createdAt).getTime()) ? new Date(viewingInstructorDetail.createdAt).toLocaleDateString() : '미지정'}
                     </div>
                   </div>
 
