@@ -181,6 +181,27 @@ export default function App() {
   const [editInstRegion, setEditInstRegion] = useState<string>('');
   const [editInstBankAccount, setEditInstBankAccount] = useState<string>('');
   const [editInstSnsLink, setEditInstSnsLink] = useState<string>('');
+  const [editInstEducation, setEditInstEducation] = useState<string>('');
+  const [editInstCareer, setEditInstCareer] = useState<string>('');
+  const [isParsingResume, setIsParsingResume] = useState<boolean>(false);
+
+  const getTierIcon = (tier: string, className = "w-4 h-4") => {
+    switch (tier) {
+      case 'Prestige Associate':
+        return <GraduationCap className={`${className} text-[#CD7F32]`} />;
+      case 'Prestige Professional':
+        return <Award className={`${className} text-blue-400`} />;
+      case 'Prestige Master':
+        return <Shield className={`${className} text-[#D4AF37]`} />;
+      case 'Prestige Elite':
+        return <Sparkles className={`${className} text-emerald-400 animate-pulse`} />;
+      case 'Prestige Legend':
+        return <Star className={`${className} text-purple-400`} />;
+      case 'Prestige Member':
+      default:
+        return <User className={`${className} text-neutral-400`} />;
+    }
+  };
 
   // Admin Lecture Editing states
   const [editingLecture, setEditingLecture] = useState<LectureRequest | null>(null);
@@ -575,7 +596,7 @@ export default function App() {
   // Account Withdrawal / Delete Account
   const handleDeleteAccount = async () => {
     if (!currentUser) return;
-    const confirmDelete = window.confirm("정말로 한국프레스티지기업강사협회 회원 탈퇴를 진행하시겠습니까? 그동안 쌓인 마일리지와 디지털 명함 정보가 즉시 영구 삭제되며 복구할 수 없습니다.");
+    const confirmDelete = window.confirm("정말로 한국프레스티지기업강사협회 회원 탈퇴를 진행하시겠습니까? 그동안 쌓인 마일리지와 공식 프로필 정보가 즉시 영구 삭제되며 복구할 수 없습니다.");
     if (!confirmDelete) return;
 
     try {
@@ -1204,28 +1225,33 @@ export default function App() {
     const wb = XLSX.utils.book_new();
     const headers = [
       "순번", "출강일자", "의뢰 기업명", "협력사명", "출강 교육 명칭", 
-      "강사 등급", "주강사", "보조강사", "강의 시간수", "예정 인원", 
+      "강사 등급", "주강사", "주강사 계좌번호", "보조강사", "강의 시간수", "예정 인원", 
       "인당 재료비(원)", "마일리지 로열티(M)", "정산 총 예산(원)", "만족도 평점", "예정 정산 기한 (익월 말일)", "정산 상태"
     ];
 
-    const rows = list.map((l, index) => [
-      index + 1,
-      l.date,
-      l.companyName || "익명 기업",
-      l.partnerCompany || "없음",
-      l.title,
-      l.targetTier,
-      l.assignedName || "없음",
-      l.assistantName || "없음",
-      l.mainHours || 0,
-      l.attendees || 0,
-      l.materialCost || 0,
-      l.mileageRoyalty || 0,
-      l.budget,
-      l.lectureRating || 5.0,
-      getNextMonthLastDay(l.date),
-      "정산 완료"
-    ]);
+    const rows = list.map((l, index) => {
+      const matchUser = users.find(u => u.uid === l.assignedTo);
+      const bankAccount = matchUser?.profileCard?.bankAccount || "미등록";
+      return [
+        index + 1,
+        l.date,
+        l.companyName || "익명 기업",
+        l.partnerCompany || "없음",
+        l.title,
+        l.targetTier,
+        l.assignedName || "없음",
+        bankAccount,
+        l.assistantName || "없음",
+        l.mainHours || 0,
+        l.attendees || 0,
+        l.materialCost || 0,
+        l.mileageRoyalty || 0,
+        l.budget,
+        l.lectureRating || 5.0,
+        getNextMonthLastDay(l.date),
+        "정산 완료"
+      ];
+    });
 
     const totalHours = list.reduce((sum, l) => sum + (l.mainHours || 0), 0);
     const totalAttendees = list.reduce((sum, l) => sum + (l.attendees || 0), 0);
@@ -1237,14 +1263,14 @@ export default function App() {
 
     const sumRow = [
       "합계 (SUM)", "", "", "", "", 
-      "", "", "", totalHours, totalAttendees, 
+      "", "", "", "", totalHours, totalAttendees, 
       "", totalRoyalty, totalBudget, averageRating, "", ""
     ];
 
     const ws = XLSX.utils.aoa_to_sheet([headers, ...rows, sumRow]);
     const cols = [
       { wch: 8 }, { wch: 12 }, { wch: 20 }, { wch: 18 }, { wch: 30 },
-      { wch: 18 }, { wch: 12 }, { wch: 12 }, { wch: 12 }, { wch: 10 },
+      { wch: 18 }, { wch: 12 }, { wch: 25 }, { wch: 12 }, { wch: 12 }, { wch: 10 },
       { wch: 15 }, { wch: 18 }, { wch: 18 }, { wch: 12 }, { wch: 25 }, { wch: 15 }
     ];
     ws['!cols'] = cols;
@@ -1265,28 +1291,33 @@ export default function App() {
     const wb = XLSX.utils.book_new();
     const headers = [
       "순번", "출강일자", "의뢰 기업명", "협력사명", "출강 교육 명칭", 
-      "강사 등급", "주강사", "보조강사", "강의 시간수", "예정 인원", 
+      "강사 등급", "주강사", "주강사 계좌번호", "보조강사", "강의 시간수", "예정 인원", 
       "인당 재료비(원)", "마일리지 로열티(M)", "정산 총 예산(원)", "만족도 평점", "예정 정산 기한 (익월 말일)", "정산 상태"
     ];
 
-    const rows = list.map((l, index) => [
-      index + 1,
-      l.date,
-      l.companyName || "익명 기업",
-      l.partnerCompany || "없음",
-      l.title,
-      l.targetTier,
-      l.assignedName || "없음",
-      l.assistantName || "없음",
-      l.mainHours || 0,
-      l.attendees || 0,
-      l.materialCost || 0,
-      l.mileageRoyalty || 0,
-      l.budget,
-      l.lectureRating || 5.0,
-      getNextMonthLastDay(l.date),
-      "정산 대기"
-    ]);
+    const rows = list.map((l, index) => {
+      const matchUser = users.find(u => u.uid === l.assignedTo);
+      const bankAccount = matchUser?.profileCard?.bankAccount || "미등록";
+      return [
+        index + 1,
+        l.date,
+        l.companyName || "익명 기업",
+        l.partnerCompany || "없음",
+        l.title,
+        l.targetTier,
+        l.assignedName || "없음",
+        bankAccount,
+        l.assistantName || "없음",
+        l.mainHours || 0,
+        l.attendees || 0,
+        l.materialCost || 0,
+        l.mileageRoyalty || 0,
+        l.budget,
+        l.lectureRating || 5.0,
+        getNextMonthLastDay(l.date),
+        "정산 대기"
+      ];
+    });
 
     const totalHours = list.reduce((sum, l) => sum + (l.mainHours || 0), 0);
     const totalAttendees = list.reduce((sum, l) => sum + (l.attendees || 0), 0);
@@ -1298,14 +1329,14 @@ export default function App() {
 
     const sumRow = [
       "합계 (SUM)", "", "", "", "", 
-      "", "", "", totalHours, totalAttendees, 
+      "", "", "", "", totalHours, totalAttendees, 
       "", totalRoyalty, totalBudget, averageRating, "", ""
     ];
 
     const ws = XLSX.utils.aoa_to_sheet([headers, ...rows, sumRow]);
     const cols = [
       { wch: 8 }, { wch: 12 }, { wch: 20 }, { wch: 18 }, { wch: 30 },
-      { wch: 18 }, { wch: 12 }, { wch: 12 }, { wch: 12 }, { wch: 10 },
+      { wch: 18 }, { wch: 12 }, { wch: 25 }, { wch: 12 }, { wch: 12 }, { wch: 10 },
       { wch: 15 }, { wch: 18 }, { wch: 18 }, { wch: 12 }, { wch: 25 }, { wch: 15 }
     ];
     ws['!cols'] = cols;
@@ -1326,28 +1357,33 @@ export default function App() {
     const wb = XLSX.utils.book_new();
     const headers = [
       "순번", "출강일자", "의뢰 기업명", "협력사명", "출강 교육 명칭", 
-      "강사 등급", "주강사", "보조강사", "강의 시간수", "예정 인원", 
+      "강사 등급", "주강사", "주강사 계좌번호", "보조강사", "강의 시간수", "예정 인원", 
       "인당 재료비(원)", "마일리지 로열티(M)", "정산 총 예산(원)", "만족도 평점", "예정 정산일(익월 말일)", "정산 상태"
     ];
 
-    const rows = completedList.map((l, index) => [
-      index + 1,
-      l.date,
-      l.companyName || "익명 기업",
-      l.partnerCompany || "없음",
-      l.title,
-      l.targetTier,
-      l.assignedName || "없음",
-      l.assistantName || "없음",
-      l.mainHours || 0,
-      l.attendees || 0,
-      l.materialCost || 0,
-      l.mileageRoyalty || 0,
-      l.budget,
-      l.lectureRating || 5.0,
-      getNextMonthLastDay(l.date),
-      l.settlementStatus === 'completed' ? "정산 완료" : "정산 대기"
-    ]);
+    const rows = completedList.map((l, index) => {
+      const matchUser = users.find(u => u.uid === l.assignedTo);
+      const bankAccount = matchUser?.profileCard?.bankAccount || "미등록";
+      return [
+        index + 1,
+        l.date,
+        l.companyName || "익명 기업",
+        l.partnerCompany || "없음",
+        l.title,
+        l.targetTier,
+        l.assignedName || "없음",
+        bankAccount,
+        l.assistantName || "없음",
+        l.mainHours || 0,
+        l.attendees || 0,
+        l.materialCost || 0,
+        l.mileageRoyalty || 0,
+        l.budget,
+        l.lectureRating || 5.0,
+        getNextMonthLastDay(l.date),
+        l.settlementStatus === 'completed' ? "정산 완료" : "정산 대기"
+      ];
+    });
 
     const totalHours = completedList.reduce((sum, l) => sum + (l.mainHours || 0), 0);
     const totalAttendees = completedList.reduce((sum, l) => sum + (l.attendees || 0), 0);
@@ -1359,14 +1395,14 @@ export default function App() {
 
     const sumRow = [
       "합계 (SUM)", "", "", "", "", 
-      "", "", "", totalHours, totalAttendees, 
+      "", "", "", "", totalHours, totalAttendees, 
       "", totalRoyalty, totalBudget, averageRating, "", ""
     ];
 
     const ws = XLSX.utils.aoa_to_sheet([headers, ...rows, sumRow]);
     const cols = [
       { wch: 8 }, { wch: 12 }, { wch: 20 }, { wch: 18 }, { wch: 30 },
-      { wch: 18 }, { wch: 12 }, { wch: 12 }, { wch: 12 }, { wch: 10 },
+      { wch: 18 }, { wch: 12 }, { wch: 25 }, { wch: 12 }, { wch: 12 }, { wch: 10 },
       { wch: 15 }, { wch: 18 }, { wch: 18 }, { wch: 12 }, { wch: 25 }, { wch: 15 }
     ];
     ws['!cols'] = cols;
@@ -2432,6 +2468,82 @@ export default function App() {
     triggerToast(`👤 ${user.name} 강사님의 가입 승인 상태가 '${nextApprovedState ? "최종 정회원 승인" : "승인 대기"}' 상태로 변경되었습니다.`, "success");
   };
 
+  const handleAiResumeUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !currentUser) return;
+
+    setIsParsingResume(true);
+    triggerToast("⏳ AI가 이력서 파일을 정밀 분석하고 있습니다...", "info");
+
+    try {
+      const getBase64 = (f: File): Promise<string> => {
+        return new Promise((resolve, reject) => {
+          const r = new FileReader();
+          r.readAsDataURL(f);
+          r.onload = () => {
+            const base64String = (r.result as string).split(',')[1];
+            resolve(base64String);
+          };
+          r.onerror = error => reject(error);
+        });
+      };
+
+      const base64Data = await getBase64(file);
+
+      const response = await fetch("/api/parse-resume", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          fileName: file.name,
+          fileType: file.type,
+          fileData: base64Data
+        })
+      });
+
+      if (!response.ok) {
+        const errData = await response.json();
+        throw new Error(errData.error || "파일 분석 도중 오류가 발생하였습니다.");
+      }
+
+      const parsedData = await response.json();
+      
+      // Update currentUser profileCard with extracted info where existing are empty
+      const updatedProfileCard = {
+        ...currentUser.profileCard,
+        title: currentUser.profileCard.title || parsedData.title || '',
+        bio: currentUser.profileCard.bio || parsedData.bio || '',
+        region: currentUser.profileCard.region || parsedData.region || '',
+        contactEmail: currentUser.profileCard.contactEmail || parsedData.contactEmail || '',
+        contactPhone: currentUser.profileCard.contactPhone || parsedData.contactPhone || '',
+        bankAccount: currentUser.profileCard.bankAccount || parsedData.bankAccount || '',
+        // Specialties, education, career lists: append if empty, or merge unique
+        specialties: currentUser.profileCard.specialties.length > 0 ? currentUser.profileCard.specialties : (parsedData.specialties || []),
+        education: currentUser.profileCard.education && currentUser.profileCard.education.length > 0 ? currentUser.profileCard.education : (parsedData.education || []),
+        career: currentUser.profileCard.career && currentUser.profileCard.career.length > 0 ? currentUser.profileCard.career : (parsedData.career || [])
+      };
+
+      const updatedUser: UserProfile = {
+        ...currentUser,
+        profileCard: updatedProfileCard,
+        updatedAt: new Date().toISOString()
+      };
+
+      setCurrentUser(updatedUser);
+      setUsers(users.map(u => u.uid === updatedUser.uid ? updatedUser : u));
+      await StorageService.saveUser(updatedUser);
+
+      triggerToast("✨ AI 이력서 분석이 완료되었습니다! 프로필 빈 자리가 자동으로 채워졌습니다.", "success");
+    } catch (err: any) {
+      console.error("AI parse resume error:", err);
+      triggerToast(err.message || "이력서 파일 분석에 실패했습니다. 다시 시도해 주세요.", "error");
+    } finally {
+      setIsParsingResume(false);
+      e.target.value = '';
+    }
+  };
+
   // 8.7. Admin Force Delete / Withdraw User (Admin)
   const handleAdminDeleteUser = async (userId: string) => {
     const user = users.find(u => u.uid === userId);
@@ -2539,6 +2651,8 @@ export default function App() {
     setEditInstRegion(u.profileCard?.region || '');
     setEditInstBankAccount(u.profileCard?.bankAccount || '');
     setEditInstSnsLink(u.profileCard?.websiteUrl || '');
+    setEditInstEducation(u.profileCard?.education ? u.profileCard.education.join('\n') : '');
+    setEditInstCareer(u.profileCard?.career ? u.profileCard.career.join('\n') : '');
   };
 
   const handleSaveInstructorFullDetailEdit = async (e: React.FormEvent) => {
@@ -2556,6 +2670,8 @@ export default function App() {
     const cleanRegion = sanitizeString(editInstRegion);
     const cleanBankAccount = sanitizeString(editInstBankAccount);
     const cleanSnsLink = sanitizeString(editInstSnsLink);
+    const cleanEducation = sanitizeString(editInstEducation).split('\n').map(l => l.trim()).filter(Boolean);
+    const cleanCareer = sanitizeString(editInstCareer).split('\n').map(l => l.trim()).filter(Boolean);
 
     if (!cleanName) {
       triggerToast("강사 성함을 입력해 주세요.", "error");
@@ -2579,7 +2695,9 @@ export default function App() {
         contactEmail: cleanEmail,
         region: cleanRegion,
         bankAccount: cleanBankAccount,
-        websiteUrl: cleanSnsLink
+        websiteUrl: cleanSnsLink,
+        education: cleanEducation,
+        career: cleanCareer
       },
       updatedAt: new Date().toISOString()
     };
@@ -3124,7 +3242,8 @@ export default function App() {
                                 <h3 className="text-xs sm:text-[13px] font-black text-white leading-snug tracking-tight line-clamp-1 group-hover:text-[#D4AF37] transition-colors">
                                   {lecture.title}
                                 </h3>
-                                <div className="flex items-center gap-1">
+                                <div className="flex items-center gap-1.5">
+                                  {getTierIcon(lecture.targetTier, "w-3 h-3")}
                                   <span className={`text-[8.5px] font-extrabold px-1.5 py-0.5 rounded border ${getTierColor(lecture.targetTier)}`}>
                                     등급: {lecture.targetTier.replace('Prestige ', '')}
                                   </span>
@@ -3503,7 +3622,8 @@ export default function App() {
                     <h3 className="text-base font-black text-white">{currentUser.name} 강사님</h3>
                     <p className="text-[10px] text-neutral-400 mt-0.5">{currentUser.email}</p>
                   </div>
-                  <span className={`text-[10px] font-black px-2.5 py-1 rounded-md ${getTierColor(currentUser.tier)}`}>
+                  <span className={`text-[10px] font-black px-2.5 py-1 rounded-md flex items-center gap-1.5 ${getTierColor(currentUser.tier)}`}>
+                    {getTierIcon(currentUser.tier, "w-3.5 h-3.5")}
                     {currentUser.tier} 등급 회원
                   </span>
                 </div>
@@ -3544,155 +3664,314 @@ export default function App() {
                     )}
                   </div>
                 </div>
-              </div>
 
-              {/* Right Column: Dynamic digital business card simulator (2 cols) */}
-              <div className="md:col-span-2 space-y-6">
-                
-                {/* Visual Business Card Wrapper */}
-                <div className="space-y-2">
-                  <label className="text-[11px] text-neutral-400 font-bold block">내 강사 디지털 명함 실시간 렌더링</label>
-                  <div className={`p-8 rounded-3xl border ${getCardThemeClass(currentUser.profileCard.cardTheme)} relative overflow-hidden`}>
-                    
-                    {/* Watermark brand in background */}
-                    <div className="absolute right-4 bottom-4 opacity-5 pointer-events-none select-none">
-                      <span className="font-display font-black text-6xl tracking-tight uppercase">KPCIA</span>
-                    </div>
-
-                    <div className="flex flex-col md:flex-row justify-between gap-6 relative z-10">
-                      <div className="space-y-4">
-                        <div>
-                          <div className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded bg-white/10 text-xs font-bold backdrop-blur-md mb-2">
-                            <span>{currentUser.tier}</span>
-                          </div>
-                          <h3 className="text-xl font-black">{currentUser.name}</h3>
-                          <p className="text-xs text-neutral-400 font-medium mt-0.5">{currentUser.profileCard.title}</p>
+                {/* AI Resume Analyzer Under Badge Cabinet */}
+                <div className="space-y-3 pt-4 border-t border-neutral-800">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[10px] text-[#D4AF37] font-black block uppercase tracking-wider flex items-center gap-1.5">
+                      <Sparkles className="w-3.5 h-3.5 text-[#D4AF37] animate-pulse" /> AI 이력서 및 강사카드 고속 분석
+                    </span>
+                    <span className="text-[8px] bg-[#D4AF37]/10 text-[#D4AF37] border border-[#D4AF37]/20 px-1.5 py-0.5 rounded font-bold">
+                      HWP / PDF 지원
+                    </span>
+                  </div>
+                  
+                  <div className="p-4 rounded-xl bg-neutral-950/60 border border-dashed border-neutral-800 hover:border-[#D4AF37]/50 transition-all text-center relative group">
+                    <input
+                      type="file"
+                      id="resume-ai-upload"
+                      className="absolute inset-0 opacity-0 cursor-pointer w-full h-full z-10"
+                      accept=".hwp,.pdf,.docx,.txt,image/*,.png,.jpg,.jpeg,.webp"
+                      onChange={handleAiResumeUpload}
+                      disabled={isParsingResume}
+                    />
+                    {isParsingResume ? (
+                      <div className="space-y-2 py-4">
+                        <div className="flex justify-center items-center gap-1.5">
+                          <span className="w-2 h-2 rounded-full bg-[#D4AF37] animate-bounce [animation-delay:-0.3s]"></span>
+                          <span className="w-2 h-2 rounded-full bg-[#D4AF37] animate-bounce [animation-delay:-0.15s]"></span>
+                          <span className="w-2 h-2 rounded-full bg-[#D4AF37] animate-bounce"></span>
                         </div>
-
-                        <p className="text-xs leading-relaxed text-neutral-300 max-w-md italic font-normal">
-                          &quot;{currentUser.profileCard.bio}&quot;
-                        </p>
+                        <p className="text-[10px] font-black text-neutral-300">이력서 파일 분석 및 스마트 인식 중...</p>
+                        <p className="text-[8px] text-neutral-500">한글(HWP)부터 PDF, 경력 증명서까지 자동 분석</p>
                       </div>
-
-                      <div className="flex flex-col justify-between items-end gap-4 text-right">
-                        <div className="h-14 w-14 rounded-full bg-white/10 border border-white/20 flex items-center justify-center font-black text-lg text-white">
-                          {currentUser.name.substring(0, 2)}
-                        </div>
-                        <div className="space-y-1 text-xs">
-                          <div className="text-[10px] text-neutral-400">📧 {currentUser.profileCard.contactEmail}</div>
-                          <div className="text-[10px] text-neutral-400">📱 {currentUser.profileCard.contactPhone}</div>
-                          <div className="text-[10px] text-neutral-400">📍 활동지역: {currentUser.profileCard.region || '서울'}</div>
-                        </div>
+                    ) : (
+                      <div className="space-y-1.5 py-3">
+                        <span className="text-xl block">📄</span>
+                        <p className="text-[10px] font-bold text-neutral-300 group-hover:text-[#D4AF37] transition-colors">이력서 또는 강사카드 파일 넣기</p>
+                        <p className="text-[8px] text-neutral-500 leading-normal">한글(HWP), PDF, Word, 이미지 지원<br/>AI가 프로필의 빈 칸을 찾아 스마트하게 채워줍니다.</p>
                       </div>
-                    </div>
-
-                    {/* Footer list of specialties */}
-                    <div className="mt-8 pt-4 border-t border-white/10 flex flex-wrap gap-1.5 relative z-10">
-                      {currentUser.profileCard.specialties.map((spec, idx) => (
-                        <span key={idx} className="text-[10px] bg-white/5 border border-white/10 px-2.5 py-0.5 rounded-full">
-                          #{spec}
-                        </span>
-                      ))}
-                    </div>
+                    )}
                   </div>
                 </div>
+              </div>
 
+              {/* Right Column: Profile editing form takes up 2 columns */}
+              <div className="md:col-span-2 space-y-6">
+                
                 {/* Edit Card Profile Simple Form */}
-                <div className="p-6 rounded-2xl bg-[#121214] border border-neutral-900 space-y-4">
-                  <h4 className="text-xs font-bold text-neutral-200 border-b border-neutral-950 pb-2">디지털 명함 정보 수정 (즉시 반영)</h4>
-                  <div className="grid grid-cols-2 gap-4 text-xs">
-                    <div className="space-y-1">
-                      <label className="text-neutral-400 font-semibold block">강사 공식 직함</label>
-                      <input
-                        type="text"
-                        value={currentUser.profileCard.title}
-                        onChange={async (e) => {
-                          const updated = {
-                            ...currentUser,
-                            profileCard: { ...currentUser.profileCard, title: e.target.value }
-                          };
-                          setCurrentUser(updated);
-                          await StorageService.saveUser(updated);
-                        }}
-                        className="w-full bg-neutral-950 border border-neutral-800 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-[#D4AF37] text-xs"
-                      />
+                <div className="p-8 rounded-2xl bg-[#121214] border border-neutral-800 space-y-6 animate-in fade-in duration-300" id="instructor-profile-form">
+                  <div className="border-b border-neutral-900 pb-3 flex justify-between items-center">
+                    <div>
+                      <h4 className="text-sm font-black text-white flex items-center gap-1.5">
+                        <span className="text-amber-400">💳</span> 강사 프로필 및 정산 계좌 관리
+                      </h4>
+                      <p className="text-[10px] text-neutral-400 mt-1">출강 완료 시 수당 지급을 위한 계좌 정보와 마스터실 연동 정보를 상세히 기술하십시오.</p>
                     </div>
+                    <span className="text-[9px] px-2 py-0.5 rounded bg-[#217346]/10 border border-[#217346]/20 text-[#30925c] font-bold">
+                      실시간 동기화
+                    </span>
+                  </div>
 
-                    <div className="space-y-1">
-                      <label className="text-neutral-400 font-semibold block">디지털 명함 디자인 테마</label>
-                      <select
-                        value={currentUser.profileCard.cardTheme}
-                        onChange={async (e) => {
-                          const updated = {
-                            ...currentUser,
-                            profileCard: { ...currentUser.profileCard, cardTheme: e.target.value as any }
-                          };
-                          setCurrentUser(updated);
-                          await StorageService.saveUser(updated);
-                          triggerToast("명함 테마 디자인이 고품격 스타일로 즉시 교체되었습니다!", "success");
-                        }}
-                        className="w-full bg-neutral-950 border border-neutral-800 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-[#D4AF37] text-xs cursor-pointer"
-                      >
-                        <option value="classic">🔳 클래식 그레이</option>
-                        <option value="gold_luxury">✨ 안티크 골드 럭셔리</option>
-                        <option value="midnight_sapphire">🌌 미드나잇 사파이어 블루</option>
-                        <option value="elite_emerald">🌿 엘리트 에메랄드 그린</option>
-                      </select>
+                  {/* Section 1: 정산 계좌번호 */}
+                  <div className="space-y-2.5">
+                    <div className="flex items-center gap-1.5 border-l-2 border-amber-500 pl-2">
+                      <span className="text-xs font-black text-neutral-200">1. 정산 대금 수령 계좌 정보</span>
+                    </div>
+                    <div className="grid grid-cols-1 gap-2 text-xs">
+                      <div className="space-y-1">
+                        <label className="text-[10px] text-neutral-400 font-semibold block">은행명 및 계좌번호 / 예금주</label>
+                        <input
+                          type="text"
+                          value={currentUser.profileCard.bankAccount || ''}
+                          placeholder="예) 국민은행 123-45678-90123 (예금주: 홍길동)"
+                          onChange={async (e) => {
+                            const updated = {
+                              ...currentUser,
+                              profileCard: { ...currentUser.profileCard, bankAccount: e.target.value }
+                            };
+                            setCurrentUser(updated);
+                            setUsers(users.map(u => u.uid === updated.uid ? updated : u));
+                            await StorageService.saveUser(updated);
+                          }}
+                          className="w-full bg-neutral-950 border border-neutral-800 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-[#D4AF37] text-xs font-mono"
+                        />
+                        <span className="text-[9px] text-neutral-500 block leading-tight">
+                          * 입력한 계좌번호는 <strong>실시간 정산 마스터 대장</strong>에서 운영사무국이 수당 송금 시 즉시 확인합니다.
+                        </span>
+                      </div>
                     </div>
                   </div>
 
-                  <div className="grid grid-cols-2 gap-4 text-xs">
-                    <div className="space-y-1">
-                      <label className="text-neutral-400 font-semibold block">전문 강의 분야 (쉼표 구분)</label>
-                      <input
-                        type="text"
-                        value={currentUser.profileCard.specialties.join(', ')}
-                        onChange={async (e) => {
-                          const specialties = e.target.value.split(',').map(s => s.trim());
-                          const updated = {
-                            ...currentUser,
-                            profileCard: { ...currentUser.profileCard, specialties }
-                          };
-                          setCurrentUser(updated);
-                          await StorageService.saveUser(updated);
-                        }}
-                        className="w-full bg-neutral-950 border border-neutral-800 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-[#D4AF37] text-xs"
-                      />
+                  {/* Section 2: SNS 및 웹사이트 */}
+                  <div className="space-y-2.5">
+                    <div className="flex items-center gap-1.5 border-l-2 border-[#217346] pl-2">
+                      <span className="text-xs font-black text-neutral-200">2. 강사 프로필 및 SNS / 홈페이지 링크</span>
                     </div>
-
-                    <div className="space-y-1">
-                      <label className="text-neutral-400 font-semibold block">주 활동 지역</label>
-                      <input
-                        type="text"
-                        value={currentUser.profileCard.region || '서울'}
-                        onChange={async (e) => {
-                          const updated = {
-                            ...currentUser,
-                            profileCard: { ...currentUser.profileCard, region: e.target.value }
-                          };
-                          setCurrentUser(updated);
-                          await StorageService.saveUser(updated);
-                        }}
-                        className="w-full bg-neutral-950 border border-neutral-800 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-[#D4AF37] text-xs"
-                      />
+                    <div className="grid grid-cols-1 gap-2 text-xs">
+                      <div className="space-y-1">
+                        <label className="text-[10px] text-neutral-400 font-semibold block">SNS 링크 / 블로그 / 공식 웹사이트 URL</label>
+                        <input
+                          type="url"
+                          value={currentUser.profileCard.websiteUrl || ''}
+                          placeholder="예) https://blog.naver.com/my_instructor_blog 또는 인스타그램 링크"
+                          onChange={async (e) => {
+                            const updated = {
+                              ...currentUser,
+                              profileCard: { ...currentUser.profileCard, websiteUrl: e.target.value }
+                            };
+                            setCurrentUser(updated);
+                            setUsers(users.map(u => u.uid === updated.uid ? updated : u));
+                            await StorageService.saveUser(updated);
+                          }}
+                          className="w-full bg-neutral-950 border border-neutral-800 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-[#217346] text-xs font-mono"
+                        />
+                        <span className="text-[9px] text-neutral-500 block leading-tight">
+                          * 강사 홍보용 SNS, 개인 블로그, 연구소 홈페이지 링크를 작성하시면 마스터실에서 포트폴리오로 조회됩니다.
+                        </span>
+                      </div>
                     </div>
                   </div>
 
-                  <div className="space-y-1 text-xs">
-                    <label className="text-neutral-400 font-semibold block">나의 다짐 및 인삿말 (Bio)</label>
-                    <textarea
-                      value={currentUser.profileCard.bio}
-                      onChange={async (e) => {
-                        const updated = {
-                          ...currentUser,
-                          profileCard: { ...currentUser.profileCard, bio: e.target.value }
-                        };
-                        setCurrentUser(updated);
-                        await StorageService.saveUser(updated);
+                  {/* Section 3: 기본 인적사항 및 연락처 */}
+                  <div className="space-y-2.5">
+                    <div className="flex items-center gap-1.5 border-l-2 border-neutral-500 pl-2">
+                      <span className="text-xs font-black text-neutral-200">3. 기본 인적사항 및 연락처</span>
+                    </div>
+                    <div className="grid grid-cols-2 gap-3 text-xs">
+                      <div className="space-y-1">
+                        <label className="text-[10px] text-neutral-400 font-semibold block">대표 연락처 이메일</label>
+                        <input
+                          type="email"
+                          value={currentUser.profileCard.contactEmail || ''}
+                          placeholder="이메일 입력"
+                          onChange={async (e) => {
+                            const updated = {
+                              ...currentUser,
+                              profileCard: { ...currentUser.profileCard, contactEmail: e.target.value }
+                            };
+                            setCurrentUser(updated);
+                            setUsers(users.map(u => u.uid === updated.uid ? updated : u));
+                            await StorageService.saveUser(updated);
+                          }}
+                          className="w-full bg-neutral-950 border border-neutral-800 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-neutral-500 text-xs"
+                        />
+                      </div>
+
+                      <div className="space-y-1">
+                        <label className="text-[10px] text-neutral-400 font-semibold block">대표 연락처 휴대전화</label>
+                        <input
+                          type="text"
+                          value={currentUser.profileCard.contactPhone || ''}
+                          placeholder="010-XXXX-XXXX"
+                          onChange={async (e) => {
+                            const updated = {
+                              ...currentUser,
+                              profileCard: { ...currentUser.profileCard, contactPhone: e.target.value }
+                            };
+                            setCurrentUser(updated);
+                            setUsers(users.map(u => u.uid === updated.uid ? updated : u));
+                            await StorageService.saveUser(updated);
+                          }}
+                          className="w-full bg-neutral-950 border border-neutral-800 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-neutral-500 text-xs font-mono"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-3 text-xs">
+                      <div className="space-y-1">
+                        <label className="text-[10px] text-neutral-400 font-semibold block">강사 공식 직함</label>
+                        <input
+                          type="text"
+                          value={currentUser.profileCard.title || ''}
+                          placeholder="예) 마케팅 실무 수석 전문위원"
+                          onChange={async (e) => {
+                            const updated = {
+                              ...currentUser,
+                              profileCard: { ...currentUser.profileCard, title: e.target.value }
+                            };
+                            setCurrentUser(updated);
+                            setUsers(users.map(u => u.uid === updated.uid ? updated : u));
+                            await StorageService.saveUser(updated);
+                          }}
+                          className="w-full bg-neutral-950 border border-neutral-800 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-neutral-500 text-xs"
+                        />
+                      </div>
+
+                      <div className="space-y-1">
+                        <label className="text-[10px] text-neutral-400 font-semibold block">주 활동 지역</label>
+                        <input
+                          type="text"
+                          value={currentUser.profileCard.region || '서울'}
+                          placeholder="예) 서울, 경기, 대전"
+                          onChange={async (e) => {
+                            const updated = {
+                              ...currentUser,
+                              profileCard: { ...currentUser.profileCard, region: e.target.value }
+                            };
+                            setCurrentUser(updated);
+                            setUsers(users.map(u => u.uid === updated.uid ? updated : u));
+                            await StorageService.saveUser(updated);
+                          }}
+                          className="w-full bg-neutral-950 border border-neutral-800 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-neutral-500 text-xs"
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Section 4: 전문 강의 분야 및 한 줄 다짐 */}
+                  <div className="space-y-2.5">
+                    <div className="flex items-center gap-1.5 border-l-2 border-neutral-500 pl-2">
+                      <span className="text-xs font-black text-neutral-200">4. 전문 분야 및 소개말</span>
+                    </div>
+                    <div className="grid grid-cols-2 gap-3 text-xs">
+                      <div className="space-y-1 col-span-2">
+                        <label className="text-[10px] text-neutral-400 font-semibold block">전문 강의 분야 (쉼표 구분)</label>
+                        <input
+                          type="text"
+                          value={(currentUser.profileCard.specialties || []).join(', ')}
+                          onChange={async (e) => {
+                            const specialties = e.target.value.split(',').map(s => s.trim());
+                            const updated = {
+                              ...currentUser,
+                              profileCard: { ...currentUser.profileCard, specialties }
+                            };
+                            setCurrentUser(updated);
+                            setUsers(users.map(u => u.uid === updated.uid ? updated : u));
+                            await StorageService.saveUser(updated);
+                          }}
+                          className="w-full bg-neutral-950 border border-neutral-800 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-neutral-500 text-xs"
+                        />
+                      </div>
+
+                      <div className="space-y-1 col-span-2">
+                        <label className="text-[10px] text-neutral-400 font-semibold block">나의 다짐 및 인삿말 (Bio)</label>
+                        <textarea
+                          value={currentUser.profileCard.bio || ''}
+                          rows={2}
+                          onChange={async (e) => {
+                            const updated = {
+                              ...currentUser,
+                              profileCard: { ...currentUser.profileCard, bio: e.target.value }
+                            };
+                            setCurrentUser(updated);
+                            setUsers(users.map(u => u.uid === updated.uid ? updated : u));
+                            await StorageService.saveUser(updated);
+                          }}
+                          className="w-full bg-neutral-950 border border-neutral-800 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-neutral-500 text-xs leading-normal"
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Section 5: 학력 및 경력 이력 기술 (추가 요청 반영) */}
+                  <div className="space-y-2.5">
+                    <div className="flex items-center gap-1.5 border-l-2 border-neutral-500 pl-2">
+                      <span className="text-xs font-black text-neutral-200">5. 학력 및 주요 경력 상세 기술</span>
+                    </div>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-xs">
+                      <div className="space-y-1">
+                        <label className="text-[10px] text-neutral-400 font-semibold block">학력 사항 (줄바꿈으로 구분)</label>
+                        <textarea
+                          value={(currentUser.profileCard.education || []).join('\n')}
+                          placeholder="예) 서울대학교 경영학 학사&#10;카이스트 MBA 석사"
+                          rows={4}
+                          onChange={async (e) => {
+                            const education = e.target.value.split('\n').map(l => l.trim()).filter(Boolean);
+                            const updated = {
+                              ...currentUser,
+                              profileCard: { ...currentUser.profileCard, education }
+                            };
+                            setCurrentUser(updated);
+                            setUsers(users.map(u => u.uid === updated.uid ? updated : u));
+                            await StorageService.saveUser(updated);
+                          }}
+                          className="w-full bg-neutral-950 border border-neutral-800 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-neutral-500 text-xs leading-normal"
+                        />
+                      </div>
+
+                      <div className="space-y-1">
+                        <label className="text-[10px] text-neutral-400 font-semibold block">주요 경력 사항 (줄바꿈으로 구분)</label>
+                        <textarea
+                          value={(currentUser.profileCard.career || []).join('\n')}
+                          placeholder="예) 前 삼성전자 인재개발원 교수&#10;現 KPCIA 수석 강사"
+                          rows={4}
+                          onChange={async (e) => {
+                            const career = e.target.value.split('\n').map(l => l.trim()).filter(Boolean);
+                            const updated = {
+                              ...currentUser,
+                              profileCard: { ...currentUser.profileCard, career }
+                            };
+                            setCurrentUser(updated);
+                            setUsers(users.map(u => u.uid === updated.uid ? updated : u));
+                            await StorageService.saveUser(updated);
+                          }}
+                          className="w-full bg-neutral-950 border border-neutral-800 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-neutral-500 text-xs leading-normal"
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="pt-2 border-t border-neutral-900 flex justify-end">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        triggerToast("💾 강사 프로필 및 계좌 정보가 안전하게 영구 저장되었습니다!", "success");
                       }}
-                      rows={2}
-                      className="w-full bg-neutral-950 border border-neutral-800 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-[#D4AF37] text-xs"
-                    />
+                      className="px-6 py-2.5 rounded-xl bg-gradient-to-r from-neutral-800 to-neutral-700 hover:from-neutral-750 hover:to-neutral-650 text-white font-bold text-center transition-all cursor-pointer text-xs"
+                    >
+                      💾 프로필 및 계좌 저장 완료하기
+                    </button>
                   </div>
                 </div>
 
@@ -4718,6 +4997,7 @@ export default function App() {
                                   <th className="p-1.5 border-r border-neutral-800 text-left font-bold pl-3">출강 교육 명칭</th>
                                   <th className="p-1.5 border-r border-neutral-800 text-center font-bold">지원자격</th>
                                   <th className="p-1.5 border-r border-neutral-800 text-center font-bold">배정 주강사</th>
+                                  <th className="p-1.5 border-r border-neutral-800 text-center font-bold text-amber-300">주강사 계좌번호</th>
                                   <th className="p-1.5 border-r border-neutral-800 text-center font-bold">배정 보조강사</th>
                                   <th className="p-1.5 border-r border-neutral-800 text-center font-bold">강의 시간</th>
                                   <th className="p-1.5 border-r border-neutral-800 text-center font-bold">예정 인원</th>
@@ -4764,6 +5044,13 @@ export default function App() {
                                         </span>
                                       </td>
                                       <td className="p-1.5 border-r border-neutral-800 text-center font-sans text-white font-bold">{lecture.assignedName || '-'}</td>
+                                      <td className="p-1.5 border-r border-neutral-800 text-center font-mono text-[10px] text-amber-300">
+                                        {(() => {
+                                          if (!lecture.assignedTo) return '-';
+                                          const matched = users.find(u => u.uid === lecture.assignedTo);
+                                          return matched?.profileCard?.bankAccount || '⚠️ 미등록';
+                                        })()}
+                                      </td>
                                       <td className="p-1.5 border-r border-neutral-800 text-center font-sans text-neutral-400">{lecture.assistantName || '-'}</td>
                                       <td className="p-1.5 border-r border-neutral-800 text-center text-emerald-400 font-bold">{lecture.mainHours || 0}시간</td>
                                       <td className="p-1.5 border-r border-neutral-800 text-center">{lecture.attendees || 0}명</td>
@@ -4793,7 +5080,7 @@ export default function App() {
                                   return (
                                     <tr className="bg-[#217346]/10 border-b border-neutral-800 text-white font-bold">
                                       <td className="p-1.5 bg-neutral-950 border-r border-neutral-800 text-neutral-500 text-center font-bold select-none">∑</td>
-                                      <td className="p-1.5 border-r border-neutral-800 text-center font-sans text-neutral-400" colSpan={7}>필터 합계 (FILTER SUM / AVG)</td>
+                                      <td className="p-1.5 border-r border-neutral-800 text-center font-sans text-neutral-400" colSpan={8}>필터 합계 (FILTER SUM / AVG)</td>
                                       <td className="p-1.5 border-r border-neutral-800 text-center"></td>
                                       <td className="p-1.5 border-r border-neutral-800 text-center text-[#30925c]">{totHours}시간</td>
                                       <td className="p-1.5 border-r border-neutral-800 text-center">{totAttendees}명</td>
@@ -5029,13 +5316,14 @@ export default function App() {
                                   onClick={() => handleViewInstructorFullDetails(u)}
                                 >
                                   <div className="flex items-center gap-1.5">
-                                    <span className="group-hover:translate-x-0.5 transition-transform">👤</span>
+                                    {getTierIcon(u.tier, "w-3.5 h-3.5 group-hover:scale-110 transition-transform")}
                                     <span className="underline decoration-[#D4AF37]/30 underline-offset-4 group-hover:decoration-[#D4AF37]">{u.name}</span>
                                   </div>
                                   <div className="text-[9px] text-neutral-500 font-normal mt-0.5">{u.profileCard?.title || '소속 강사'}</div>
                                 </td>
                                 <td className="py-3">
-                                  <span className={`text-[9px] font-black px-1.5 py-0.5 rounded ${getTierColor(u.tier)}`}>
+                                  <span className={`text-[9px] font-black px-1.5 py-0.5 rounded flex items-center gap-1 w-max ${getTierColor(u.tier)}`}>
+                                    {getTierIcon(u.tier, "w-2.5 h-2.5")}
                                     {u.tier}
                                   </span>
                                 </td>
@@ -5727,7 +6015,8 @@ export default function App() {
                     {/* Title and main badges */}
                     <div className="space-y-2">
                       <div className="flex flex-wrap gap-1.5 items-center">
-                        <span className={`text-[9px] font-black px-2 py-0.5 rounded border ${getTierColor(currentModalLec.targetTier)}`}>
+                        <span className={`text-[9px] font-black px-2 py-0.5 rounded border flex items-center gap-1 ${getTierColor(currentModalLec.targetTier)}`}>
+                          {getTierIcon(currentModalLec.targetTier, "w-3 h-3")}
                           지원 자격: {currentModalLec.targetTier}
                         </span>
                         <span className={`text-[9px] font-black px-2 py-0.5 rounded-full flex items-center gap-1 ${
@@ -6730,7 +7019,8 @@ export default function App() {
                   <div className="p-4 rounded-xl bg-[#0e0e10] border border-neutral-850 grid grid-cols-3 gap-3 text-center">
                     <div>
                       <span className="text-neutral-500 text-[10px] font-bold block">자격 등급</span>
-                      <span className={`inline-block mt-1 text-[9px] font-black px-2 py-0.5 rounded ${getTierColor(viewingInstructorDetail.tier)}`}>
+                      <span className={`inline-flex items-center gap-1 mt-1 text-[9px] font-black px-2 py-0.5 rounded ${getTierColor(viewingInstructorDetail.tier)}`}>
+                        {getTierIcon(viewingInstructorDetail.tier, "w-2.5 h-2.5")}
                         {viewingInstructorDetail.tier}
                       </span>
                     </div>
@@ -6798,6 +7088,29 @@ export default function App() {
                         ) : (
                           <span className="text-neutral-500">등록된 외부 포트폴리오 채널이 없습니다.</span>
                         )}
+                      </div>
+
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div className="bg-neutral-950/40 p-3 rounded-xl border border-neutral-850 space-y-1">
+                          <span className="text-neutral-500 text-[9px] font-bold block">🎓 학력 사항</span>
+                          <div className="text-neutral-200 text-xs leading-relaxed whitespace-pre-wrap">
+                            {viewingInstructorDetail.profileCard?.education && viewingInstructorDetail.profileCard.education.length > 0 ? (
+                              viewingInstructorDetail.profileCard.education.join('\n')
+                            ) : (
+                              <span className="text-neutral-500 italic">학력 사항 미기재</span>
+                            )}
+                          </div>
+                        </div>
+                        <div className="bg-neutral-950/40 p-3 rounded-xl border border-neutral-850 space-y-1">
+                          <span className="text-neutral-500 text-[9px] font-bold block">💼 주요 경력 사항</span>
+                          <div className="text-neutral-200 text-xs leading-relaxed whitespace-pre-wrap">
+                            {viewingInstructorDetail.profileCard?.career && viewingInstructorDetail.profileCard.career.length > 0 ? (
+                              viewingInstructorDetail.profileCard.career.join('\n')
+                            ) : (
+                              <span className="text-neutral-500 italic">경력 사항 미기재</span>
+                            )}
+                          </div>
+                        </div>
                       </div>
                     </div>
                   </div>
@@ -6997,6 +7310,29 @@ export default function App() {
                     />
                   </div>
 
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-left">
+                    <div className="space-y-1">
+                      <label className="text-neutral-400 font-semibold block">🎓 학력 사항 (줄바꿈 구분)</label>
+                      <textarea
+                        value={editInstEducation}
+                        onChange={(e) => setEditInstEducation(e.target.value)}
+                        placeholder="예) 서울대학교 경영학 학사&#10;카이스트 MBA 석사"
+                        rows={3}
+                        className="w-full bg-neutral-950 border border-neutral-800 rounded-lg px-2.5 py-2 text-white focus:outline-none focus:border-[#D4AF37] text-xs leading-normal"
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <label className="text-neutral-400 font-semibold block">💼 주요 경력 사항 (줄바꿈 구분)</label>
+                      <textarea
+                        value={editInstCareer}
+                        onChange={(e) => setEditInstCareer(e.target.value)}
+                        placeholder="예) 前 삼성전자 인재개발원 교수&#10;現 KPCIA 수석 강사"
+                        rows={3}
+                        className="w-full bg-neutral-950 border border-neutral-800 rounded-lg px-2.5 py-2 text-white focus:outline-none focus:border-[#D4AF37] text-xs leading-normal"
+                      />
+                    </div>
+                  </div>
+
                   <div className="flex gap-2.5 pt-3">
                     <button
                       type="button"
@@ -7051,7 +7387,8 @@ export default function App() {
                 <div className="flex flex-col sm:flex-row justify-between gap-6 relative z-10 text-left">
                   <div className="space-y-4">
                     <div>
-                      <span className={`text-[9px] font-black px-2.5 py-0.5 rounded ${getTierColor(selectedInstructorCard.tier)} mb-2 block w-max`}>
+                      <span className={`text-[9px] font-black px-2.5 py-0.5 rounded flex items-center gap-1 ${getTierColor(selectedInstructorCard.tier)} mb-2 w-max`}>
+                        {getTierIcon(selectedInstructorCard.tier, "w-2.5 h-2.5")}
                         {selectedInstructorCard.tier}
                       </span>
                       <h3 className="text-xl font-black">{selectedInstructorCard.name}</h3>
@@ -7117,7 +7454,7 @@ export default function App() {
                   setSelectedInstructorCard(null);
                   setActiveTab('partnership');
                   setPartTitle(`[강사 지명매칭] ${selectedInstructorCard.name} 강사님 지명 출강의뢰`);
-                  setPartContent(`KPCIA 소속 ${selectedInstructorCard.name} 강사님의 프로필 디지털 명함을 확인하고, 저희 사내 교육과정 강사로 전격 초청(지명매칭)하고자 일정 조율 및 출강비 산정 상세 의뢰를 요청합니다.`);
+                  setPartContent(`KPCIA 소속 ${selectedInstructorCard.name} 강사님의 공식 프로필을 확인하고, 저희 사내 교육과정 강사로 전격 초청(지명매칭)하고자 일정 조율 및 출강비 산정 상세 의뢰를 요청합니다.`);
                 }}
                 className="w-full py-3 rounded-xl bg-gradient-to-r from-amber-600 to-[#D4AF37] text-neutral-950 font-black text-center text-xs transition-all cursor-pointer mt-6"
               >
