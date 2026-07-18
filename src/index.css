@@ -20,6 +20,20 @@
     color: #F3F4F6;
     font-family: var(--font-sans);
     -webkit-font-smoothing: antialiased;
+    
+    /* Anti-Copying Text Selection Prevention Rule */
+    user-select: none;
+    -webkit-user-select: none;
+    -moz-user-select: none;
+    -ms-user-select: none;
+  }
+
+  /* Allow text selection in inputs, textareas and editable fields so users can still write forms */
+  input, textarea, select, [contenteditable="true"] {
+    user-select: text !important;
+    -webkit-user-select: text !important;
+    -moz-user-select: text !important;
+    -ms-user-select: text !important;
   }
 }
 

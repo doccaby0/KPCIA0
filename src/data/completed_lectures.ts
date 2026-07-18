@@ -198,8 +198,8 @@ export function getCompletedLectures(): LectureRequest[] {
     const materialFee = attendees * materialCost;
     const budget = mainFee + assistantFee + materialFee;
     
-    // 5% Royalty rate
-    const mileageRoyalty = Math.floor(budget * 0.05);
+    // Royalty rate is 0 since no custom approved curriculum program is associated
+    const mileageRoyalty = 0;
     
     results.push({
       id: `lect_hist_${i}`,

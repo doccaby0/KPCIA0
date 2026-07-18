@@ -288,9 +288,19 @@ export class StorageService {
   }
 
   static getLocalLectures(): LectureRequest[] {
-    const raw = this.getLocalItem('kpcia_lectures_cleared') === 'true'
+    let raw = this.getLocalItem('kpcia_lectures_cleared') === 'true'
       ? this.getLocal<LectureRequest[]>('lectures', [])
       : this.getLocal<LectureRequest[]>('lectures', INITIAL_LECTURES);
+    
+    // Ensure all INITIAL_LECTURES are present in raw if not explicitly cleared
+    if (this.getLocalItem('kpcia_lectures_cleared') !== 'true') {
+      const rawIds = new Set(raw.map(l => l.id));
+      const missing = INITIAL_LECTURES.filter(l => !rawIds.has(l.id));
+      if (missing.length > 0) {
+        raw = [...raw, ...missing];
+        this.setLocal('lectures', raw);
+      }
+    }
     
     // Enrich with companyName from INITIAL_LECTURES if missing for historical items
     const initialMap = new Map(INITIAL_LECTURES.map(l => [l.id, l]));
@@ -383,12 +393,16 @@ export class StorageService {
             }
           }
 
-          const sampleHistRef = doc(db, 'lectures', 'lect_hist_1');
-          const sampleHistSnap = await getDoc(sampleHistRef);
-          if (!sampleHistSnap.exists() && !lecturesExplicitlyCleared) {
-            console.log("Seeding historical completed lectures to Firestore...");
+          if (!lecturesExplicitlyCleared) {
+            console.log("Checking and seeding missing historical completed lectures in Firestore...");
+            const lecturesSnap = await getDocs(collection(db, 'lectures'));
+            const existingIds = new Set(lecturesSnap.docs.map(doc => doc.id));
+            
             for (const l of INITIAL_LECTURES) {
-              await setDoc(doc(db, 'lectures', l.id), this.cleanUndefined(l));
+              if (!existingIds.has(l.id)) {
+                console.log(`Seeding missing lecture to Firestore: ${l.id} (${l.title})`);
+                await setDoc(doc(db, 'lectures', l.id), this.cleanUndefined(l));
+              }
             }
           }
 
