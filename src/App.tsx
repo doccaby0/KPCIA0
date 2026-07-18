@@ -151,6 +151,9 @@ export default function App() {
   const [evaluationRating, setEvaluationRating] = useState<number>(5);
   const [evaluationComment, setEvaluationComment] = useState<string>('');
   const [showTermsModal, setShowTermsModal] = useState<boolean>(false);
+  const [showFooterTermsModal, setShowFooterTermsModal] = useState<boolean>(false);
+  const [showFooterPrivacyModal, setShowFooterPrivacyModal] = useState<boolean>(false);
+  const [showFooterIPModal, setShowFooterIPModal] = useState<boolean>(false);
 
   // Admin Lecture Ratings Map (lectureId -> rating value)
   const [adminLectureRatings, setAdminLectureRatings] = useState<Record<string, number>>({});
@@ -4530,70 +4533,70 @@ export default function App() {
             <div className="overflow-auto max-w-full p-4 bg-neutral-950 rounded-2xl border border-neutral-800">
               <div 
                 id="kpcia-certificate-print"
-                className="w-[210mm] h-[297mm] relative bg-neutral-950 text-neutral-100 flex flex-col justify-between p-[18mm] border-[5px] border-double border-[#D4AF37] select-none shadow-2xl font-sans shrink-0 overflow-hidden"
+                className="w-[210mm] h-[297mm] relative bg-gradient-to-br from-[#FDFBF7] via-[#F5EAD2] to-[#DFCA9F] text-neutral-900 flex flex-col justify-between p-[18mm] border-[6px] border-double border-[#8C6B1A] select-none shadow-2xl font-sans shrink-0 overflow-hidden"
                 style={{ width: '210mm', height: '297mm', minWidth: '210mm', minHeight: '297mm', boxSizing: 'border-box' }}
               >
                 {/* Luxury gold double border decoration */}
-                <div className="absolute inset-[3mm] border border-[#D4AF37]/30 pointer-events-none"></div>
+                <div className="absolute inset-[3mm] border border-[#8C6B1A]/40 pointer-events-none"></div>
 
                 {/* Watermark in background */}
-                <div className="absolute inset-0 flex items-center justify-center opacity-[0.02] pointer-events-none select-none">
-                  <span className="font-display font-black text-[100px] uppercase tracking-widest rotate-[-12deg]">KPCIA</span>
+                <div className="absolute inset-0 flex items-center justify-center opacity-[0.06] pointer-events-none select-none">
+                  <span className="font-display font-black text-[100px] uppercase tracking-widest rotate-[-12deg] text-[#8C6B1A]">KPCIA</span>
                 </div>
 
                 {/* Top Title Section */}
                 <div className="text-center space-y-3 mt-[10mm]">
-                  <div className="text-[10px] text-[#D4AF37] font-bold tracking-[6px] uppercase">KOREA PRESTIGE INSTRUCTOR ASSOCIATION</div>
-                  <h1 className="text-[38px] font-black text-white tracking-[24px] pl-[24px] pt-1">위 임 장</h1>
-                  <div className="text-[10px] text-neutral-500 font-mono tracking-wider pt-1">
+                  <div className="text-[10px] text-[#8C6B1A] font-bold tracking-[6px] uppercase">KOREA PRESTIGE INSTRUCTOR ASSOCIATION</div>
+                  <h1 className="text-[38px] font-black text-neutral-950 tracking-[24px] pl-[24px] pt-1">위 임 장</h1>
+                  <div className="text-[10px] text-neutral-600 font-mono tracking-wider pt-1">
                     증서번호: KPCIA-CERT-2026-{selectedCertificateLecture.id.substring(5, 11).toUpperCase()}
                   </div>
                 </div>
 
                 {/* Body Content Section */}
                 <div className="px-[10mm] text-left space-y-[8mm] my-auto">
-                  <div className="grid grid-cols-5 gap-y-[5mm] text-[13.5px] border-t border-b border-[#D4AF37]/20 py-[8mm]">
-                    <span className="text-neutral-400 col-span-1 font-semibold">성 명:</span>
-                    <span className="text-white font-extrabold col-span-4 text-[16px]">
+                  <div className="grid grid-cols-5 gap-y-[5mm] text-[13.5px] border-t border-b border-[#8C6B1A]/30 py-[8mm]">
+                    <span className="text-[#6B5A3E] col-span-1 font-semibold">성 명:</span>
+                    <span className="text-neutral-950 font-black col-span-4 text-[16px]">
                       {selectedCertificateLecture.assignedName || 'KPCIA 정회원'} 강사
                     </span>
 
-                    <span className="text-neutral-400 col-span-1 font-semibold">수탁 기관:</span>
-                    <span className="text-white font-bold col-span-4 text-[14.5px]">{selectedCertificateLecture.companyName}</span>
+                    <span className="text-[#6B5A3E] col-span-1 font-semibold">수탁 기관:</span>
+                    <span className="text-neutral-900 font-bold col-span-4 text-[14.5px]">{selectedCertificateLecture.companyName}</span>
 
-                    <span className="text-neutral-400 col-span-1 font-semibold">위임 사항:</span>
-                    <span className="text-neutral-100 font-extrabold col-span-4 text-[14.5px] underline decoration-[#D4AF37]/60 underline-offset-4">
+                    <span className="text-[#6B5A3E] col-span-1 font-semibold">위임 사항:</span>
+                    <span className="text-neutral-950 font-black col-span-4 text-[14.5px] underline decoration-[#8C6B1A]/80 underline-offset-4">
                       {selectedCertificateLecture.title}
                     </span>
 
-                    <span className="text-neutral-400 col-span-1 font-semibold">위임 기간:</span>
-                    <span className="text-neutral-300 col-span-4">{selectedCertificateLecture.date} ({selectedCertificateLecture.time})</span>
+                    <span className="text-[#6B5A3E] col-span-1 font-semibold">위임 기간:</span>
+                    <span className="text-neutral-800 col-span-4">{selectedCertificateLecture.date} ({selectedCertificateLecture.time})</span>
 
-                    <span className="text-neutral-400 col-span-1 font-semibold">정산 예산:</span>
-                    <span className="text-amber-400 font-bold col-span-4 text-[14.5px]">₩{selectedCertificateLecture.budget.toLocaleString()} (지적 IP 연계 필)</span>
+                    <span className="text-[#6B5A3E] col-span-1 font-semibold">정산 예산:</span>
+                    <span className="text-[#8C1D1D] font-black col-span-4 text-[14.5px]">₩{selectedCertificateLecture.budget.toLocaleString()} (지적 IP 연계 필)</span>
                   </div>
 
-                  <p className="text-[13px] text-neutral-300 leading-relaxed text-justify indent-[8px] pt-[2mm]">
-                    귀하는 사단법인 한국프레스티지기업강사협회의 정회원으로서, 본 협회가 수탁받은 상기 기업 교육 과정의 주강사 및 위임 전문가로 정식 위임되어 출강함을 승인하는 바, 본 위임장을 수여합니다.
+                  <p className="text-[13.5px] text-neutral-800 font-medium leading-relaxed text-justify indent-[8px] pt-[2mm]">
+                    귀하는 비영리 법인 한국프레스티지기업강사협회의 정회원으로서, 본 협회가 수탁받은 상기 기업 교육 과정의 주강사 및 위임 전문가로 정식 위임되어 출강함을 승인하는 바, 본 위임장을 수여합니다.
                   </p>
                 </div>
 
                 {/* Bottom Stamp and Date Section */}
                 <div className="flex flex-col items-center space-y-6 mb-[10mm] text-center w-full">
                   <div className="space-y-1">
-                    <div className="text-[12px] text-neutral-400 font-semibold font-mono">발행일자: 2026년 07월 16일</div>
+                    <div className="text-[12px] text-neutral-600 font-semibold font-mono">발행일자: 2026년 07월 16일</div>
                     <div className="text-[9px] text-neutral-500 font-bold uppercase tracking-wider">KPCIA Verification Office Certified</div>
                   </div>
 
                   {/* President Seal Visual stamp */}
                   <div className="relative flex items-center justify-center pt-2">
-                    <span className="text-[17px] font-black text-white tracking-[4px] relative z-10 mr-[20px]">
-                      사단법인 한국프레스티지기업강사협회 회장
+                    <span className="text-[17px] font-black text-neutral-950 tracking-[4px] relative z-10 mr-[20px]">
+                      비영리 법인 한국프레스티지기업강사협회 회장
                     </span>
-                    {/* Official red circular stamp */}
-                    <div className="absolute right-[-15px] w-[55px] h-[55px] rounded-full border-4 border-red-600/80 bg-transparent flex items-center justify-center -rotate-12 select-none pointer-events-none opacity-90 scale-105">
-                      <span className="text-red-600 font-black text-[9px] leading-tight text-center">
-                        한국강사<br />협회인
+                    {/* Official red square seal (사용인감) */}
+                    <div className="absolute right-[-20px] w-[60px] h-[60px] rounded-sm border-[3px] border-[#C22727] bg-transparent flex items-center justify-center rotate-3 select-none pointer-events-none opacity-95">
+                      <span className="text-[#C22727] font-sans font-black text-[9.5px] leading-[1.1] text-center tracking-tighter">
+                        한국프레<br />스티지기<br />업강사협<br />회인장
                       </span>
                     </div>
                   </div>
@@ -4724,11 +4727,15 @@ export default function App() {
           </div>
 
           <div className="space-y-3">
-            <h4 className="font-bold text-neutral-300">협회 대표 사무국 정보</h4>
-            <ul className="space-y-1.5 text-neutral-400">
+            <h4 className="font-bold text-neutral-300 font-sans">협회 대표 사무국 정보</h4>
+            <ul className="space-y-1.5 text-neutral-400 font-sans">
               <li>📍 <span className="text-neutral-500">주소:</span> 충청북도 충주시 성남동 365</li>
               <li>📞 <span className="text-neutral-500">연락처:</span> 010-6400-0924</li>
               <li>📧 <span className="text-neutral-500">이메일:</span> insight9edu@naver.com</li>
+              <li className="pt-1 border-t border-neutral-900 text-[11px] text-neutral-500 leading-relaxed">
+                대표자: 구교준 | 고유번호: 702-82-02115 (비영리법인)<br />
+                개인정보보호책임자: 구교준 | 협력 운영: 인사이트9교육연구소
+              </li>
             </ul>
           </div>
 
@@ -4737,12 +4744,160 @@ export default function App() {
         <div className="max-w-7xl mx-auto px-6 pt-8 mt-8 border-t border-neutral-900/60 text-center flex flex-col md:flex-row justify-between items-center gap-4 text-[10px]">
           <span>© 2026 KPCIA 한국프레스티지기업강사협회. All Rights Reserved.</span>
           <div className="flex gap-4">
-            <span className="hover:text-neutral-300 cursor-pointer">이용약관</span>
-            <span className="hover:text-neutral-300 cursor-pointer">개인정보처리방침</span>
-            <span className="hover:text-neutral-300 cursor-pointer">지적재산권 규정</span>
+            <span onClick={() => setShowFooterTermsModal(true)} className="hover:text-neutral-300 cursor-pointer transition-colors">이용약관</span>
+            <span onClick={() => setShowFooterPrivacyModal(true)} className="hover:text-amber-400 text-neutral-300 font-bold cursor-pointer transition-colors underline decoration-amber-400/30 underline-offset-4">개인정보처리방침</span>
+            <span onClick={() => setShowFooterIPModal(true)} className="hover:text-neutral-300 cursor-pointer transition-colors">지적재산권 규정</span>
           </div>
         </div>
       </footer>
+
+      {/* 📜 FOOTER LEGAL MODAL: 이용약관 */}
+      {showFooterTermsModal && (
+        <div className="fixed inset-0 z-[2000] bg-black/80 backdrop-blur-md flex items-center justify-center p-4 overflow-y-auto animate-in fade-in duration-200">
+          <div className="bg-neutral-900 border border-neutral-800 rounded-2xl w-full max-w-2xl overflow-hidden shadow-2xl relative my-auto font-sans p-6 text-left">
+            <div className="flex justify-between items-center border-b border-neutral-800 pb-4 mb-4">
+              <h3 className="text-base font-black text-white flex items-center gap-2">
+                <span className="text-amber-400">📜</span>
+                <span>KPCIA 한국프레스티지기업강사협회 이용약관</span>
+              </h3>
+              <button 
+                onClick={() => setShowFooterTermsModal(false)}
+                className="text-neutral-400 hover:text-white text-lg font-bold transition-all cursor-pointer"
+              >
+                ✕
+              </button>
+            </div>
+            <div className="h-96 overflow-y-auto bg-neutral-950 p-4 rounded-xl border border-neutral-850 text-xs text-neutral-300 space-y-4 leading-relaxed">
+              <p className="font-extrabold text-[#D4AF37] text-sm">제1장 총칙</p>
+              <p><strong>제1조 (목적)</strong><br />본 약관은 비영리 법인 한국프레스티지기업강사협회(이하 &apos;협회&apos;)가 제공하는 매칭 플랫폼, 출강 위임장 디지털 발행, 저작권 교육과정 공유 및 마일리지 누적 정산 시스템 등의 서비스 이용과 관련하여 협회와 소속 강사 회원 간의 권리, 의무, 자격 심사 및 서비스 이용에 관한 제반 사항을 규정함을 목적으로 합니다.</p>
+              <p><strong>제2조 (용어의 정의)</strong><br />1. &apos;서비스&apos;라 함은 협회가 홈페이지를 통해 정회원들에게 제공하는 강사 프로필 노출, 기업 출강 매칭 제안, 디지털 위임장 발급, 마일리지 정산 등을 포함하는 제반 시스템을 의미합니다.<br />2. &apos;강사 회원(또는 정회원)&apos;이라 함은 본 약관 및 개인정보 동의를 거쳐 가입을 신청하고 협회 마스터실의 공식 승인 절차를 거쳐 강의 권리를 위임받은 명품 사외 강사를 의미합니다.</p>
+              
+              <p className="font-extrabold text-[#D4AF37] text-sm pt-2">제2장 서비스 이용 계약 및 가입</p>
+              <p><strong>제3조 (이용 신청 및 승인)</strong><br />1. 가입 희망자는 협회가 요구하는 기본 프로필, 학력, 이력 사항, 전문 분야를 충실히 기입하고 약관에 동의하여 가입을 신청합니다.<br />2. 가입은 단순 기입만으로 완료되지 않으며, 협회 마스터실의 엄격한 이력 심사 후 최종 승인(Approved)을 득해야 정회원의 법적 자격을 위임받고 활동할 수 있습니다.</p>
+              <p><strong>제4조 (회원의 의무 및 도덕율)</strong><br />1. 회원은 출강 확정 시 최고의 강사 품격을 유지하며 성실하게 강의를 진행해야 합니다.<br />2. 현장 담당자가 추가 강의/예산 문의 시, 협회와 긴밀히 조율할 수 있도록 안내해야 하며, 임의로 사적 계약을 유치해서는 안 됩니다.</p>
+              
+              <p className="font-extrabold text-[#D4AF37] text-sm pt-2">제3장 저작권 및 마일리지</p>
+              <p><strong>제5조 (지식 저작권 교육과정 및 로열티)</strong><br />1. 회원은 자신의 창작물인 독창적 강의안 및 과정을 카탈로그에 등록 요청할 수 있습니다.<br />2. 승인된 저작권 교과목에 연계하여 출강이 이루어질 경우 협회 규정에 의거한 로열티 마일리지가 정상 누적 정산됩니다.</p>
+            </div>
+            <div className="mt-5 text-right">
+              <button 
+                onClick={() => setShowFooterTermsModal(false)}
+                className="px-5 py-2 rounded-xl bg-neutral-950 border border-neutral-800 text-neutral-300 hover:text-white font-bold transition-all cursor-pointer text-xs"
+              >
+                확인 및 닫기
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 📜 FOOTER LEGAL MODAL: 개인정보처리방침 (Strict Compliance) */}
+      {showFooterPrivacyModal && (
+        <div className="fixed inset-0 z-[2000] bg-black/80 backdrop-blur-md flex items-center justify-center p-4 overflow-y-auto animate-in fade-in duration-200">
+          <div className="bg-neutral-900 border border-neutral-800 rounded-2xl w-full max-w-2xl overflow-hidden shadow-2xl relative my-auto font-sans p-6 text-left">
+            <div className="flex justify-between items-center border-b border-neutral-800 pb-4 mb-4">
+              <h3 className="text-base font-black text-white flex items-center gap-2">
+                <span className="text-emerald-400">🛡️</span>
+                <span>KPCIA 한국프레스티지기업강사협회 개인정보처리방침</span>
+              </h3>
+              <button 
+                onClick={() => setShowFooterPrivacyModal(false)}
+                className="text-neutral-400 hover:text-white text-lg font-bold transition-all cursor-pointer"
+              >
+                ✕
+              </button>
+            </div>
+            <div className="h-96 overflow-y-auto bg-neutral-950 p-4 rounded-xl border border-neutral-850 text-xs text-neutral-300 space-y-4 leading-relaxed">
+              <p className="text-neutral-400 leading-relaxed bg-neutral-900 p-3 rounded-lg border border-neutral-850">
+                본 방침은 개인정보 보호법 제30조에 따라 이용자의 개인정보를 보호하고 관련 고충을 신속하게 처리할 수 있도록 하기 위하여 수립·공개하는 공식 개인정보처리방침입니다.
+              </p>
+              
+              <p className="font-extrabold text-amber-400 text-sm">1. 수집하는 개인정보의 항목 및 수집 방법</p>
+              <p>협회는 최초 강사 정회원 등록 신청 시 원활한 매칭 지원을 위해 아래와 같은 필수/선택 항목을 수집합니다.<br />
+              - <strong>필수 항목:</strong> 성명, 로그인ID, 비밀번호, 성별, 생년월일, 휴대전화번호, 이메일 주소, 학력/강의 이력, 주요 대표 전문분야, 한줄소개<br />
+              - <strong>선택 항목:</strong> 블로그/SNS 웹사이트 주소, 정비 포트폴리오 자료 등</p>
+
+              <p className="font-extrabold text-amber-400 text-sm pt-2">2. 개인정보의 수집 및 이용 목적</p>
+              <p>- <strong>정회원 신원 확인:</strong> 이력 적격성 심사 및 강사 등급 승격 처리<br />
+              - <strong>출강 매칭 및 증서 발행:</strong> 출강 공고 추천, 매칭 시 디지털 위임장 발급 및 주최측 전송<br />
+              - <strong>정산 및 리워드 관리:</strong> 로열티 마일리지 적립, 누적 출강료 정산금 지급 대행</p>
+
+              <p className="font-extrabold text-amber-400 text-sm pt-2">3. 개인정보의 제3자 제공에 관한 사항 (중요)</p>
+              <p className="p-3 bg-neutral-900/60 rounded border border-neutral-800">
+                협회는 원활한 기업 출강 연계를 위해 수집한 개인정보 중 일부를 제3자(출강을 신청한 기업 및 주최 교육기관)에게 제공합니다.<br />
+                - <strong>제공받는 자:</strong> 실시간 출강 공고를 게시하고 강사 선발을 의뢰한 위탁 기업 및 기관<br />
+                - <strong>제공하는 항목:</strong> 성명, 소속 전문 등급, 강의 이력서, 전문 키워드, 대표 소개글 (배정이 최종 확정된 경우 연락처 제공)<br />
+                - <strong>제공 목적:</strong> 적격성 심사 및 강사 배정 승인, 원활한 강의 조율<br />
+                - <strong>보유 및 이용기간:</strong> 강의 매칭 목적 달성 후 즉시 파기
+              </p>
+
+              <p className="font-extrabold text-amber-400 text-sm pt-2">4. 개인정보의 보유 및 이용 기간</p>
+              <p>협회는 원칙적으로 개인정보 수집 및 이용목적이 달성된 후에는 해당 정보를 지체 없이 파기합니다. 단, 회원 탈퇴 시까지 보관을 원칙으로 하며 법령의 규정에 따라 보존할 필요가 있는 경우 관련 법령이 정한 기간 동안 개인정보를 보관합니다.</p>
+
+              <p className="font-extrabold text-amber-400 text-sm pt-2">5. 정보주체의 권리·의무 및 행사방법</p>
+              <p>정보주체는 언제든지 등록되어 있는 자신의 개인정보를 열람하거나 수정할 수 있으며, 가입 해지(동의 철회)를 요구할 수 있습니다.</p>
+
+              <p className="font-extrabold text-amber-400 text-sm pt-2">6. 개인정보 보호책임자 지정</p>
+              <p>이용자의 개인정보를 보호하고 개인정보와 관련한 고충을 처리하기 위하여 다음과 같이 개인정보 보호책임자를 지정하고 있습니다.<br />
+              - <strong>개인정보 보호책임자:</strong> 구교준 대표<br />
+              - <strong>연락처:</strong> 010-6400-0924 | insight9edu@naver.com</p>
+            </div>
+            <div className="mt-5 text-right">
+              <button 
+                onClick={() => setShowFooterPrivacyModal(false)}
+                className="px-5 py-2 rounded-xl bg-neutral-950 border border-neutral-800 text-neutral-300 hover:text-white font-bold transition-all cursor-pointer text-xs"
+              >
+                동의 및 닫기
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 📜 FOOTER LEGAL MODAL: 지적재산권 규정 */}
+      {showFooterIPModal && (
+        <div className="fixed inset-0 z-[2000] bg-black/80 backdrop-blur-md flex items-center justify-center p-4 overflow-y-auto animate-in fade-in duration-200">
+          <div className="bg-neutral-900 border border-neutral-800 rounded-2xl w-full max-w-2xl overflow-hidden shadow-2xl relative my-auto font-sans p-6 text-left">
+            <div className="flex justify-between items-center border-b border-neutral-800 pb-4 mb-4">
+              <h3 className="text-base font-black text-white flex items-center gap-2">
+                <span className="text-amber-400">💡</span>
+                <span>KPCIA 지식 저작권 보호 및 지식 IP 로열티 운영 규정</span>
+              </h3>
+              <button 
+                onClick={() => setShowFooterIPModal(false)}
+                className="text-neutral-400 hover:text-white text-lg font-bold transition-all cursor-pointer"
+              >
+                ✕
+              </button>
+            </div>
+            <div className="h-96 overflow-y-auto bg-neutral-950 p-4 rounded-xl border border-neutral-850 text-xs text-neutral-300 space-y-4 leading-relaxed">
+              <p className="text-neutral-400 leading-relaxed">
+                KPCIA 한국프레스티지기업강사협회는 우수 강사진이 독자적으로 연구·개발한 교육 프로그램과 지적 재산(IP)의 침해를 방지하고, 이를 통한 공정하고 투명한 로열티 누적 정산 문화를 확립하는 것을 최우선 가치로 삼습니다.
+              </p>
+              
+              <p className="font-extrabold text-[#D4AF37] text-sm">제1조 (교육 프로그램 저작권의 귀속)</p>
+              <p>1. 정회원이 자체 기획·설계하여 협회 카탈로그에 등록한 교육과정의 저작권 및 지적재산권은 전적으로 최초 개발한 정회원에게 귀속됩니다.<br />
+              2. 협회는 본 매칭 플랫폼을 통해 해당 프로그램을 대외 홍보하고 기업 출강으로 연계할 수 있는 비독점적 라이선스 권한만을 위임받습니다.</p>
+
+              <p className="font-extrabold text-[#D4AF37] text-sm pt-2">제2조 (저작권의 침해 금지)</p>
+              <p>1. 협회 회원 및 제휴 기관은 타 회원이 카탈로그에 공유한 강의 계획서, 교안 디자인, 교육 가이드라인을 무단으로 모방하거나 허가 없이 타 출강에 유용해서는 안 됩니다.<br />
+              2. 무단 복제 및 상업적 무단 도용 적발 시 저작권법 제136조 등에 의거하여 민·형사상의 상응하는 법적 책임 조치가 전제됩니다.</p>
+
+              <p className="font-extrabold text-[#D4AF37] text-sm pt-2">제3조 (지식 IP 로열티 마일리지 지급 구조)</p>
+              <p>1. 회원이 자체 설계한 교육 프로그램이 다른 강사에 의해 기업 출강 매칭 시 연결되는 경우, 승인 시점에 확정된 지식 IP 로열티 비율(총 정산 예산의 % 비율)에 해당하는 로열티 마일리지가 자동 누계 정산됩니다.<br />
+              2. 적립된 저작권료 마일리지는 마스터실의 누적 통계에 의거하여 지급 신청 시 현금으로 정상 정산 지급됩니다.</p>
+            </div>
+            <div className="mt-5 text-right">
+              <button 
+                onClick={() => setShowFooterIPModal(false)}
+                className="px-5 py-2 rounded-xl bg-neutral-950 border border-neutral-800 text-neutral-300 hover:text-white font-bold transition-all cursor-pointer text-xs"
+              >
+                규정 확인 및 닫기
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* 🔐 AUTH LOGIN & REGISTER MODAL */}
       {showAuthModal && (
@@ -5042,6 +5197,14 @@ export default function App() {
                             <p>1. 수집 항목: 성명, 아이디, 비밀번호, 성별, 생년월일, 연락처, 이메일, 전문 분야, 학력/이력 사항, SNS/블로그 링크, 프로필 한줄 소개 등<br />
                             2. 수집 목적: 정회원 신원 확인, 등급 부여, 출강 공고 추천, 매칭 시 위임장/확약서 디지털 증서 발행, 마일리지 누적 및 정산 서비스 제공<br />
                             3. 보유 기간: 회원 탈퇴 시까지 또는 법정 의무 보유 기간까지 보관합니다.</p>
+                          </div>
+
+                          <p className="font-extrabold text-[#D4AF37] text-xs pt-1">【 개인정보 제3자 제공 동의 (필수) 】</p>
+                          <div className="space-y-2 text-neutral-400">
+                            <p>1. 제공받는 자: 실시간 출강 공고를 등록하고 강사를 매칭받고자 하는 기업 및 주최 교육 기관<br />
+                            2. 제공하는 항목: 성명, 전문 강사 등급, 이력/학력 사항, 대표 전문 분야 및 소개글, 대표 전문 키워드, 연락처(강의 최종 배정 승인 완료 시에 한함)<br />
+                            3. 제공받는 자의 이용 목적: 출강 강사단 적격성 검토 및 최종 강의 승인, 디지털 위임장 발급 및 출강 수강 조율<br />
+                            4. 제공받는 자의 보유 및 이용 기간: 교육 목적 달성 및 출강 계약 완료 시 즉시 파기</p>
                           </div>
                         </div>
 
