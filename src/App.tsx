@@ -1890,6 +1890,35 @@ export default function App() {
     triggerToast(`👤 ${user.name} 강사님의 가입 승인 상태가 '${nextApprovedState ? "최종 정회원 승인" : "승인 대기"}' 상태로 변경되었습니다.`, "success");
   };
 
+  // 8.7. Admin Force Delete / Withdraw User (Admin)
+  const handleAdminDeleteUser = async (userId: string) => {
+    const user = users.find(u => u.uid === userId);
+    if (!user) return;
+
+    if (currentUser?.uid === userId) {
+      triggerToast("본인 계정은 이곳에서 탈퇴시킬 수 없습니다. 우측 상단 프로필의 '회원탈퇴' 메뉴를 이용해 주세요.", "error");
+      return;
+    }
+
+    const confirmDelete = window.confirm(`⚠️ [경고] 정말로 '${user.name}' 강사님을 협회에서 강제 탈퇴시키겠습니까?\n\n이 작업은 즉시 해당 회원의 가입 정보, 이력서, 누적 마일리지를 영구적으로 파기하며 이 작업은 되돌릴 수 없습니다.`);
+    if (!confirmDelete) return;
+
+    try {
+      const updatedUsers = users.filter(u => u.uid !== userId);
+      setUsers(updatedUsers);
+      await StorageService.deleteUser(userId);
+      triggerToast(`👤 ${user.name} 강사님이 협회 강사 명단에서 영구 탈퇴/삭제 처리되었습니다.`, "success");
+      
+      // If the admin was viewing this instructor's details, close or clean up
+      if (viewingInstructorDetail?.uid === userId) {
+        setViewingInstructorDetail(null);
+      }
+    } catch (err) {
+      console.error(err);
+      triggerToast("강사 강제 탈퇴 처리 중 오류가 발생했습니다.", "error");
+    }
+  };
+
   // 9. Save Instructor Profile Changes (Admin)
   const handleSaveInstructorEdit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -4310,6 +4339,13 @@ export default function App() {
                                   <option value="Prestige Elite">Elite</option>
                                   <option value="Prestige Legend">Legend</option>
                                 </select>
+                                <button
+                                  onClick={() => handleAdminDeleteUser(u.uid)}
+                                  className="px-2 py-1 rounded bg-red-950/40 hover:bg-red-900/60 text-red-400 hover:text-red-300 border border-red-900/30 font-bold transition-all text-[9px] cursor-pointer"
+                                  title="강사 영구 탈퇴 처리"
+                                >
+                                  ❌ 강제탈퇴
+                                </button>
                               </div>
                             </td>
                           </tr>
@@ -5416,6 +5452,14 @@ export default function App() {
                       className="flex-1 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-bold text-center transition-all cursor-pointer text-[11px] flex items-center justify-center gap-1.5"
                     >
                       <span>✏️ 이 회원 정보 수정하기</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleAdminDeleteUser(viewingInstructorDetail.uid)}
+                      className="py-2.5 px-3 rounded-xl border border-red-900 bg-red-950/40 hover:bg-red-900/60 text-red-400 font-bold text-center transition-all cursor-pointer text-[11px] flex items-center justify-center gap-1"
+                      title="강사 영구 탈퇴 처리"
+                    >
+                      <span>❌ 강제탈퇴</span>
                     </button>
                   </div>
                 </div>
