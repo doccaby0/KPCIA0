@@ -1821,7 +1821,7 @@ export default function App() {
       return;
     }
 
-    triggerToast("📄 고해상도 PDF 증명서를 생성하여 내려받는 중입니다. 잠시만 기다려 주세요...", "info");
+    triggerToast("📄 고해상도 PDF 위임장을 생성하여 내려받는 중입니다. 잠시만 기다려 주세요...", "info");
     
     html2canvas(element, {
       scale: 2,
@@ -1830,20 +1830,20 @@ export default function App() {
     }).then((canvas) => {
       const imgData = canvas.toDataURL('image/png');
       const pdf = new jsPDF({
-        orientation: 'landscape',
+        orientation: 'portrait',
         unit: 'mm',
         format: 'a4'
       });
       
-      const imgWidth = 297; // A4 landscape width
+      const imgWidth = 210; // A4 portrait width
       const imgHeight = (canvas.height * imgWidth) / canvas.width;
       
       pdf.addImage(imgData, 'PNG', 0, 0, imgWidth, imgHeight);
-      pdf.save(`KPCIA_Certificate_${Date.now()}.pdf`);
-      triggerToast("✅ 디지털 위임장 및 매칭 증명서가 PDF로 성공적으로 다운로드되었습니다!", "success");
+      pdf.save(`KPCIA_Appointment_${Date.now()}.pdf`);
+      triggerToast("✅ 디지털 위임장이 PDF로 성공적으로 다운로드되었습니다!", "success");
     }).catch((err) => {
       console.error("PDF download failure:", err);
-      triggerToast("증명서 생성 중 오류가 발생했습니다. 다시 시도해 주세요.", "error");
+      triggerToast("위임장 생성 중 오류가 발생했습니다. 다시 시도해 주세요.", "error");
     });
   };
 
@@ -2729,13 +2729,6 @@ export default function App() {
                                       >
                                         <FileText className="w-3 h-3" />
                                         위임장 출력
-                                      </button>
-                                      <button
-                                        onClick={() => handleOpenCertificate(lecture, 'matching')}
-                                        className="px-3 py-1.5 rounded-lg bg-neutral-950 hover:bg-neutral-900 border border-neutral-800 text-emerald-400 text-[10px] font-bold transition-all cursor-pointer flex items-center gap-1"
-                                      >
-                                        <FileText className="w-3 h-3" />
-                                        매칭 확인서 출력
                                       </button>
                                     </div>
                                   )}
@@ -4537,73 +4530,68 @@ export default function App() {
             <div className="overflow-auto max-w-full p-4 bg-neutral-950 rounded-2xl border border-neutral-800">
               <div 
                 id="kpcia-certificate-print"
-                className="w-[297mm] h-[210mm] relative bg-neutral-950 text-neutral-100 flex flex-col justify-between p-[20mm] border-[5px] border-double border-[#D4AF37] select-none shadow-2xl font-sans shrink-0 overflow-hidden"
-                style={{ width: '297mm', height: '210mm', minWidth: '297mm', minHeight: '210mm', boxSizing: 'border-box' }}
+                className="w-[210mm] h-[297mm] relative bg-neutral-950 text-neutral-100 flex flex-col justify-between p-[18mm] border-[5px] border-double border-[#D4AF37] select-none shadow-2xl font-sans shrink-0 overflow-hidden"
+                style={{ width: '210mm', height: '297mm', minWidth: '210mm', minHeight: '297mm', boxSizing: 'border-box' }}
               >
                 {/* Luxury gold double border decoration */}
                 <div className="absolute inset-[3mm] border border-[#D4AF37]/30 pointer-events-none"></div>
 
                 {/* Watermark in background */}
-                <div className="absolute inset-0 flex items-center justify-center opacity-[0.03] pointer-events-none select-none">
-                  <span className="font-display font-black text-[120px] uppercase tracking-widest">KPCIA</span>
+                <div className="absolute inset-0 flex items-center justify-center opacity-[0.02] pointer-events-none select-none">
+                  <span className="font-display font-black text-[100px] uppercase tracking-widest rotate-[-12deg]">KPCIA</span>
                 </div>
 
                 {/* Top Title Section */}
-                <div className="text-center space-y-2 mt-[10mm]">
-                  <div className="text-[12px] text-[#D4AF37] font-bold tracking-[8px] uppercase">KOREA PRESTIGE INSTRUCTOR ASSOCIATION</div>
-                  <h1 className="text-[42px] font-black text-white tracking-[24px] pl-[24px]">
-                    {certificateType === 'appointment' ? '위 임 장' : '출강 매칭 증명서'}
-                  </h1>
-                  <div className="text-[11px] text-neutral-500 font-mono tracking-wider">
+                <div className="text-center space-y-3 mt-[10mm]">
+                  <div className="text-[10px] text-[#D4AF37] font-bold tracking-[6px] uppercase">KOREA PRESTIGE INSTRUCTOR ASSOCIATION</div>
+                  <h1 className="text-[38px] font-black text-white tracking-[24px] pl-[24px] pt-1">위 임 장</h1>
+                  <div className="text-[10px] text-neutral-500 font-mono tracking-wider pt-1">
                     증서번호: KPCIA-CERT-2026-{selectedCertificateLecture.id.substring(5, 11).toUpperCase()}
                   </div>
                 </div>
 
                 {/* Body Content Section */}
-                <div className="px-[15mm] text-left space-y-[8mm] my-auto">
-                  <div className="grid grid-cols-5 gap-y-[4mm] text-[14px]">
-                    <span className="text-neutral-400 col-span-1">성 명:</span>
+                <div className="px-[10mm] text-left space-y-[8mm] my-auto">
+                  <div className="grid grid-cols-5 gap-y-[5mm] text-[13.5px] border-t border-b border-[#D4AF37]/20 py-[8mm]">
+                    <span className="text-neutral-400 col-span-1 font-semibold">성 명:</span>
                     <span className="text-white font-extrabold col-span-4 text-[16px]">
-                      {certificateType === 'appointment' ? `${selectedCertificateLecture.assignedName || 'KPCIA 정회원'} 강사` : `${selectedCertificateLecture.assignedName || 'KPCIA'} 대표 강사단`}
+                      {selectedCertificateLecture.assignedName || 'KPCIA 정회원'} 강사
                     </span>
 
-                    <span className="text-neutral-400 col-span-1">수탁 기관:</span>
-                    <span className="text-white font-bold col-span-4">{selectedCertificateLecture.companyName}</span>
+                    <span className="text-neutral-400 col-span-1 font-semibold">수탁 기관:</span>
+                    <span className="text-white font-bold col-span-4 text-[14.5px]">{selectedCertificateLecture.companyName}</span>
 
-                    <span className="text-neutral-400 col-span-1">위임 사항:</span>
-                    <span className="text-neutral-100 font-extrabold col-span-4 text-[15px] underline decoration-[#D4AF37]/60 underline-offset-4">
+                    <span className="text-neutral-400 col-span-1 font-semibold">위임 사항:</span>
+                    <span className="text-neutral-100 font-extrabold col-span-4 text-[14.5px] underline decoration-[#D4AF37]/60 underline-offset-4">
                       {selectedCertificateLecture.title}
                     </span>
 
-                    <span className="text-neutral-400 col-span-1">위임 기간:</span>
+                    <span className="text-neutral-400 col-span-1 font-semibold">위임 기간:</span>
                     <span className="text-neutral-300 col-span-4">{selectedCertificateLecture.date} ({selectedCertificateLecture.time})</span>
 
-                    <span className="text-neutral-400 col-span-1">정산 예산:</span>
-                    <span className="text-amber-400 font-bold col-span-4">₩{selectedCertificateLecture.budget.toLocaleString()} (지적 IP 연계 필)</span>
+                    <span className="text-neutral-400 col-span-1 font-semibold">정산 예산:</span>
+                    <span className="text-amber-400 font-bold col-span-4 text-[14.5px]">₩{selectedCertificateLecture.budget.toLocaleString()} (지적 IP 연계 필)</span>
                   </div>
 
-                  <p className="text-[13px] text-neutral-300 leading-relaxed text-justify indent-[6px]">
-                    {certificateType === 'appointment' 
-                      ? "귀하는 사단법인 한국프레스티지기업강사협회의 정회원으로서, 본 협회가 수탁받은 상기 기업 교육 과정의 주강사 및 위임 전문가로 정식 위임되어 출강함을 승인하는 바, 본 위임장을 수여합니다."
-                      : "상기 명시된 기업 교육 매칭 과정에 대하여 본 협회의 검증 사양서에 의거, 최종 출강 매칭 승인 및 수탁 계약이 투명하게 체결되어 출강 강사단이 정상 위임 배정되었음을 공식 증명합니다."
-                    }
+                  <p className="text-[13px] text-neutral-300 leading-relaxed text-justify indent-[8px] pt-[2mm]">
+                    귀하는 사단법인 한국프레스티지기업강사협회의 정회원으로서, 본 협회가 수탁받은 상기 기업 교육 과정의 주강사 및 위임 전문가로 정식 위임되어 출강함을 승인하는 바, 본 위임장을 수여합니다.
                   </p>
                 </div>
 
                 {/* Bottom Stamp and Date Section */}
-                <div className="flex justify-between items-end px-[10mm] mb-[5mm]">
-                  <div className="space-y-1 text-left">
+                <div className="flex flex-col items-center space-y-6 mb-[10mm] text-center w-full">
+                  <div className="space-y-1">
                     <div className="text-[12px] text-neutral-400 font-semibold font-mono">발행일자: 2026년 07월 16일</div>
-                    <div className="text-[10px] text-neutral-500 font-bold uppercase">KPCIA Verification Office Certified</div>
+                    <div className="text-[9px] text-neutral-500 font-bold uppercase tracking-wider">KPCIA Verification Office Certified</div>
                   </div>
 
                   {/* President Seal Visual stamp */}
-                  <div className="relative flex items-center justify-center">
-                    <span className="text-[18px] font-black text-white tracking-[6px] relative z-10 mr-[25px]">
+                  <div className="relative flex items-center justify-center pt-2">
+                    <span className="text-[17px] font-black text-white tracking-[4px] relative z-10 mr-[20px]">
                       사단법인 한국프레스티지기업강사협회 회장
                     </span>
                     {/* Official red circular stamp */}
-                    <div className="absolute right-0 w-[55px] h-[55px] rounded-full border-4 border-red-600/80 bg-transparent flex items-center justify-center -rotate-12 select-none pointer-events-none opacity-90 scale-105">
+                    <div className="absolute right-[-15px] w-[55px] h-[55px] rounded-full border-4 border-red-600/80 bg-transparent flex items-center justify-center -rotate-12 select-none pointer-events-none opacity-90 scale-105">
                       <span className="text-red-600 font-black text-[9px] leading-tight text-center">
                         한국강사<br />협회인
                       </span>
