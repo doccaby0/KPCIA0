@@ -2034,7 +2034,7 @@ export default function App() {
 
   // Sub-navigation: Render dynamic components of page
   return (
-    <div className="min-h-screen bg-[#09090B] text-neutral-100 font-sans antialiased selection:bg-amber-500/20 selection:text-amber-300">
+    <div className="min-h-screen bg-[#09090B] text-neutral-100 font-sans antialiased selection:bg-amber-500/20 selection:text-amber-300 pb-20 md:pb-0">
       
       {/* 🔔 Toast Feedback Notification */}
       {toast && (
@@ -5983,6 +5983,47 @@ export default function App() {
       )}
 
 
+
+      {/* 📱 Elegant Mobile Bottom Navigation Bar */}
+      <div className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-[#09090B]/95 backdrop-blur-md border-t border-neutral-900/60 h-16 flex items-center justify-around px-2 pb-safe shadow-[0_-10px_30px_rgba(0,0,0,0.8)]">
+        {[
+          { id: 'home', label: '협회소개', icon: <Home className="w-5 h-5" />, action: () => setActiveTab('home') },
+          { id: 'lectures', label: '출강정보', icon: <FileText className="w-5 h-5" />, action: () => setActiveTab('lectures') },
+          ...(currentUser && currentUser.isApproved 
+            ? [{ id: 'programs', label: '고품격교육', icon: <BookOpen className="w-5 h-5" />, action: () => setActiveTab('programs') }]
+            : [{ id: 'partnership', label: '제휴의뢰', icon: <Send className="w-5 h-5" />, action: () => setActiveTab('partnership') }]
+          ),
+          ...(currentUser?.isAdmin 
+            ? [{ id: 'admin', label: '마스터실', icon: <Settings className="w-5 h-5 text-[#D4AF37]" />, action: () => setActiveTab('admin') }]
+            : []
+          ),
+          ...(currentUser 
+            ? [{ id: 'mypage', label: '마이페이지', icon: <User className="w-5 h-5" />, action: () => setActiveTab('mypage') }]
+            : [{ id: 'login', label: '로그인', icon: <LogIn className="w-5 h-5" />, action: () => { setAuthMode('login'); setShowAuthModal(true); } }]
+          )
+        ].map(item => {
+          const isActive = activeTab === item.id;
+          return (
+            <button
+              key={item.id}
+              onClick={item.action}
+              className={`flex flex-col items-center justify-center flex-1 h-full py-1 text-[10px] font-bold transition-all relative ${
+                isActive 
+                  ? 'text-[#D4AF37]' 
+                  : 'text-neutral-400 active:text-[#D4AF37]'
+              }`}
+            >
+              <div className={`p-1 rounded-lg transition-all ${isActive ? 'bg-amber-500/10 text-[#D4AF37]' : ''}`}>
+                {item.icon}
+              </div>
+              <span className="mt-0.5 scale-90 origin-center tracking-tighter">{item.label}</span>
+              {isActive && (
+                <div className="absolute top-0 left-1/2 -translate-x-1/2 w-8 h-[2px] bg-gradient-to-r from-amber-500 to-[#D4AF37] rounded-full" />
+              )}
+            </button>
+          );
+        })}
+      </div>
 
     </div>
   );
