@@ -12,6 +12,7 @@ import {
 import html2canvas from 'html2canvas';
 import { jsPDF } from 'jspdf';
 import * as XLSX from 'xlsx';
+import ExcelJS from 'exceljs';
 import { StorageService, generateBadgeForTier } from './lib/firebase';
 import { sanitizeString, sanitizePhone } from './utils/security';
 import { 
@@ -1068,6 +1069,13 @@ export default function App() {
   };
 
   const handleDownloadQR = async (lecture: LectureRequest) => {
+    const isMainLecturer = currentUser && lecture.assignedTo === currentUser.uid;
+    const isAssistantLecturer = currentUser && lecture.assistantId === currentUser.uid;
+    if (!currentUser?.isAdmin && !isMainLecturer && !isAssistantLecturer) {
+      triggerToast("🔒 KPCIA 마스터실의 승인을 거쳐 최종 배정 완료된 강사님만 만족도 QR 다운로드가 가능합니다.", "error");
+      return;
+    }
+
     const surveyUrl = lecture.surveyUrl || "https://docs.google.com/forms/d/e/1FAIpQLSdWC4rgAa5hQi2G1wcMnCWlwYCA8rfRkHurHG3e7JeiR24V1A/viewform?usp=sharing&ouid=108376898401719889630";
     const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(surveyUrl)}`;
     try {
@@ -1088,138 +1096,327 @@ export default function App() {
     }
   };
 
-  const handleDownloadExcel = (lecture?: LectureRequest) => {
-    // If a specific lecture is provided, check if the currentUser has applied or is admin
+  const handleDownloadExcel = async (lecture?: LectureRequest) => {
+    // If a specific lecture is provided, check if the currentUser is assigned or is admin
     if (lecture) {
-      const hasApplied = currentUser && lecture.applicants.includes(currentUser.uid);
-      if (!currentUser?.isAdmin && !hasApplied) {
-        triggerToast("🔒 이 강의 공고에 출강 지원을 신청한 강사님만 상세 엑셀 다운로드가 가능합니다.", "error");
+      const isMainLecturer = currentUser && lecture.assignedTo === currentUser.uid;
+      const isAssistantLecturer = currentUser && lecture.assistantId === currentUser.uid;
+      if (!currentUser?.isAdmin && !isMainLecturer && !isAssistantLecturer) {
+        triggerToast("🔒 KPCIA 마스터실의 승인을 거쳐 최종 배정 완료된 강사님만 상세 엑셀 다운로드가 가능합니다.", "error");
         return;
       }
     }
 
-    const wb = XLSX.utils.book_new();
-
     if (lecture) {
-      // 1. Single Lecture: Beautiful custom layout according to user's desired template image
-      const aoa = [
-        [`[KPCIA] 출강 강의 파견 안내서`],
-        [],
-        [`1. 기본 강의 정보`],
-        [`기관명`, ``, lecture.companyName || "익명 기업", ``, ``, ``, ``, ``],
-        [`교육 일정`, ``, lecture.date, ``, `교육 시간`, ``, `${lecture.time} (총 ${lecture.duration || '3시간'})`, ``],
-        [`장소`, ``, lecture.location || "교육장", ``, ``, ``, ``, ``],
-        [`교육 주제`, ``, lecture.title, ``, ``, ``, ``, ``],
-        [`현장 담당자`, ``, lecture.managerName || "인재개발원 담당자", ``, `연락처`, ``, lecture.managerPhone || "010-0000-0000", ``],
-        [],
-        [`2. 비용 및 정산 안내`],
-        [`항목`, ``, `금액 / 계산 기준`, ``, `내용`, ``, ``, `비고 (주의사항)`],
-        [`주 강사비`, ``, `${((lecture.mainHours || 3) * 100000).toLocaleString()}원`, ``, `${lecture.mainHours || 3}시간`, ``, ``, `주강사 주임수당 포함`],
-        [`보조 강사비`, ``, `${((lecture.assistantHours || 0) * 50000).toLocaleString()}원`, ``, lecture.assistantHours ? `${lecture.assistantHours}시간` : `-`, ``, ``, lecture.assistantHours ? `보조강사 배정 수당` : `보조강사 배정 없음`],
-        [`재료비`, ``, `${((lecture.attendees || 0) * (lecture.materialCost || 0)).toLocaleString()}원`, ``, `${(lecture.materialCost || 0).toLocaleString()}원 * ${lecture.attendees || 0}명`, ``, ``, `(정원 미달 시에도 남은 재료 소진 필수)`],
-        [`총 비용`, ``, `${lecture.budget.toLocaleString()}원`, ``, `합계 금액`, ``, ``, `합계 금액`],
-        [],
-        [`3. 프로그램 진행 플로우 (강사 행동 요령)`],
-        [`단계`, `시간 및 타이밍`, ``, `주요 행동 지침`, ``, ``, ``, `완료 체크`],
-        [`사전 준비`, `강의 시작 30분 전`, ``, `현장 도착 완료 및 교육장 세팅 후 '세팅 완료 사진' 촬영 필수`, ``, ``, ``, `[  ]`],
-        [`강의 진행`, `강의 중`, ``, `수강생 교육 진행 및 활발한 스케치 사진(강의 중 사진) 촬영`, ``, ``, ``, `[  ]`],
-        [`마무리`, `강의 종료 10분 전`, ``, `프로그램 완료, 결과물 모아서 단체 사진 촬영 및 만족도 QR 조사 실시`, ``, ``, ``, `[  ]`],
-        [`사후 보고`, `강의 종료 후 즉시`, ``, `촬영한 모든 사진(세팅, 강의, 결과물 등)을 대표님 카카오톡으로 전송`, ``, ``, ``, `[  ]`],
-        [],
-        [`4. 강의 후 행정 및 결제 처리 안내`],
-        [`지출증빙 영수증 제출`, ``, `총예산 지출증빙 영수증을 사진 촬영 또는 이메일로 발송 (insight9edu@naver.com)`, ``, ``, ``, ``, ``],
-        [`현금영수증 발행 정보`, ``, `사업자 지출증빙: 702-41-00899 (인사이트9교육연구소)`, ``, ``, ``, ``, ``],
-        [`현장 추가 문의 응대`, ``, `현장 담당자의 프로그램/강의 예산 추가 문의 시 -> '인사이트9교육연구소(본사)에 연락하시면 안내해 드립니다'로 응대`, ``, ``, ``, ``, ``],
-        [],
-        [`5. 주의 및 특이사항 (필수 준수)`],
-        [`• 현장 담당자에게 소속 소개 시 '인사이트9교육연구소와 함께하는 협력 기관'이라고 소개해주세요.`, ``, ``, ``, ``, ``, ``, ``],
-        [`• 출강 전 현장 담당자와 연락하여 강의장 컨디션, 시간, 장소, 특이사항을 사전 체크해주세요.`, ``, ``, ``, ``, ``, ``, ``],
-        [`• 현장에서 인원 추가는 절대 불가합니다. 요청 시 '본사에서 정해진 인원으로만 진행된다'고 안내해주세요.`, ``, ``, ``, ``, ``, ``, ``],
-        [`• 개인/협회/공방 SNS나 블로그에 후기 PR 게시 시 '인사이트9교육연구소와 협업했다'는 내용을 꼭 기재해주세요.`, ``, ``, ``, ``, ``, ``, ``]
-      ];
-
-      const merges = [
-        { s: { r: 0, c: 0 }, e: { r: 0, c: 7 } }, // Banner
-        { s: { r: 2, c: 0 }, e: { r: 2, c: 7 } }, // Sec 1 header
-        { s: { r: 3, c: 0 }, e: { r: 3, c: 1 } }, { s: { r: 3, c: 2 }, e: { r: 3, c: 7 } }, // 기관명
-        { s: { r: 4, c: 0 }, e: { r: 4, c: 1 } }, { s: { r: 4, c: 2 }, e: { r: 4, c: 3 } }, { s: { r: 4, c: 4 }, e: { r: 4, c: 5 } }, { s: { r: 4, c: 6 }, e: { r: 4, c: 7 } }, // 일정 & 시간
-        { s: { r: 5, c: 0 }, e: { r: 5, c: 1 } }, { s: { r: 5, c: 2 }, e: { r: 5, c: 7 } }, // 장소
-        { s: { r: 6, c: 0 }, e: { r: 6, c: 1 } }, { s: { r: 6, c: 2 }, e: { r: 6, c: 7 } }, // 주제
-        { s: { r: 7, c: 0 }, e: { r: 7, c: 1 } }, { s: { r: 7, c: 2 }, e: { r: 7, c: 3 } }, { s: { r: 7, c: 4 }, e: { r: 7, c: 5 } }, { s: { r: 7, c: 6 }, e: { r: 7, c: 7 } }, // 담당자 & 연락처
+      try {
+        const todayStr = new Date().toISOString().substring(0, 10);
+        const workbook = new ExcelJS.Workbook();
+        const ws = workbook.addWorksheet('출강파견안내서');
         
-        { s: { r: 9, c: 0 }, e: { r: 9, c: 7 } }, // Sec 2 header
-        { s: { r: 10, c: 0 }, e: { r: 10, c: 1 } }, { s: { r: 10, c: 2 }, e: { r: 10, c: 3 } }, { s: { r: 10, c: 4 }, e: { r: 10, c: 6 } }, // cost table header
-        { s: { r: 11, c: 0 }, e: { r: 11, c: 1 } }, { s: { r: 11, c: 2 }, e: { r: 11, c: 3 } }, { s: { r: 11, c: 4 }, e: { r: 11, c: 6 } }, // 주 강사비
-        { s: { r: 12, c: 0 }, e: { r: 12, c: 1 } }, { s: { r: 12, c: 2 }, e: { r: 12, c: 3 } }, { s: { r: 12, c: 4 }, e: { r: 12, c: 6 } }, // 보조 강사비
-        { s: { r: 13, c: 0 }, e: { r: 13, c: 1 } }, { s: { r: 13, c: 2 }, e: { r: 13, c: 3 } }, { s: { r: 13, c: 4 }, e: { r: 13, c: 6 } }, // 재료비
-        { s: { r: 14, c: 0 }, e: { r: 14, c: 1 } }, { s: { r: 14, c: 2 }, e: { r: 14, c: 3 } }, { s: { r: 14, c: 4 }, e: { r: 14, c: 6 } }, // 총 비용
-        
-        { s: { r: 16, c: 0 }, e: { r: 16, c: 7 } }, // Sec 3 header
-        { s: { r: 17, c: 1 }, e: { r: 17, c: 2 } }, { s: { r: 17, c: 3 }, e: { r: 17, c: 6 } }, // flow table header
-        { s: { r: 18, c: 1 }, e: { r: 18, c: 2 } }, { s: { r: 18, c: 3 }, e: { r: 18, c: 6 } },
-        { s: { r: 19, c: 1 }, e: { r: 19, c: 2 } }, { s: { r: 19, c: 3 }, e: { r: 19, c: 6 } },
-        { s: { r: 20, c: 1 }, e: { r: 20, c: 2 } }, { s: { r: 20, c: 3 }, e: { r: 20, c: 6 } },
-        { s: { r: 21, c: 1 }, e: { r: 21, c: 2 } }, { s: { r: 21, c: 3 }, e: { r: 21, c: 6 } },
-        
-        { s: { r: 23, c: 0 }, e: { r: 23, c: 7 } }, // Sec 4 header
-        { s: { r: 24, c: 0 }, e: { r: 24, c: 1 } }, { s: { r: 24, c: 2 }, e: { r: 24, c: 7 } },
-        { s: { r: 25, c: 0 }, e: { r: 25, c: 1 } }, { s: { r: 25, c: 2 }, e: { r: 25, c: 7 } },
-        { s: { r: 26, c: 0 }, e: { r: 26, c: 1 } }, { s: { r: 26, c: 2 }, e: { r: 26, c: 7 } },
-        
-        { s: { r: 28, c: 0 }, e: { r: 28, c: 7 } }, // Sec 5 header
-        { s: { r: 29, c: 0 }, e: { r: 29, c: 7 } },
-        { s: { r: 30, c: 0 }, e: { r: 30, c: 7 } },
-        { s: { r: 31, c: 0 }, e: { r: 31, c: 7 } },
-        { s: { r: 32, c: 0 }, e: { r: 32, c: 7 } }
-      ];
+        // Page setup for single page fit
+        ws.pageSetup = {
+          orientation: 'portrait',
+          paperSize: 9, // A4
+          fitToPage: true,
+          fitToWidth: 1,
+          fitToHeight: 1,
+          margins: {
+            left: 0.4, right: 0.4,
+            top: 0.4, bottom: 0.4,
+            header: 0.2, footer: 0.2
+          }
+        };
 
-      const cols = [
-        { wch: 18 }, { wch: 18 }, { wch: 20 }, { wch: 15 }, 
-        { wch: 15 }, { wch: 15 }, { wch: 25 }, { wch: 45 }
-      ];
+        ws.views = [{ showGridLines: true }];
 
-      const rowHeights = [
-        { hpt: 35 }, // Row 0: Banner
-        { hpt: 15 }, // Row 1
-        { hpt: 25 }, // Row 2: Sec 1 title
-        { hpt: 22 }, // Row 3
-        { hpt: 22 }, // Row 4
-        { hpt: 22 }, // Row 5
-        { hpt: 22 }, // Row 6
-        { hpt: 22 }, // Row 7
-        { hpt: 15 }, // Row 8
-        { hpt: 25 }, // Row 9: Sec 2 title
-        { hpt: 22 }, // Row 10
-        { hpt: 20 }, // Row 11
-        { hpt: 20 }, // Row 12
-        { hpt: 20 }, // Row 13
-        { hpt: 20 }, // Row 14
-        { hpt: 15 }, // Row 15
-        { hpt: 25 }, // Row 16: Sec 3 title
-        { hpt: 22 }, // Row 17
-        { hpt: 20 }, // Row 18
-        { hpt: 20 }, // Row 19
-        { hpt: 20 }, // Row 20
-        { hpt: 20 }, // Row 21
-        { hpt: 15 }, // Row 22
-        { hpt: 25 }, // Row 23: Sec 4 title
-        { hpt: 20 }, // Row 24
-        { hpt: 20 }, // Row 25
-        { hpt: 20 }, // Row 26
-        { hpt: 15 }, // Row 27
-        { hpt: 25 }, // Row 28: Sec 5 title
-        { hpt: 20 }, // Row 29
-        { hpt: 20 }, // Row 30
-        { hpt: 20 }, // Row 31
-        { hpt: 20 }  // Row 32
-      ];
+        // Set Column Widths (total ~160)
+        ws.columns = [
+          { width: 16 }, // A
+          { width: 16 }, // B
+          { width: 22 }, // C
+          { width: 14 }, // D
+          { width: 16 }, // E
+          { width: 14 }, // F
+          { width: 22 }, // G
+          { width: 42 }  // H
+        ];
 
-      const ws = XLSX.utils.aoa_to_sheet(aoa);
-      ws['!merges'] = merges;
-      ws['!cols'] = cols;
-      ws['!rows'] = rowHeights;
-      XLSX.utils.book_append_sheet(wb, ws, "파견안내서");
+        // Helper function to set values, merges, and styles
+        const mergeAndStyle = (
+          range: string, 
+          value: any, 
+          style: {
+            bold?: boolean;
+            size?: number;
+            color?: string; // ARGB
+            fill?: string;  // ARGB
+            align?: 'left' | 'center' | 'right';
+            border?: 'thin' | 'double' | 'none';
+            wrapText?: boolean;
+            numFormat?: string;
+          } = {}
+        ) => {
+          ws.mergeCells(range);
+          const [start, end] = range.split(':');
+          
+          const startCol = start.charCodeAt(0) - 65 + 1;
+          const startRow = parseInt(start.substring(1));
+          const endCol = end.charCodeAt(0) - 65 + 1;
+          const endRow = parseInt(end.substring(1));
+
+          for (let r = startRow; r <= endRow; r++) {
+            for (let c = startCol; c <= endCol; c++) {
+              const cell = ws.getCell(r, c);
+              cell.font = {
+                name: 'Malgun Gothic',
+                size: style.size || 10,
+                bold: style.bold || false,
+                color: style.color ? { argb: style.color } : { argb: 'FF1E293B' }
+              };
+              if (style.fill) {
+                cell.fill = {
+                  type: 'pattern',
+                  pattern: 'solid',
+                  fgColor: { argb: style.fill }
+                };
+              } else {
+                cell.fill = {
+                  type: 'pattern',
+                  pattern: 'solid',
+                  fgColor: { argb: 'FFFFFFFF' }
+                };
+              }
+              cell.alignment = {
+                vertical: 'middle',
+                horizontal: style.align || 'left',
+                wrapText: style.wrapText !== undefined ? style.wrapText : true
+              };
+              if (style.numFormat) {
+                cell.numFmt = style.numFormat;
+              }
+              if (style.border !== 'none') {
+                const borderStyle = style.border === 'double' ? 'double' : 'thin';
+                cell.border = {
+                  top: { style: borderStyle, color: { argb: 'FFCBD5E1' } },
+                  left: { style: borderStyle, color: { argb: 'FFCBD5E1' } },
+                  bottom: { style: borderStyle, color: { argb: 'FFCBD5E1' } },
+                  right: { style: borderStyle, color: { argb: 'FFCBD5E1' } }
+                };
+              } else {
+                cell.border = {
+                  top: null, left: null, bottom: null, right: null
+                };
+              }
+            }
+          }
+
+          const startCell = ws.getCell(start);
+          startCell.value = value;
+        };
+
+        const cell = (
+          ref: string, 
+          value: any, 
+          style: {
+            bold?: boolean;
+            size?: number;
+            color?: string;
+            fill?: string;
+            align?: 'left' | 'center' | 'right';
+            border?: 'thin' | 'double' | 'none';
+            wrapText?: boolean;
+            numFormat?: string;
+          } = {}
+        ) => {
+          const range = ref.includes(':') ? ref : `${ref}:${ref}`;
+          mergeAndStyle(range, value, { border: 'thin', ...style });
+        };
+
+        // Set Row heights
+        const rowHeights: Record<number, number> = {
+          1: 38,  // Title Banner
+          2: 24,  // Sub Banner
+          3: 20,  // Code & Date
+          4: 12,  // spacer
+          5: 25,  // Sec 1 title
+          6: 22,  // 주제
+          7: 22,  // 기관/협력사
+          8: 22,  // 일정/시간
+          9: 22,  // 장소
+          10: 22, // 담당자
+          11: 22, // 배정 강사
+          12: 12, // spacer
+          13: 25, // Sec 2 title
+          14: 22, // Settlement Table Header
+          15: 22, // 주강사료
+          16: 22, // 보조강사료
+          17: 22, // 재료비
+          18: 24, // 총 합계
+          19: 12, // spacer
+          20: 25, // Sec 3 title
+          21: 22, // Timeline Header
+          22: 40, // 사전준비
+          23: 40, // 진행
+          24: 40, // 정리
+          25: 40, // 행정보고
+          26: 12, // spacer
+          27: 25, // Sec 4 title
+          28: 22, // 지출증빙
+          29: 22, // 현금영수증
+          30: 22, // 추가문의
+          31: 12, // spacer
+          32: 25, // Sec 5 title
+          33: 22, // 강령 1
+          34: 22, // 강령 2
+          35: 22, // 강령 3
+          36: 22, // 강령 4
+          37: 12, // spacer
+          38: 34, // 서약서 문구
+          39: 28  // 발행처 서명
+        };
+
+        Object.entries(rowHeights).forEach(([r, h]) => {
+          ws.getRow(parseInt(r)).height = h;
+        });
+
+        // Write content row by row with beautiful colors
+        // [Banner Area]
+        cell('A1:H1', '📋 [KPCIA] 공식 출강 강의 파견 안내서', { size: 14, bold: true, color: 'FFFFFFFF', fill: 'FF0F172A', align: 'center' });
+        cell('A2:H2', '인사이트9교육연구소 × KPCIA 한국 프레스티지 기업 강사 협회', { size: 10, bold: true, color: 'FFF59E0B', fill: 'FF1E293B', align: 'center' });
+        cell('A3:H3', `발행일자: ${todayStr}   |   강의 배정상태: 최종 배정 승인 완료 (Assigned)   |   안내서 고유번호: KPCIA-L-${lecture.id.substring(0, 6).toUpperCase()}`, { size: 9, color: 'FF475569', fill: 'FFF8FAFC', align: 'center' });
+        cell('A4:H4', '', { border: 'none' });
+
+        // [Section 1: 기본 정보]
+        cell('A5:H5', ' ▶ 1. 출강 기본 정보 (Basic Lecture Information)', { size: 11, bold: true, color: 'FFFFFFFF', fill: 'FF1E3A8A' }); // Royal Blue header
+        cell('A6:B6', '[교육 주제]', { bold: true, fill: 'FFF1F5F9', align: 'center' });
+        cell('C6:H6', lecture.title, { bold: true, align: 'left' });
+
+        cell('A7:B7', '[매칭 기업/기관]', { bold: true, fill: 'FFF1F5F9', align: 'center' });
+        cell('C7:H7', lecture.companyName || "익명 기업 / 기관", { align: 'left' });
+
+        cell('A8:B8', '[출강 일자]', { bold: true, fill: 'FFF1F5F9', align: 'center' });
+        cell('C8:D8', lecture.date, { align: 'left' });
+        cell('E8:F8', '[교육 시간]', { bold: true, fill: 'FFF1F5F9', align: 'center' });
+        cell('G8:H8', `${lecture.time} (총 ${lecture.duration || '3시간'})`, { align: 'left' });
+
+        cell('A9:B9', '[출강 장소]', { bold: true, fill: 'FFF1F5F9', align: 'center' });
+        cell('C9:H9', lecture.location || "지정 교육장", { align: 'left' });
+
+        cell('A10:B10', '[현장 담당자]', { bold: true, fill: 'FFF1F5F9', align: 'center' });
+        cell('C10:D10', lecture.managerName || "인재개발원 담당자", { align: 'left' });
+        cell('E10:F10', '[담당 연락처]', { bold: true, fill: 'FFF1F5F9', align: 'center' });
+        cell('G10:H10', lecture.managerPhone || "010-0000-0000", { align: 'left' });
+
+        cell('A11:B11', '[배정 주강사]', { bold: true, fill: 'FFE2E8F0', align: 'center' });
+        cell('C11:D11', `${lecture.assignedName || '미배정'} 강사`, { bold: true, color: 'FF1D4ED8', align: 'left' });
+        cell('E11:F11', '[배정 보조강사]', { bold: true, fill: 'FFE2E8F0', align: 'center' });
+        cell('G11:H11', lecture.assistantName ? `${lecture.assistantName} 강사` : '배정 없음', { bold: true, color: 'FF0F766E', align: 'left' });
+
+        cell('A12:H12', '', { border: 'none' });
+
+        // [Section 2: 정산 정보]
+        cell('A13:H13', ' ▶ 2. 강사료 및 재료비 정산 세부 안내 (Settlement & Fee)', { size: 11, bold: true, color: 'FFFFFFFF', fill: 'FF1E3A8A' });
+        
+        cell('A14:B14', '구분 항목', { bold: true, fill: 'FFE2E8F0', align: 'center' });
+        cell('C14:D14', '지급 금액', { bold: true, fill: 'FFE2E8F0', align: 'center' });
+        cell('E14:F14', '계산 기준', { bold: true, fill: 'FFE2E8F0', align: 'center' });
+        cell('G14:H14', '세부 정산 및 지급 비고', { bold: true, fill: 'FFE2E8F0', align: 'center' });
+
+        const mainFee = (lecture.mainHours || 3) * 100000;
+        cell('A15:B15', '주강사료', { fill: 'FFF8FAFC', align: 'center' });
+        cell('C15:D15', `${mainFee.toLocaleString()}원`, { bold: true, align: 'right' });
+        cell('E15:F15', `${lecture.mainHours || 3}시간`, { align: 'center' });
+        cell('G15:H15', '시간당 100,000원 기준 (주강사 수당 포함)', { align: 'left' });
+
+        const assistantFee = (lecture.assistantHours || 0) * 50000;
+        cell('A16:B16', '보조강사료', { fill: 'FFF8FAFC', align: 'center' });
+        cell('C16:D16', `${assistantFee.toLocaleString()}원`, { align: 'right' });
+        cell('E16:F16', lecture.assistantHours ? `${lecture.assistantHours}시간` : '-', { align: 'center' });
+        cell('G16:H16', lecture.assistantHours ? '시간당 50,000원 기준 (KPCIA 보조 수당)' : '보조강사 매칭 없음', { align: 'left' });
+
+        const materialFee = (lecture.attendees || 0) * (lecture.materialCost || 0);
+        cell('A17:B17', '교구재 재료비', { fill: 'FFF8FAFC', align: 'center' });
+        cell('C17:D17', `${materialFee.toLocaleString()}원`, { align: 'right' });
+        cell('E17:F17', `${(lecture.materialCost || 0).toLocaleString()}원 × ${lecture.attendees || 0}명`, { align: 'center' });
+        cell('G17:H17', '정원 패키지 수량 기준 제공 (현장 잔여재료 소진 필수)', { align: 'left' });
+
+        cell('A18:B18', '총 정산 합계', { bold: true, fill: 'FEF3C7', align: 'center' }); // Light amber background
+        cell('C18:D18', `${lecture.budget.toLocaleString()}원`, { bold: true, color: 'FFB45309', fill: 'FEF3C7', align: 'right' });
+        cell('E18:F18', '총 예산 금액', { bold: true, fill: 'FEF3C7', align: 'center' });
+        cell('G18:H18', '', { size: 9, fill: 'FEF3C7', align: 'left' });
+
+        cell('A19:H19', '', { border: 'none' });
+
+        // [Section 3: 진행 플로우]
+        cell('A20:H20', ' ▶ 3. 출강 현장 표준 타임라인 & 강사 행동 요령 (Protocol)', { size: 11, bold: true, color: 'FFFFFFFF', fill: 'FF1E3A8A' });
+        
+        cell('A21:B21', '단계', { bold: true, fill: 'FFE2E8F0', align: 'center' });
+        cell('C21:D21', '행동 타이밍', { bold: true, fill: 'FFE2E8F0', align: 'center' });
+        cell('E21:G21', '주요 현장 대응 지침 및 사진 촬영 가이드', { bold: true, fill: 'FFE2E8F0', align: 'center' });
+        cell('H21:H21', '현장 확인', { bold: true, fill: 'FFE2E8F0', align: 'center' });
+
+        cell('A22:B22', '① 사전 준비', { bold: true, fill: 'FFF8FAFC', align: 'center' });
+        cell('C22:D22', '강의 시작 30분 전', { align: 'center' });
+        cell('E22:G22', '• 현장 도착 완료 후 강의장 환기 및 교구 재료 테이블 정렬 세팅\n• 정렬 완료 후 \'세팅 완료 전경 사진\' 1장 이상 촬영 필수', { align: 'left' });
+        cell('H22:H22', '[  ] 완료', { bold: true, color: 'FF64748B', align: 'center' });
+
+        cell('A23:B23', '② 과정 진행', { bold: true, fill: 'FFF8FAFC', align: 'center' });
+        cell('C23:D23', '강의 시간 중', { align: 'center' });
+        cell('E23:G23', '• 수강생 집중도 체크 및 친절하고 활기찬 공예/원예 교육 선사\n• 과정 도중 자연스러운 교육 활동 스케치 사진 2장 이상 촬영', { align: 'left' });
+        cell('H23:H23', '[  ] 완료', { bold: true, color: 'FF64748B', align: 'center' });
+
+        cell('A24:B24', '③ 정리 및 완료', { bold: true, fill: 'FFF8FAFC', align: 'center' });
+        cell('C24:D24', '종료 10분 전', { align: 'center' });
+        cell('E24:G24', '• 완성된 모든 교육생 작품들을 가지런히 모아 단체 결과물 컷 촬영\n• 협회 전용 만족도 조사 QR을 안내하여 즉시 응답 참여 유도', { align: 'left' });
+        cell('H24:H24', '[  ] 완료', { bold: true, color: 'FF64748B', align: 'center' });
+
+        cell('A25:B25', '④ 행정 및 보고', { bold: true, fill: 'FFF8FAFC', align: 'center' });
+        cell('C25:D25', '종료 직후 즉시', { align: 'center' });
+        cell('E25:G25', '• 촬영 완료된 고화질 사진 3종 세트를 대표님 카톡으로 즉시 전송\n• 뒷정리 확인 및 현장 담당자에게 퇴실 완료 안내 실시', { align: 'left' });
+        cell('H25:H25', '[  ] 완료', { bold: true, color: 'FF64748B', align: 'center' });
+
+        cell('A26:H26', '', { border: 'none' });
+
+        // [Section 4: 비상 대응]
+        cell('A27:H27', ' ▶ 4. 출강 후 행정 증빙 및 현장 비상 대응 매뉴얼 (FAQ)', { size: 11, bold: true, color: 'FFFFFFFF', fill: 'FF1E3A8A' });
+        cell('A28:B28', '[지출 증빙 제출]', { bold: true, fill: 'FFF1F5F9', align: 'center' });
+        cell('C28:H28', '출강 예산 지출 증빙 영수증은 사진 촬영 후 이메일(insight9edu@naver.com) 또는 카카오톡 발송', { align: 'left' });
+        cell('A29:B29', '[현금영수증 발행]', { bold: true, fill: 'FFF1F5F9', align: 'center' });
+        cell('C29:H29', '사업자 번호: 702-41-00899 인사이트9교육연구소 / 대표: 구교준', { align: 'left' });
+        cell('A30:B30', '[추가 계약 문의]', { bold: true, fill: 'FFF1F5F9', align: 'center' });
+        cell('C30:H30', '현장 담당자의 프로그램 추가/예산 문의 시 주최측에 문의 하시라고 해야 함', { align: 'left' });
+
+        cell('A31:H31', '', { border: 'none' });
+
+        // [Section 5: 주의 및 서약]
+        cell('A32:H32', ' ▶ 5. 협회 강사 행동 강령 및 서약 사항 (Required)', { size: 11, bold: true, color: 'FFFFFFFF', fill: 'FF1E3A8A' });
+        cell('A33:H33', '• [소속 공지] 담당자 자기소개 시 반드시 "인사이트9교육연구소 파트너 강사"로 소개합니다.', { size: 9.5, fill: 'FFFBFBFE', align: 'left' });
+        cell('A34:H34', '• [사전 체크] 출강 2~3일 전 담당자와 전화 연결하여 강의 환경(마이크, PPT 사용 여부, 조별 구성 가능 여부, 주차 등등의 컨디션 체크', { size: 9.5, fill: 'FFFBFBFE', align: 'left' });
+        cell('A35:H35', '• [임의 변경 불가] 현장에서 인원 임의 추가 요구 시, "협의된 전용 교구가 배정 수량만큼만 제작되었다"고 친절히 거절합니다.', { size: 9.5, fill: 'FFFBFBFE', align: 'left' });
+        cell('A36:H36', '• [SNS 후기 PR] 개인 SNS, 블로그 후기 작성 시 반드시 "인사이트9교육연구소 협업 출강" 키워드를 포함하여 기재합니다.', { size: 9.5, fill: 'FFFBFBFE', align: 'left' });
+
+        cell('A37:H37', '', { border: 'none' });
+
+        cell('A38:H38', '상기 명시된 출강 강의 정보를 모두 정확히 인지하였으며, KPCIA 정회원으로서 최고의 품격을 갖춘 강의 품질을 바탕으로 출강 계약상의 업무를 성실히 수행할 것을 서약합니다.', { size: 9.5, bold: true, color: 'FF374151', fill: 'FFF1F5F9', align: 'center' });
+        cell('A39:H39', '발행처: KPCIA 한국 프레스티지 기업 강사 협회 × 인사이트9교육연구소   [ 직인생략 ]', { size: 10.5, bold: true, color: 'FF111827', align: 'center' });
+
+        // Save styled workbook using Blob and buffer
+        const buffer = await workbook.xlsx.writeBuffer();
+        const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `KPCIA_출강_파견안내서_${lecture.companyName || "공고"}_${lecture.id}.xlsx`;
+        a.click();
+        window.URL.revokeObjectURL(url);
+        
+        triggerToast("📊 프리미엄 출강 파견 안내서가 성공적으로 생성되어 저장되었습니다!", "success");
+      } catch (error) {
+        console.error("Excel generation error:", error);
+        triggerToast("❌ 엑셀 파일 생성 중 오류가 발생했습니다.", "error");
+      }
     } else {
+      const wb = XLSX.utils.book_new();
       // 2. All lectures: Generate a consolidated overview list
       const headers = [
         "공고번호", "출강기업/기관명", "출강 교육명칭", "요구 강사등급", 
@@ -1251,14 +1448,11 @@ export default function App() {
       ];
       ws['!cols'] = cols;
       XLSX.utils.book_append_sheet(wb, ws, "출강공고_전체목록");
+
+      const fileName = `KPCIA_실시간출강공고_전체목록_${new Date().toISOString().substring(0, 10)}.xlsx`;
+      XLSX.writeFile(wb, fileName);
+      triggerToast("📊 엑셀 저장 완료! 다운로드 폴더를 확인해 주세요.", "success");
     }
-
-    const fileName = lecture 
-      ? `KPCIA_출강_파견안내서_${lecture.companyName || "공고"}_${lecture.id}.xlsx` 
-      : `KPCIA_실시간출강공고_전체목록_${new Date().toISOString().substring(0, 10)}.xlsx`;
-
-    XLSX.writeFile(wb, fileName);
-    triggerToast("📊 엑셀 저장 완료! 다운로드 폴더를 확인해 주세요.", "success");
   };
 
   // Helper: Display Tier badge styling
@@ -2443,32 +2637,43 @@ export default function App() {
 
                                       {/* Side-by-side Download Buttons */}
                                       <div className="pt-1 flex flex-wrap gap-2">
-                                        {hasApplied || currentUser?.isAdmin ? (
-                                          <button
-                                            onClick={() => handleDownloadExcel(lecture)}
-                                            className="px-2.5 py-1 rounded bg-neutral-900 hover:bg-neutral-800 border border-neutral-800 text-neutral-300 text-[10px] font-bold transition-all cursor-pointer flex items-center gap-1.5"
-                                          >
-                                            <Download className="w-3 h-3 text-emerald-400" />
-                                            <span>강의 상세 엑셀 다운로드</span>
-                                          </button>
+                                        {isMainLecturer || isAssistantLecturer || currentUser?.isAdmin ? (
+                                          <>
+                                            <button
+                                              onClick={() => handleDownloadExcel(lecture)}
+                                              className="px-2.5 py-1 rounded bg-neutral-900 hover:bg-neutral-800 border border-neutral-800 text-neutral-300 text-[10px] font-bold transition-all cursor-pointer flex items-center gap-1.5"
+                                            >
+                                              <Download className="w-3 h-3 text-emerald-400" />
+                                              <span>강의 상세 엑셀 다운로드</span>
+                                            </button>
+                                            <button
+                                              onClick={() => handleDownloadQR(lecture)}
+                                              className="px-2.5 py-1 rounded bg-neutral-900 hover:bg-neutral-800 border border-neutral-800 text-amber-400 text-[10px] font-bold transition-all cursor-pointer flex items-center gap-1.5"
+                                            >
+                                              <QrCode className="w-3 h-3 text-amber-400" />
+                                              <span>만족도 QR 다운로드</span>
+                                            </button>
+                                          </>
                                         ) : (
-                                          <button
-                                            onClick={() => triggerToast("🔒 이 강의 공고에 출강 지원을 신청한 강사님만 상세 엑셀 다운로드가 가능합니다.", "error")}
-                                            className="px-2.5 py-1 rounded bg-neutral-950/40 border border-neutral-900 text-neutral-500 text-[10px] font-bold cursor-pointer flex items-center gap-1.5"
-                                            title="출강 신청 강사님 전용 다운로드"
-                                          >
-                                            <Lock className="w-3 h-3 text-neutral-600" />
-                                            <span>강의상세 (지원자 전용)</span>
-                                          </button>
+                                          <>
+                                            <button
+                                              onClick={() => triggerToast("🔒 KPCIA 마스터실의 승인을 거쳐 최종 배정 완료된 강사님만 상세 엑셀 다운로드가 가능합니다.", "error")}
+                                              className="px-2.5 py-1 rounded bg-neutral-950/40 border border-neutral-900 text-neutral-500 text-[10px] font-bold cursor-pointer flex items-center gap-1.5"
+                                              title="배정 완료 강사님 전용 다운로드"
+                                            >
+                                              <Lock className="w-3 h-3 text-neutral-600" />
+                                              <span>강의상세 (배정자 전용)</span>
+                                            </button>
+                                            <button
+                                              onClick={() => triggerToast("🔒 KPCIA 마스터실의 승인을 거쳐 최종 배정 완료된 강사님만 만족도 QR 다운로드가 가능합니다.", "error")}
+                                              className="px-2.5 py-1 rounded bg-neutral-950/40 border border-neutral-900 text-neutral-500 text-[10px] font-bold cursor-pointer flex items-center gap-1.5"
+                                              title="배정 완료 강사님 전용 다운로드"
+                                            >
+                                              <Lock className="w-3 h-3 text-neutral-600" />
+                                              <span>만족도 QR (배정자 전용)</span>
+                                            </button>
+                                          </>
                                         )}
-
-                                        <button
-                                          onClick={() => handleDownloadQR(lecture)}
-                                          className="px-2.5 py-1 rounded bg-neutral-900 hover:bg-neutral-800 border border-neutral-800 text-amber-400 text-[10px] font-bold transition-all cursor-pointer flex items-center gap-1.5"
-                                        >
-                                          <QrCode className="w-3 h-3 text-amber-400" />
-                                          <span>만족도 QR 다운로드</span>
-                                        </button>
                                       </div>
                                     </div>
                                   </div>
