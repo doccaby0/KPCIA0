@@ -240,6 +240,109 @@ export default function App() {
   const [adminProgPage, setAdminProgPage] = useState<number>(1);
   const [adminProgItemsPerPage, setAdminProgItemsPerPage] = useState<number>(10);
 
+  // Memoized: Main filtered and sorted lectures for list rendering
+  const filteredAndSortedLectures = React.useMemo(() => {
+    return lectures
+      .filter(l => {
+        const queryText = searchLecture.toLowerCase();
+        const titleMatch = l.title.toLowerCase().includes(queryText) || (l.companyName && l.companyName.toLowerCase().includes(queryText));
+        const tierMatch = filterLecTier === 'all' || l.targetTier === filterLecTier;
+        return titleMatch && tierMatch;
+      })
+      .sort((a, b) => {
+        // Status priority: 'open' (Priority 1) -> 'assigned' (Priority 2) -> 'completed' (Priority 3)
+        const getStatusPriority = (status: string) => {
+          if (status === 'open') return 1;
+          if (status === 'assigned') return 2;
+          return 3;
+        };
+        const prioA = getStatusPriority(a.status);
+        const prioB = getStatusPriority(b.status);
+        if (prioA !== prioB) {
+          return prioA - prioB;
+        }
+        const dateA = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+        const dateB = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+        if (dateB !== dateA) {
+          return dateB - dateA; // Newest registered first
+        }
+        return (b.id || '').localeCompare(a.id || '');
+      });
+  }, [lectures, searchLecture, filterLecTier]);
+
+  // Memoized: Lectures count statistics
+  const lecturesStats = React.useMemo(() => {
+    let openCount = 0;
+    let assignedCount = 0;
+    let completedCount = 0;
+    for (let i = 0; i < lectures.length; i++) {
+      const status = lectures[i].status;
+      if (status === 'open') openCount++;
+      else if (status === 'assigned') assignedCount++;
+      else if (status === 'completed') completedCount++;
+    }
+    return {
+      total: lectures.length,
+      open: openCount,
+      assigned: assignedCount,
+      completed: completedCount,
+    };
+  }, [lectures]);
+
+  // Memoized: Control room filtered and sorted lectures
+  const controlRoomFilteredAndSortedLectures = React.useMemo(() => {
+    const filtered = lectures.filter(l => {
+      if (controlRoomStatus !== 'all' && l.status !== controlRoomStatus) return false;
+      if (controlRoomSearch.trim()) {
+        const q = controlRoomSearch.toLowerCase();
+        return l.title.toLowerCase().includes(q) || 
+               (l.companyName || '').toLowerCase().includes(q) || 
+               (l.partnerCompany || '').toLowerCase().includes(q) || 
+               (l.location || '').toLowerCase().includes(q);
+      }
+      return true;
+    });
+
+    return [...filtered].sort((a, b) => {
+      if (controlRoomSort === 'date') return a.date.localeCompare(b.date);
+      if (controlRoomSort === 'budget') return b.budget - a.budget;
+      return b.createdAt ? b.createdAt.localeCompare(a.createdAt || '') : b.id.localeCompare(a.id);
+    });
+  }, [lectures, controlRoomStatus, controlRoomSearch, controlRoomSort]);
+
+  // Memoized: Excel filtered and sorted lectures
+  const excelFilteredAndSortedLectures = React.useMemo(() => {
+    const filtered = lectures.filter(l => {
+      // Status filter
+      if (excelStatusFilter === 'open' && l.status !== 'open') return false;
+      if (excelStatusFilter === 'assigned' && l.status !== 'assigned') return false;
+      if (excelStatusFilter === 'pending' && !(l.status === 'completed' && l.settlementStatus !== 'completed')) return false;
+      if (excelStatusFilter === 'completed' && !(l.status === 'completed' && l.settlementStatus === 'completed')) return false;
+
+      // Search query
+      if (excelSearch.trim()) {
+        const q = excelSearch.toLowerCase();
+        return (l.title || '').toLowerCase().includes(q) ||
+               (l.date || '').toLowerCase().includes(q) ||
+               (l.companyName || '').toLowerCase().includes(q) ||
+               (l.partnerCompany || '').toLowerCase().includes(q) ||
+               (l.assignedName || '').toLowerCase().includes(q) ||
+               (l.assistantName || '').toLowerCase().includes(q);
+      }
+      return true;
+    });
+
+    return [...filtered].sort((a, b) => {
+      const parseFirstDate = (dStr: string) => {
+        if (!dStr) return 0;
+        const firstPart = dStr.split('~')[0].trim();
+        const t = new Date(firstPart).getTime();
+        return isNaN(t) ? 0 : t;
+      };
+      return parseFirstDate(a.date) - parseFirstDate(b.date);
+    });
+  }, [lectures, excelStatusFilter, excelSearch]);
+
   // Trigger global notifications
   const triggerToast = (message: string, type: 'success' | 'info' | 'error' = 'success') => {
     setToast({ message, type });
@@ -2907,24 +3010,24 @@ export default function App() {
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-3" id="lecture-notices-stats">
               <div className="p-3 bg-neutral-900/40 rounded-xl border border-neutral-850 text-center">
                 <span className="text-[10px] text-neutral-500 font-bold block">전체 출강 요청</span>
-                <strong className="text-sm text-white font-black mt-0.5 block">{lectures.length} 건</strong>
+                <strong className="text-sm text-white font-black mt-0.5 block">{lecturesStats.total} 건</strong>
               </div>
               <div className="p-3 bg-amber-500/[0.02] rounded-xl border border-amber-500/10 text-center">
                 <span className="text-[10px] text-[#D4AF37] font-bold block">🔥 강사 모집 중</span>
                 <strong className="text-sm text-[#D4AF37] font-black mt-0.5 block">
-                  {lectures.filter(l => l.status === 'open').length} 건
+                  {lecturesStats.open} 건
                 </strong>
               </div>
               <div className="p-3 bg-blue-500/[0.02] rounded-xl border border-blue-500/10 text-center">
                 <span className="text-[10px] text-blue-400 font-bold block">🤝 매칭 배정 완료</span>
                 <strong className="text-sm text-blue-400 font-black mt-0.5 block">
-                  {lectures.filter(l => l.status === 'assigned').length} 건
+                  {lecturesStats.assigned} 건
                 </strong>
               </div>
               <div className="p-3 bg-emerald-500/[0.02] rounded-xl border border-emerald-500/10 text-center">
                 <span className="text-[10px] text-emerald-400 font-bold block">✓ 출강 정산 완료</span>
                 <strong className="text-sm text-emerald-400 font-black mt-0.5 block">
-                  {lectures.filter(l => l.status === 'completed').length} 건
+                  {lecturesStats.completed} 건
                 </strong>
               </div>
             </div>
@@ -2961,32 +3064,7 @@ export default function App() {
             {/* Lectures List with Pagination */}
             <div id="lecture-notices-list" className="space-y-6">
               {(() => {
-                const filteredLectures = lectures
-                  .filter(l => {
-                    const queryText = searchLecture.toLowerCase();
-                    const titleMatch = l.title.toLowerCase().includes(queryText) || (l.companyName && l.companyName.toLowerCase().includes(queryText));
-                    const tierMatch = filterLecTier === 'all' || l.targetTier === filterLecTier;
-                    return titleMatch && tierMatch;
-                  })
-                  .sort((a, b) => {
-                    // Status priority: 'open' (Priority 1) -> 'assigned' (Priority 2) -> 'completed' (Priority 3)
-                    const getStatusPriority = (status: string) => {
-                      if (status === 'open') return 1;
-                      if (status === 'assigned') return 2;
-                      return 3;
-                    };
-                    const prioA = getStatusPriority(a.status);
-                    const prioB = getStatusPriority(b.status);
-                    if (prioA !== prioB) {
-                      return prioA - prioB;
-                    }
-                    const dateA = a.createdAt ? new Date(a.createdAt).getTime() : 0;
-                    const dateB = b.createdAt ? new Date(b.createdAt).getTime() : 0;
-                    if (dateB !== dateA) {
-                      return dateB - dateA; // Newest registered first
-                    }
-                    return (b.id || '').localeCompare(a.id || '');
-                  });
+                const filteredLectures = filteredAndSortedLectures;
                 
                 const itemsPerPage = 12;
                 const totalPages = Math.ceil(filteredLectures.length / itemsPerPage) || 1;
@@ -4137,7 +4215,7 @@ export default function App() {
                             controlRoomStatus === 'all' ? 'bg-neutral-850 text-white' : 'text-neutral-500 hover:text-neutral-300'
                           }`}
                         >
-                          전체({lectures.length})
+                          전체({lecturesStats.total})
                         </button>
                         <button
                           type="button"
@@ -4146,7 +4224,7 @@ export default function App() {
                             controlRoomStatus === 'open' ? 'bg-amber-500/10 text-amber-500 border border-amber-500/10' : 'text-neutral-500 hover:text-neutral-300'
                           }`}
                         >
-                          모집({lectures.filter(l => l.status === 'open').length})
+                          모집({lecturesStats.open})
                         </button>
                         <button
                           type="button"
@@ -4155,7 +4233,7 @@ export default function App() {
                             controlRoomStatus === 'assigned' ? 'bg-blue-500/10 text-blue-400 border border-blue-500/10' : 'text-neutral-500 hover:text-neutral-300'
                           }`}
                         >
-                          배정({lectures.filter(l => l.status === 'assigned').length})
+                          배정({lecturesStats.assigned})
                         </button>
                         <button
                           type="button"
@@ -4164,7 +4242,7 @@ export default function App() {
                             controlRoomStatus === 'completed' ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/10' : 'text-neutral-500 hover:text-neutral-300'
                           }`}
                         >
-                          완료({lectures.filter(l => l.status === 'completed').length})
+                          완료({lecturesStats.completed})
                         </button>
                       </div>
                     </div>
@@ -4172,23 +4250,7 @@ export default function App() {
                     {/* Compact Scrollable List (Prevent vertical bloat) */}
                     <div className="space-y-3.5 max-h-[620px] overflow-y-auto pr-1.5 custom-scrollbar">
                       {(() => {
-                        const filtered = lectures.filter(l => {
-                          if (controlRoomStatus !== 'all' && l.status !== controlRoomStatus) return false;
-                          if (controlRoomSearch.trim()) {
-                            const q = controlRoomSearch.toLowerCase();
-                            return l.title.toLowerCase().includes(q) || 
-                                   (l.companyName || '').toLowerCase().includes(q) || 
-                                   (l.partnerCompany || '').toLowerCase().includes(q) || 
-                                   (l.location || '').toLowerCase().includes(q);
-                          }
-                          return true;
-                        });
-
-                        const sorted = [...filtered].sort((a, b) => {
-                          if (controlRoomSort === 'date') return a.date.localeCompare(b.date);
-                          if (controlRoomSort === 'budget') return b.budget - a.budget;
-                          return b.createdAt ? b.createdAt.localeCompare(a.createdAt || '') : b.id.localeCompare(a.id);
-                        });
+                        const sorted = controlRoomFilteredAndSortedLectures;
 
                         if (sorted.length === 0) {
                           return (
@@ -4525,37 +4587,7 @@ export default function App() {
 
                   {/* Real Excel Grid Simulation */}
                   {lectures.length > 0 ? (() => {
-                    // Filter lectures based on search & status filter
-                    const filtered = lectures.filter(l => {
-                      // Status filter
-                      if (excelStatusFilter === 'open' && l.status !== 'open') return false;
-                      if (excelStatusFilter === 'assigned' && l.status !== 'assigned') return false;
-                      if (excelStatusFilter === 'pending' && !(l.status === 'completed' && l.settlementStatus !== 'completed')) return false;
-                      if (excelStatusFilter === 'completed' && !(l.status === 'completed' && l.settlementStatus === 'completed')) return false;
-
-                      // Search query
-                      if (excelSearch.trim()) {
-                        const q = excelSearch.toLowerCase();
-                        return (l.title || '').toLowerCase().includes(q) ||
-                               (l.date || '').toLowerCase().includes(q) ||
-                               (l.companyName || '').toLowerCase().includes(q) ||
-                               (l.partnerCompany || '').toLowerCase().includes(q) ||
-                               (l.assignedName || '').toLowerCase().includes(q) ||
-                               (l.assistantName || '').toLowerCase().includes(q);
-                      }
-                      return true;
-                    });
-
-                    // Sort lectures by date (Oldest to Newest, as requested earlier)
-                    const sorted = [...filtered].sort((a, b) => {
-                      const parseFirstDate = (dStr: string) => {
-                        if (!dStr) return 0;
-                        const firstPart = dStr.split('~')[0].trim();
-                        const t = new Date(firstPart).getTime();
-                        return isNaN(t) ? 0 : t;
-                      };
-                      return parseFirstDate(a.date) - parseFirstDate(b.date);
-                    });
+                    const sorted = excelFilteredAndSortedLectures;
 
                     // Paginate lectures
                     const totalItems = sorted.length;
@@ -5653,7 +5685,7 @@ export default function App() {
         return (
           <div className="fixed inset-0 z-[999] bg-black/85 backdrop-blur-sm flex items-center justify-center p-4 overflow-y-auto animate-in fade-in duration-200" onClick={() => setSelectedLectureForModal(null)}>
             <div 
-              className="bg-[#0b0b0c] border border-neutral-850 rounded-2xl w-full max-w-2xl overflow-hidden shadow-2xl relative my-auto font-sans text-xs flex flex-col max-h-[90vh] animate-in zoom-in-95 duration-150" 
+              className="bg-[#0b0b0c] border border-neutral-850 rounded-2xl w-full max-w-4xl overflow-hidden shadow-2xl relative my-auto font-sans text-xs flex flex-col max-h-[90vh] animate-in zoom-in-95 duration-150" 
               onClick={(e) => e.stopPropagation()}
             >
               {/* Header */}
@@ -5674,148 +5706,160 @@ export default function App() {
                 </button>
               </div>
 
-              {/* Scrollable Content */}
-              <div className="p-6 space-y-6 overflow-y-auto select-text text-left">
-                {/* Title and main badges */}
-                <div className="space-y-3">
-                  <div className="flex flex-wrap gap-2 items-center">
-                    <span className={`text-[9px] font-black px-2 py-0.5 rounded border ${getTierColor(currentModalLec.targetTier)}`}>
-                      지원 자격: {currentModalLec.targetTier}
-                    </span>
-                    <span className={`text-[9px] font-black px-2 py-0.5 rounded-full flex items-center gap-1 ${
-                      currentModalLec.status === 'completed' 
-                        ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' 
-                        : currentModalLec.status === 'assigned'
-                        ? 'bg-blue-500/10 text-blue-400 border border-blue-500/20'
-                        : 'bg-amber-500/10 text-[#D4AF37] border border-[#D4AF37]/20'
-                    }`}>
-                      <span className={`w-1 h-1 rounded-full ${
-                        currentModalLec.status === 'completed' 
-                          ? 'bg-emerald-400' 
-                          : currentModalLec.status === 'assigned'
-                          ? 'bg-blue-400'
-                          : 'bg-amber-400 animate-pulse'
-                      }`} />
-                      {currentModalLec.status === 'completed' ? '출강 완료(정산완료)' : currentModalLec.status === 'assigned' ? '강사배정 완료' : '강사모집 중'}
-                    </span>
-                    {currentModalLec.companyName && (
-                      <span className="inline-flex items-center gap-1 bg-neutral-900 border border-neutral-800 text-neutral-400 px-2 py-0.5 rounded text-[9.5px] font-bold">
-                        <Building className="w-3 h-3 text-[#D4AF37]" />
-                        {currentModalLec.companyName}
-                      </span>
+              {/* Scrollable Content (Grid layout to fit completely without drag/scroll) */}
+              <div className="p-5 overflow-y-auto select-text text-left max-h-[calc(90vh-120px)]">
+                <div className="grid grid-cols-1 md:grid-cols-12 gap-5">
+                  
+                  {/* Left Column: Core Info & Metadata */}
+                  <div className="md:col-span-6 space-y-4">
+                    {/* Title and main badges */}
+                    <div className="space-y-2">
+                      <div className="flex flex-wrap gap-1.5 items-center">
+                        <span className={`text-[9px] font-black px-2 py-0.5 rounded border ${getTierColor(currentModalLec.targetTier)}`}>
+                          지원 자격: {currentModalLec.targetTier}
+                        </span>
+                        <span className={`text-[9px] font-black px-2 py-0.5 rounded-full flex items-center gap-1 ${
+                          currentModalLec.status === 'completed' 
+                            ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' 
+                            : currentModalLec.status === 'assigned'
+                            ? 'bg-blue-500/10 text-blue-400 border border-blue-500/20'
+                            : 'bg-amber-500/10 text-[#D4AF37] border border-[#D4AF37]/20'
+                        }`}>
+                          <span className={`w-1.5 h-1.5 rounded-full ${
+                            currentModalLec.status === 'completed' 
+                              ? 'bg-emerald-400' 
+                              : currentModalLec.status === 'assigned'
+                              ? 'bg-blue-400'
+                              : 'bg-amber-400 animate-pulse'
+                          }`} />
+                          {currentModalLec.status === 'completed' ? '출강 완료(정산완료)' : currentModalLec.status === 'assigned' ? '강사배정 완료' : '강사모집 중'}
+                        </span>
+                        {currentModalLec.companyName && (
+                          <span className="inline-flex items-center gap-1 bg-neutral-900 border border-neutral-800 text-neutral-400 px-2 py-0.5 rounded text-[9px] font-bold">
+                            <Building className="w-3 h-3 text-[#D4AF37]" />
+                            {currentModalLec.companyName}
+                          </span>
+                        )}
+                      </div>
+
+                      <h2 className="text-sm sm:text-base font-black text-white leading-snug">
+                        {currentModalLec.title}
+                      </h2>
+
+                      {/* Associated IP Program Link */}
+                      {currentModalLec.programTitle && (
+                        <div className="flex items-center gap-2 bg-amber-500/[0.03] border border-amber-500/10 rounded-lg p-2">
+                          <span className="shrink-0 bg-amber-500/10 text-[#D4AF37] font-extrabold text-[8.5px] px-1.5 py-0.5 rounded border border-amber-500/20 tracking-wider">
+                            지식 IP 연계 과정
+                          </span>
+                          <span className="font-extrabold text-neutral-200 text-[10px] truncate">
+                            {currentModalLec.programTitle}
+                          </span>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Grid attributes */}
+                    <div className="grid grid-cols-2 gap-3 bg-neutral-950 p-3 rounded-xl border border-neutral-900">
+                      <div className="space-y-0.5">
+                        <span className="text-[9px] text-neutral-500 font-bold block">📅 출강 일정</span>
+                        <strong className="text-[11px] text-neutral-200 font-black">{currentModalLec.date}</strong>
+                      </div>
+                      <div className="space-y-0.5">
+                        <span className="text-[9px] text-neutral-500 font-bold block">💵 총 강의 예산</span>
+                        <strong className="text-[11px] text-white font-black">₩{currentModalLec.budget.toLocaleString()} 원</strong>
+                      </div>
+                      <div className="space-y-0.5">
+                        <span className="text-[9px] text-neutral-500 font-bold block">⏱️ 강의 시간대</span>
+                        <strong className="text-[11px] text-emerald-400 font-black block truncate" title={currentModalLec.time}>
+                          {currentModalLec.time} <span className="text-neutral-500 text-[9px] font-normal">({currentModalLec.duration || '2시간'})</span>
+                        </strong>
+                      </div>
+                      <div className="space-y-0.5">
+                        <span className="text-[9px] text-neutral-500 font-bold block">🪙 지식 IP 로열티 마일리지</span>
+                        <strong className="text-[11px] text-[#D4AF37] font-black">
+                          {currentModalLec.programId && programs.find(p => p.id === currentModalLec.programId)?.isApproved 
+                            ? `${(currentModalLec.mileageRoyalty || 0).toLocaleString()} M` 
+                            : '0 M (비적용 과정)'}
+                        </strong>
+                      </div>
+                      <div className="space-y-0.5 col-span-2 border-t border-neutral-900 pt-2 mt-1">
+                        <span className="text-[9px] text-neutral-500 font-bold block">📍 출강 교육 장소 및 인원</span>
+                        <div className="flex justify-between items-center gap-2">
+                          <strong className="text-[11px] text-neutral-200 font-bold truncate max-w-[180px]" title={currentModalLec.location}>
+                            {currentModalLec.location}
+                          </strong>
+                          <span className="bg-neutral-900 text-neutral-400 text-[9px] px-1.5 py-0.5 rounded border border-neutral-800 font-bold shrink-0">
+                            👥 {currentModalLec.attendees || 30}명 예정
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Assigned instructors information */}
+                    {(currentModalLec.assignedName || currentModalLec.assistantName) && (
+                      <div className="space-y-1.5">
+                        <span className="text-[9px] text-neutral-500 font-black uppercase tracking-wider block">👥 배정 강사 정보</span>
+                        <div className="flex flex-wrap gap-1.5">
+                          {currentModalLec.assignedName && (
+                            <span className="inline-flex items-center gap-1 bg-blue-500/10 text-blue-400 px-2.5 py-1 rounded-lg text-[10px] font-bold border border-blue-500/15">
+                              주강사: {currentModalLec.assignedName}
+                            </span>
+                          )}
+                          {currentModalLec.assistantName && (
+                            <span className="inline-flex items-center gap-1 bg-purple-500/10 text-purple-400 px-2.5 py-1 rounded-lg text-[10px] font-bold border border-purple-500/15">
+                              보조강사: {currentModalLec.assistantName}
+                            </span>
+                          )}
+                        </div>
+                      </div>
                     )}
                   </div>
 
-                  <h2 className="text-base sm:text-lg font-black text-white leading-snug">
-                    {currentModalLec.title}
-                  </h2>
-
-                  {/* Associated IP Program Link */}
-                  {currentModalLec.programTitle && (
-                    <div className="flex items-center gap-2 bg-amber-500/[0.03] border border-amber-500/10 rounded-lg p-2.5">
-                      <span className="shrink-0 bg-amber-500/10 text-[#D4AF37] font-extrabold text-[9px] px-2 py-0.5 rounded border border-amber-500/20 tracking-wider">
-                        지식 IP 연계 과정
-                      </span>
-                      <span className="font-extrabold text-neutral-200 text-[11px] truncate">
-                        {currentModalLec.programTitle}
-                      </span>
-                    </div>
-                  )}
-                </div>
-
-                {/* Grid attributes */}
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 bg-neutral-950 p-4 rounded-xl border border-neutral-900/80">
-                  <div className="space-y-1">
-                    <span className="text-[10px] text-neutral-500 font-bold block">📅 출강 일정</span>
-                    <strong className="text-xs text-neutral-200 font-black">{currentModalLec.date}</strong>
-                  </div>
-                  <div className="space-y-1">
-                    <span className="text-[10px] text-neutral-500 font-bold block">💵 총 강의 예산</span>
-                    <strong className="text-xs text-white font-black">₩{currentModalLec.budget.toLocaleString()} 원</strong>
-                  </div>
-                  <div className="space-y-1">
-                    <span className="text-[10px] text-neutral-500 font-bold block">⏱️ 강의 시간대</span>
-                    <strong className="text-xs text-emerald-400 font-black">
-                      {currentModalLec.time} <span className="text-neutral-500 text-[10px] font-normal">({currentModalLec.duration || '2시간'})</span>
-                    </strong>
-                  </div>
-                  <div className="space-y-1">
-                    <span className="text-[10px] text-neutral-500 font-bold block">🪙 지식 IP 로열티 마일리지</span>
-                    <strong className="text-xs text-[#D4AF37] font-black">
-                      {currentModalLec.programId && programs.find(p => p.id === currentModalLec.programId)?.isApproved 
-                        ? `${(currentModalLec.mileageRoyalty || 0).toLocaleString()} M` 
-                        : '0 M (비적용 과정)'}
-                    </strong>
-                  </div>
-                  <div className="space-y-1 sm:col-span-2 border-t border-neutral-900 pt-3 mt-1">
-                    <span className="text-[10px] text-neutral-500 font-bold block">📍 출강 교육 장소 및 교육 인원</span>
-                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-                      <strong className="text-xs text-neutral-200 font-bold">{currentModalLec.location}</strong>
-                      <span className="bg-neutral-900 text-neutral-400 text-[10px] px-2 py-0.5 rounded border border-neutral-800 self-start sm:self-auto font-bold">
-                        👥 {currentModalLec.attendees || 30}명 예정
-                      </span>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Assigned instructors information */}
-                {(currentModalLec.assignedName || currentModalLec.assistantName) && (
-                  <div className="space-y-2">
-                    <span className="text-[10px] text-neutral-500 font-black uppercase tracking-wider block">👥 배정 강사 정보</span>
-                    <div className="flex flex-wrap gap-2">
-                      {currentModalLec.assignedName && (
-                        <span className="inline-flex items-center gap-1 bg-blue-500/10 text-blue-400 px-3 py-1 rounded-lg text-[11px] font-bold border border-blue-500/15">
-                          주강사: {currentModalLec.assignedName}
-                        </span>
-                      )}
-                      {currentModalLec.assistantName && (
-                        <span className="inline-flex items-center gap-1 bg-purple-500/10 text-purple-400 px-3 py-1 rounded-lg text-[11px] font-bold border border-purple-500/15">
-                          보조강사: {currentModalLec.assistantName}
-                        </span>
-                      )}
-                    </div>
-                  </div>
-                )}
-
-                {/* Description */}
-                <div className="space-y-2">
-                  <span className="text-[10px] text-neutral-500 font-black uppercase tracking-wider block">📖 출강 요청 상세내용 및 커리큘럼 요구사항</span>
-                  <div className="bg-neutral-950 p-4 rounded-xl border border-neutral-900 text-neutral-200 text-xs leading-relaxed whitespace-pre-wrap select-text">
-                    {currentModalLec.description}
-                  </div>
-                </div>
-
-                {/* QR Code section for assigned / admins */}
-                {(() => {
-                  const isMainLecturer = currentUser && currentModalLec.assignedTo === currentUser.uid;
-                  const isAssistantLecturer = currentUser && currentModalLec.assistantId === currentUser.uid;
-                  
-                  if (isMainLecturer || isAssistantLecturer || currentUser?.isAdmin) {
-                    return (
-                      <div className="p-4 bg-amber-500/[0.02] rounded-xl border border-amber-500/10 space-y-3">
-                        <div className="flex items-center justify-between text-[#D4AF37] font-bold">
-                          <span className="flex items-center gap-1.5"><QrCode className="w-4 h-4 text-amber-500" /> 현장 만족도 설문조사 관리 도구</span>
-                          <span className="text-[9px] text-neutral-500">배정 강사 및 관리자 전용 권한</span>
-                        </div>
-                        <div className="flex flex-col sm:flex-row gap-2">
-                          <button 
-                            onClick={() => handleDownloadExcel(currentModalLec)} 
-                            className="flex-1 px-3 py-2 rounded-lg bg-neutral-900 hover:bg-neutral-850 border border-neutral-800 text-neutral-300 hover:text-white transition-all text-xs font-bold flex items-center justify-center gap-1.5 cursor-pointer"
-                          >
-                            <Download className="w-3.5 h-3.5 text-emerald-400" /> 상세 만족도 응답 엑셀 다운
-                          </button>
-                          <button 
-                            onClick={() => handleDownloadQR(currentModalLec)} 
-                            className="flex-1 px-3 py-2 rounded-lg bg-neutral-900 hover:bg-neutral-850 border border-neutral-800 text-[#D4AF37] hover:text-amber-400 transition-all text-xs font-bold flex items-center justify-center gap-1.5 cursor-pointer"
-                          >
-                            <QrCode className="w-3.5 h-3.5 text-amber-500" /> 만족도 조사용 QR 이미지 받기
-                          </button>
-                        </div>
+                  {/* Right Column: Detailed Curriculum Description & PDF/QR management tools */}
+                  <div className="md:col-span-6 flex flex-col justify-between space-y-4">
+                    {/* Description Container */}
+                    <div className="space-y-1.5 flex flex-col flex-1">
+                      <span className="text-[9px] text-neutral-500 font-black uppercase tracking-wider block">📖 출강 요청 상세내용 및 커리큘럼 요구사항</span>
+                      <div className="bg-neutral-950 p-4 rounded-xl border border-neutral-900 text-neutral-300 text-xs leading-relaxed whitespace-pre-wrap select-text h-[160px] md:h-[190px] overflow-y-auto custom-scrollbar flex-1">
+                        {currentModalLec.description}
                       </div>
-                    );
-                  }
-                  return null;
-                })()}
+                    </div>
+
+                    {/* QR Code / Excel management section for assigned/admins */}
+                    {(() => {
+                      const isMainLecturer = currentUser && currentModalLec.assignedTo === currentUser.uid;
+                      const isAssistantLecturer = currentUser && currentModalLec.assistantId === currentUser.uid;
+                      
+                      if (isMainLecturer || isAssistantLecturer || currentUser?.isAdmin) {
+                        return (
+                          <div className="p-3 bg-amber-500/[0.02] rounded-xl border border-amber-500/10 space-y-2 shrink-0">
+                            <div className="flex items-center justify-between text-[#D4AF37] font-bold text-[10px]">
+                              <span className="flex items-center gap-1"><QrCode className="w-3.5 h-3.5 text-amber-500" /> 현장 만족도 설문조사 관리 도구</span>
+                              <span className="text-[8px] text-neutral-500">배정 강사 및 관리자 전용 권한</span>
+                            </div>
+                            <div className="flex gap-2">
+                              <button 
+                                onClick={() => handleDownloadExcel(currentModalLec)} 
+                                className="flex-1 px-3 py-1.5 rounded-lg bg-neutral-900 hover:bg-neutral-850 border border-neutral-800 text-neutral-300 hover:text-white transition-all text-[10px] font-bold flex items-center justify-center gap-1.5 cursor-pointer"
+                              >
+                                <Download className="w-3 h-3 text-emerald-400" /> 상세 응답 엑셀 다운
+                              </button>
+                              <button 
+                                onClick={() => handleDownloadQR(currentModalLec)} 
+                                className="flex-1 px-3 py-1.5 rounded-lg bg-neutral-900 hover:bg-neutral-850 border border-neutral-800 text-[#D4AF37] hover:text-amber-400 transition-all text-[10px] font-bold flex items-center justify-center gap-1.5 cursor-pointer"
+                              >
+                                <QrCode className="w-3 h-3 text-amber-500" /> QR 이미지 다운
+                              </button>
+                            </div>
+                          </div>
+                        );
+                      }
+                      return null;
+                    })()}
+                  </div>
+
+                </div>
               </div>
 
               {/* Footer Actions */}
