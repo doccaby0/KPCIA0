@@ -2125,14 +2125,7 @@ export default function App() {
         </div>
       </header>
 
-      {/* ⚠️ Pending Approval Global Warning Banner */}
-      {currentUser && !currentUser.isApproved && (
-        <div className="bg-amber-500/10 border-b border-amber-500/20 text-amber-400 py-3 px-6 text-xs font-semibold text-center select-all flex items-center justify-center gap-2">
-          <span>⏳ <strong>KPCIA 본부 알림</strong>: 현재 가입 승인 대기 상태입니다. 운영국의 최종 정회원 승인 처리 전까지는 '고품격 교육과정' 등의 고급 서비스 이용이 일부 제한됩니다.</span>
-          <span className="text-neutral-400">|</span>
-          <span>💡 <strong>체험 가이드</strong>: 관리자 계정 <code>insight9lab</code> (비밀번호 <code>400828</code>)로 로그인하신 뒤, 마스터실의 '소속 강사 관리'에서 정회원 승인을 수동 부여해 보세요!</span>
-        </div>
-      )}
+
 
       {/* 🚀 MAIN HERO AREA (Only on Home Tab) */}
       {activeTab === 'home' && (
