@@ -3096,7 +3096,7 @@ export default function App() {
                           >
                             <div className="space-y-2.5">
                               {/* Top row: Company & Status */}
-                              <div className="flex items-center justify-between gap-2">
+                              <div className="flex items-center justify-between gap-2 z-10 relative">
                                 <div className="flex items-center gap-1 bg-neutral-950 border border-neutral-850 rounded px-1.5 py-0.5 text-[9px] text-neutral-400 font-bold truncate max-w-[130px]">
                                   <Building className="w-2.5 h-2.5 text-[#D4AF37] shrink-0" />
                                   <span className="truncate">{lecture.companyName || "익명 기업"}</span>
@@ -3157,7 +3157,7 @@ export default function App() {
 
                             {/* Restricted indicator layer */}
                             {isRestricted && (
-                              <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/85 backdrop-blur-sm p-3 text-center">
+                              <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/85 backdrop-blur-sm p-3 pt-8 text-center">
                                 <Lock className="w-3.5 h-3.5 text-amber-500 mb-1" />
                                 <span className="text-[10px] font-black text-[#D4AF37]">🔒 {lecture.targetTier.replace('Prestige ', '')} 전용</span>
                                 <span className="text-[8px] text-neutral-400 mt-0.5">등급 미충족 (활동 실적 필요)</span>
@@ -5749,8 +5749,8 @@ export default function App() {
                         {currentModalLec.companyName && (
                           <span className="inline-flex items-center gap-1 bg-neutral-900 border border-neutral-800 text-neutral-400 px-2 py-0.5 rounded text-[9px] font-bold">
                             <Building className="w-3 h-3 text-[#D4AF37]" />
-                            <span className={isRestricted ? "blur-[3px] select-none pointer-events-none" : ""}>
-                              {isRestricted ? "KPCIA 제휴 대기업" : currentModalLec.companyName}
+                            <span>
+                              {currentModalLec.companyName}
                             </span>
                           </span>
                         )}
