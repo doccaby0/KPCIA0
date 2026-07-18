@@ -786,6 +786,14 @@ export default function App() {
     const lect = lectures.find(l => l.id === lectureId);
     if (!lect) return;
 
+    // Check tier rank
+    const userRank = getTierRank(currentUser.tier);
+    const targetRank = getTierRank(lect.targetTier);
+    if (!currentUser.isAdmin && userRank < targetRank) {
+      triggerToast(`출강 지원 자격이 부족합니다. 해당 공고는 '${lect.targetTier}' 등급 이상만 지원이 가능합니다.`, "error");
+      return;
+    }
+
     if (lect.applicants.includes(currentUser.uid)) {
       triggerToast("이미 출강 신청이 완료된 강의 공고입니다.", "info");
       return;
@@ -5682,6 +5690,10 @@ export default function App() {
         const currentModalLec = lectures.find(l => l.id === selectedLectureForModal.id);
         if (!currentModalLec) return null;
 
+        const userRank = currentUser ? getTierRank(currentUser.tier) : 0;
+        const targetRank = getTierRank(currentModalLec.targetTier);
+        const isRestricted = !currentUser?.isAdmin && (userRank < targetRank);
+
         return (
           <div className="fixed inset-0 z-[999] bg-black/85 backdrop-blur-sm flex items-center justify-center p-4 overflow-y-auto animate-in fade-in duration-200" onClick={() => setSelectedLectureForModal(null)}>
             <div 
@@ -5737,13 +5749,22 @@ export default function App() {
                         {currentModalLec.companyName && (
                           <span className="inline-flex items-center gap-1 bg-neutral-900 border border-neutral-800 text-neutral-400 px-2 py-0.5 rounded text-[9px] font-bold">
                             <Building className="w-3 h-3 text-[#D4AF37]" />
-                            {currentModalLec.companyName}
+                            <span className={isRestricted ? "blur-[3px] select-none pointer-events-none" : ""}>
+                              {isRestricted ? "KPCIA 제휴 대기업" : currentModalLec.companyName}
+                            </span>
                           </span>
                         )}
                       </div>
 
                       <h2 className="text-sm sm:text-base font-black text-white leading-snug">
-                        {currentModalLec.title}
+                        {isRestricted ? (
+                          <span className="flex items-center gap-1.5 text-neutral-300">
+                            <Lock className="w-3.5 h-3.5 text-[#D4AF37] shrink-0" />
+                            <span className="blur-[4px] select-none pointer-events-none">[등급제한] {currentModalLec.title}</span>
+                          </span>
+                        ) : (
+                          currentModalLec.title
+                        )}
                       </h2>
 
                       {/* Associated IP Program Link */}
@@ -5752,8 +5773,8 @@ export default function App() {
                           <span className="shrink-0 bg-amber-500/10 text-[#D4AF37] font-extrabold text-[8.5px] px-1.5 py-0.5 rounded border border-amber-500/20 tracking-wider">
                             지식 IP 연계 과정
                           </span>
-                          <span className="font-extrabold text-neutral-200 text-[10px] truncate">
-                            {currentModalLec.programTitle}
+                          <span className={`font-extrabold text-neutral-200 text-[10px] truncate ${isRestricted ? "blur-[3.5px] select-none pointer-events-none" : ""}`}>
+                            {isRestricted ? "비공개 명품 IP 교육과정" : currentModalLec.programTitle}
                           </span>
                         </div>
                       )}
@@ -5763,34 +5784,54 @@ export default function App() {
                     <div className="grid grid-cols-2 gap-3 bg-neutral-950 p-3 rounded-xl border border-neutral-900">
                       <div className="space-y-0.5">
                         <span className="text-[9px] text-neutral-500 font-bold block">📅 출강 일정</span>
-                        <strong className="text-[11px] text-neutral-200 font-black">{currentModalLec.date}</strong>
+                        {isRestricted ? (
+                          <span className="text-[11px] text-neutral-400 font-black blur-[3px] select-none pointer-events-none block">2026년 08월 중</span>
+                        ) : (
+                          <strong className="text-[11px] text-neutral-200 font-black">{currentModalLec.date}</strong>
+                        )}
                       </div>
                       <div className="space-y-0.5">
                         <span className="text-[9px] text-neutral-500 font-bold block">💵 총 강의 예산</span>
-                        <strong className="text-[11px] text-white font-black">₩{currentModalLec.budget.toLocaleString()} 원</strong>
+                        {isRestricted ? (
+                          <span className="text-[11px] text-[#D4AF37] font-black blur-[3px] select-none pointer-events-none block">₩2,500,000 원</span>
+                        ) : (
+                          <strong className="text-[11px] text-white font-black">₩{currentModalLec.budget.toLocaleString()} 원</strong>
+                        )}
                       </div>
                       <div className="space-y-0.5">
                         <span className="text-[9px] text-neutral-500 font-bold block">⏱️ 강의 시간대</span>
-                        <strong className="text-[11px] text-emerald-400 font-black block truncate" title={currentModalLec.time}>
-                          {currentModalLec.time} <span className="text-neutral-500 text-[9px] font-normal">({currentModalLec.duration || '2시간'})</span>
-                        </strong>
+                        {isRestricted ? (
+                          <span className="text-[11px] text-emerald-400 font-black blur-[3px] select-none pointer-events-none block">14:00~16:00 (2시간)</span>
+                        ) : (
+                          <strong className="text-[11px] text-emerald-400 font-black block truncate" title={currentModalLec.time}>
+                            {currentModalLec.time} <span className="text-neutral-500 text-[9px] font-normal">({currentModalLec.duration || '2시간'})</span>
+                          </strong>
+                        )}
                       </div>
                       <div className="space-y-0.5">
                         <span className="text-[9px] text-neutral-500 font-bold block">🪙 지식 IP 로열티 마일리지</span>
-                        <strong className="text-[11px] text-[#D4AF37] font-black">
-                          {currentModalLec.programId && programs.find(p => p.id === currentModalLec.programId)?.isApproved 
-                            ? `${(currentModalLec.mileageRoyalty || 0).toLocaleString()} M` 
-                            : '0 M (비적용 과정)'}
-                        </strong>
+                        {isRestricted ? (
+                          <span className="text-[11px] text-amber-500 font-black blur-[3px] select-none pointer-events-none block">10,000 M</span>
+                        ) : (
+                          <strong className="text-[11px] text-[#D4AF37] font-black">
+                            {currentModalLec.programId && programs.find(p => p.id === currentModalLec.programId)?.isApproved 
+                              ? `${(currentModalLec.mileageRoyalty || 0).toLocaleString()} M` 
+                              : '0 M (비적용 과정)'}
+                          </strong>
+                        )}
                       </div>
                       <div className="space-y-0.5 col-span-2 border-t border-neutral-900 pt-2 mt-1">
                         <span className="text-[9px] text-neutral-500 font-bold block">📍 출강 교육 장소 및 인원</span>
                         <div className="flex justify-between items-center gap-2">
-                          <strong className="text-[11px] text-neutral-200 font-bold truncate max-w-[180px]" title={currentModalLec.location}>
-                            {currentModalLec.location}
-                          </strong>
+                          {isRestricted ? (
+                            <span className="text-[11px] text-neutral-400 font-bold blur-[3px] select-none pointer-events-none block">서울 및 수도권 선호지역</span>
+                          ) : (
+                            <strong className="text-[11px] text-neutral-200 font-bold truncate max-w-[180px]" title={currentModalLec.location}>
+                              {currentModalLec.location}
+                            </strong>
+                          )}
                           <span className="bg-neutral-900 text-neutral-400 text-[9px] px-1.5 py-0.5 rounded border border-neutral-800 font-bold shrink-0">
-                            👥 {currentModalLec.attendees || 30}명 예정
+                            👥 {isRestricted ? "XX" : (currentModalLec.attendees || 30)}명 예정
                           </span>
                         </div>
                       </div>
@@ -5821,9 +5862,24 @@ export default function App() {
                     {/* Description Container */}
                     <div className="space-y-1.5 flex flex-col flex-1">
                       <span className="text-[9px] text-neutral-500 font-black uppercase tracking-wider block">📖 출강 요청 상세내용 및 커리큘럼 요구사항</span>
-                      <div className="bg-neutral-950 p-4 rounded-xl border border-neutral-900 text-neutral-300 text-xs leading-relaxed whitespace-pre-wrap select-text h-[160px] md:h-[190px] overflow-y-auto custom-scrollbar flex-1">
-                        {currentModalLec.description}
-                      </div>
+                      {isRestricted ? (
+                        <div className="relative flex-1 min-h-[160px] md:min-h-[190px]">
+                          <div className="bg-neutral-950 p-4 rounded-xl border border-neutral-900 text-neutral-400 text-xs leading-relaxed whitespace-pre-wrap select-none blur-[4.5px] h-[160px] md:h-[190px] overflow-hidden">
+                            {currentModalLec.description}
+                          </div>
+                          <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/60 rounded-xl p-4 text-center border border-amber-500/10">
+                            <Lock className="w-5 h-5 text-amber-500 mb-1.5" />
+                            <span className="text-xs font-black text-[#D4AF37]">{currentModalLec.targetTier.replace('Prestige ', '')} 전용</span>
+                            <span className="text-[9.5px] text-neutral-400 mt-1 max-w-[280px]">
+                              현재 강사님의 등급({currentUser ? currentUser.tier.replace('Prestige ', '') : '미인증'})으로는 열람할 수 없는 고등급 전용 세부 커리큘럼입니다.
+                            </span>
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="bg-neutral-950 p-4 rounded-xl border border-neutral-900 text-neutral-300 text-xs leading-relaxed whitespace-pre-wrap select-text h-[160px] md:h-[190px] overflow-y-auto custom-scrollbar flex-1">
+                          {currentModalLec.description}
+                        </div>
+                      )}
                     </div>
 
                     {/* QR Code / Excel management section for assigned/admins */}
@@ -5849,7 +5905,7 @@ export default function App() {
                                 onClick={() => handleDownloadQR(currentModalLec)} 
                                 className="flex-1 px-3 py-1.5 rounded-lg bg-neutral-900 hover:bg-neutral-850 border border-neutral-800 text-[#D4AF37] hover:text-amber-400 transition-all text-[10px] font-bold flex items-center justify-center gap-1.5 cursor-pointer"
                               >
-                                <QrCode className="w-3 h-3 text-amber-500" /> QR 이미지 다운
+                                <QrCode className="w-3.5 h-3.5 text-amber-500" /> QR 이미지 다운
                               </button>
                             </div>
                           </div>
@@ -5914,17 +5970,27 @@ export default function App() {
                         <span className="text-[11px] text-neutral-400 font-medium">
                           신청 강사: <strong className="text-[#D4AF37]">{currentModalLec.applicants.length}명</strong>
                         </span>
-                        <button
-                          onClick={() => handleApplyLecture(currentModalLec.id)}
-                          disabled={hasApplied}
-                          className={`px-5 py-2.5 rounded-xl text-xs font-black transition-all cursor-pointer ${
-                            hasApplied 
-                              ? 'bg-neutral-800 text-neutral-500 border border-neutral-800 cursor-not-allowed'
-                              : 'bg-gradient-to-r from-amber-500 to-[#D4AF37] text-neutral-950 hover:brightness-110 shadow-lg shadow-amber-500/25'
-                          }`}
-                        >
-                          {hasApplied ? '✓ 지원신청 완료됨' : '출강 지원신청'}
-                        </button>
+                        {isRestricted ? (
+                          <button
+                            disabled={true}
+                            className="px-5 py-2.5 rounded-xl text-xs font-black bg-neutral-800 text-neutral-500 border border-neutral-800 cursor-not-allowed flex items-center gap-1.5"
+                          >
+                            <Lock className="w-3 h-3 text-amber-500 shrink-0" />
+                            {currentModalLec.targetTier.replace('Prestige ', '')} 지원자격 미달
+                          </button>
+                        ) : (
+                          <button
+                            onClick={() => handleApplyLecture(currentModalLec.id)}
+                            disabled={hasApplied}
+                            className={`px-5 py-2.5 rounded-xl text-xs font-black transition-all cursor-pointer ${
+                              hasApplied 
+                                ? 'bg-neutral-800 text-neutral-500 border border-neutral-800 cursor-not-allowed'
+                                : 'bg-gradient-to-r from-amber-500 to-[#D4AF37] text-neutral-950 hover:brightness-110 shadow-lg shadow-amber-500/25'
+                            }`}
+                          >
+                            {hasApplied ? '✓ 지원신청 완료됨' : '출강 지원신청'}
+                          </button>
+                        )}
                       </div>
                     );
                   })()}
