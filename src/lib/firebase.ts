@@ -348,6 +348,9 @@ export class StorageService {
   }
 
   static getLocalLectures(): LectureRequest[] {
+    if (this.getLocalItem('kpcia_lectures_cleared') === 'true') {
+      return this.getLocal<LectureRequest[]>('lectures', []);
+    }
     return this.getLocal<LectureRequest[]>('lectures', INITIAL_LECTURES);
   }
 
@@ -388,6 +391,21 @@ export class StorageService {
     try {
       await Promise.race([
         (async () => {
+          // Check if lectures were explicitly cleared by admin
+          let lecturesExplicitlyCleared = false;
+          try {
+            const stateSnap = await getDoc(doc(db, 'metadata', 'lectures_state'));
+            if (stateSnap.exists() && stateSnap.data()?.cleared === true) {
+              lecturesExplicitlyCleared = true;
+            }
+          } catch (e) {
+            console.log("Could not check metadata lectures_state, checking localStorage.");
+          }
+
+          if (this.getLocalItem('kpcia_lectures_cleared') === 'true') {
+            lecturesExplicitlyCleared = true;
+          }
+
           // 1. Seed users
           const usersSnap = await getDocs(collection(db, 'users'));
           if (usersSnap.empty) {
@@ -399,7 +417,7 @@ export class StorageService {
 
           // 2. Seed lectures
           const lecturesSnap = await getDocs(collection(db, 'lectures'));
-          if (lecturesSnap.empty) {
+          if (lecturesSnap.empty && !lecturesExplicitlyCleared) {
             console.log("Seeding lectures to Firestore...");
             for (const l of INITIAL_LECTURES) {
               await setDoc(doc(db, 'lectures', l.id), this.cleanUndefined(l));
@@ -503,6 +521,16 @@ export class StorageService {
   }
 
   static async saveLecture(lecture: LectureRequest): Promise<void> {
+    // If saving a lecture, ensure the cleared flag is turned off
+    this.setLocalItem('kpcia_lectures_cleared', 'false');
+    if (useFirestore && db) {
+      try {
+        await setDoc(doc(db, 'metadata', 'lectures_state'), { cleared: false });
+      } catch (e) {
+        console.warn(e);
+      }
+    }
+
     const cleaned = this.cleanUndefined(lecture);
     const current = await this.getLectures();
     const updated = current.map(l => l.id === cleaned.id ? cleaned : l);
@@ -524,6 +552,17 @@ export class StorageService {
     await this.runWithTimeout(async () => {
       await deleteDoc(doc(db, 'lectures', lectureId));
     }, null);
+  }
+
+  static async setLecturesCleared(cleared: boolean): Promise<void> {
+    this.setLocalItem('kpcia_lectures_cleared', cleared ? 'true' : 'false');
+    if (useFirestore && db) {
+      try {
+        await setDoc(doc(db, 'metadata', 'lectures_state'), { cleared });
+      } catch (e) {
+        console.warn("Could not set lectures_state cleared in Firestore", e);
+      }
+    }
   }
 
   // Programs Operations
@@ -661,8 +700,8 @@ export class StorageService {
       const list: LectureRequest[] = [];
       snap.forEach(d => list.push(d.data() as LectureRequest));
       
-      // Prevent empty cloud snapshot from wiping local storage
-      if (list.length === 0) {
+      // Prevent empty cloud snapshot from wiping local storage unless explicitly cleared
+      if (list.length === 0 && this.getLocalItem('kpcia_lectures_cleared') !== 'true') {
         const local = this.getLocalLectures();
         if (local.length > 0) {
           console.log("Firestore 'lectures' collection is empty. Retaining local data and uploading to cloud...");
@@ -835,7 +874,9 @@ export class StorageService {
     if (!useFirestore || !db) throw new Error("클라우드 DB에 연결되어 있지 않습니다.");
     
     const users = this.getLocal<UserProfile[]>('users', INITIAL_USERS);
-    const lectures = this.getLocal<LectureRequest[]>('lectures', INITIAL_LECTURES);
+    const lectures = this.getLocalItem('kpcia_lectures_cleared') === 'true'
+      ? this.getLocal<LectureRequest[]>('lectures', [])
+      : this.getLocal<LectureRequest[]>('lectures', INITIAL_LECTURES);
     const programs = this.getLocal<EducationalProgram[]>('programs', INITIAL_PROGRAMS);
     const transactions = this.getLocal<MileageTransaction[]>('transactions', INITIAL_TRANSACTIONS);
     const proposals = this.getLocal<PartnershipProposal[]>('proposals', INITIAL_PROPOSALS);

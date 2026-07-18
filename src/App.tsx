@@ -13,7 +13,7 @@ import html2canvas from 'html2canvas';
 import { jsPDF } from 'jspdf';
 import * as XLSX from 'xlsx';
 import ExcelJS from 'exceljs';
-import { StorageService, generateBadgeForTier } from './lib/firebase';
+import { StorageService, generateBadgeForTier, INITIAL_LECTURES } from './lib/firebase';
 import { sanitizeString, sanitizePhone } from './utils/security';
 import { 
   Award, 
@@ -940,6 +940,145 @@ export default function App() {
     reader.readAsBinaryString(file);
   };
 
+  const getNextMonthLastDay = (dateStr: string): string => {
+    if (!dateStr) return "-";
+    try {
+      const parts = dateStr.split('-');
+      if (parts.length !== 3) return "-";
+      const year = parseInt(parts[0], 10);
+      const month = parseInt(parts[1], 10);
+      const date = new Date(year, month + 1, 0);
+      const y = date.getFullYear();
+      const m = String(date.getMonth() + 1).padStart(2, '0');
+      const d = String(date.getDate()).padStart(2, '0');
+      return `${y}-${m}-${d}`;
+    } catch (e) {
+      return "-";
+    }
+  };
+
+  const handleDownloadSettledLecturesExcel = () => {
+    const list = lectures.filter(l => l.status === 'completed' && l.settlementStatus === 'completed');
+    if (list.length === 0) {
+      triggerToast("정산 완료된 강의 내역이 없습니다.", "error");
+      return;
+    }
+
+    const wb = XLSX.utils.book_new();
+    const headers = [
+      "순번", "출강일자", "의뢰 기업명", "협력사명", "출강 교육 명칭", 
+      "강사 등급", "주강사", "보조강사", "강의 시간수", "예정 인원", 
+      "인당 재료비(원)", "마일리지 로열티(M)", "정산 총 예산(원)", "만족도 평점", "예정 정산 기한 (익월 말일)", "정산 상태"
+    ];
+
+    const rows = list.map((l, index) => [
+      index + 1,
+      l.date,
+      l.companyName || "익명 기업",
+      l.partnerCompany || "없음",
+      l.title,
+      l.targetTier,
+      l.assignedName || "없음",
+      l.assistantName || "없음",
+      l.mainHours || 0,
+      l.attendees || 0,
+      l.materialCost || 0,
+      l.mileageRoyalty || 0,
+      l.budget,
+      l.lectureRating || 5.0,
+      getNextMonthLastDay(l.date),
+      "정산 완료"
+    ]);
+
+    const totalHours = list.reduce((sum, l) => sum + (l.mainHours || 0), 0);
+    const totalAttendees = list.reduce((sum, l) => sum + (l.attendees || 0), 0);
+    const totalRoyalty = list.reduce((sum, l) => sum + (l.mileageRoyalty || 0), 0);
+    const totalBudget = list.reduce((sum, l) => sum + l.budget, 0);
+    const averageRating = list.length > 0 
+      ? Number((list.reduce((sum, l) => sum + (l.lectureRating || 5.0), 0) / list.length).toFixed(2))
+      : 5.0;
+
+    const sumRow = [
+      "합계 (SUM)", "", "", "", "", 
+      "", "", "", totalHours, totalAttendees, 
+      "", totalRoyalty, totalBudget, averageRating, "", ""
+    ];
+
+    const ws = XLSX.utils.aoa_to_sheet([headers, ...rows, sumRow]);
+    const cols = [
+      { wch: 8 }, { wch: 12 }, { wch: 20 }, { wch: 18 }, { wch: 30 },
+      { wch: 18 }, { wch: 12 }, { wch: 12 }, { wch: 12 }, { wch: 10 },
+      { wch: 15 }, { wch: 18 }, { wch: 18 }, { wch: 12 }, { wch: 25 }, { wch: 15 }
+    ];
+    ws['!cols'] = cols;
+    XLSX.utils.book_append_sheet(wb, ws, "정산_완료_강의_내역");
+
+    const fileName = `KPCIA_정산완료_강의내역_${new Date().toISOString().substring(0, 10)}.xlsx`;
+    XLSX.writeFile(wb, fileName);
+    triggerToast("📊 정산 완료된 강의 내역 엑셀 다운로드 완료!", "success");
+  };
+
+  const handleDownloadPendingSettlementLecturesExcel = () => {
+    const list = lectures.filter(l => l.status === 'completed' && (l.settlementStatus === 'pending' || !l.settlementStatus));
+    if (list.length === 0) {
+      triggerToast("강의 완료 후 정산 대기 중인 내역이 없습니다.", "error");
+      return;
+    }
+
+    const wb = XLSX.utils.book_new();
+    const headers = [
+      "순번", "출강일자", "의뢰 기업명", "협력사명", "출강 교육 명칭", 
+      "강사 등급", "주강사", "보조강사", "강의 시간수", "예정 인원", 
+      "인당 재료비(원)", "마일리지 로열티(M)", "정산 총 예산(원)", "만족도 평점", "예정 정산 기한 (익월 말일)", "정산 상태"
+    ];
+
+    const rows = list.map((l, index) => [
+      index + 1,
+      l.date,
+      l.companyName || "익명 기업",
+      l.partnerCompany || "없음",
+      l.title,
+      l.targetTier,
+      l.assignedName || "없음",
+      l.assistantName || "없음",
+      l.mainHours || 0,
+      l.attendees || 0,
+      l.materialCost || 0,
+      l.mileageRoyalty || 0,
+      l.budget,
+      l.lectureRating || 5.0,
+      getNextMonthLastDay(l.date),
+      "정산 대기"
+    ]);
+
+    const totalHours = list.reduce((sum, l) => sum + (l.mainHours || 0), 0);
+    const totalAttendees = list.reduce((sum, l) => sum + (l.attendees || 0), 0);
+    const totalRoyalty = list.reduce((sum, l) => sum + (l.mileageRoyalty || 0), 0);
+    const totalBudget = list.reduce((sum, l) => sum + l.budget, 0);
+    const averageRating = list.length > 0 
+      ? Number((list.reduce((sum, l) => sum + (l.lectureRating || 5.0), 0) / list.length).toFixed(2))
+      : 5.0;
+
+    const sumRow = [
+      "합계 (SUM)", "", "", "", "", 
+      "", "", "", totalHours, totalAttendees, 
+      "", totalRoyalty, totalBudget, averageRating, "", ""
+    ];
+
+    const ws = XLSX.utils.aoa_to_sheet([headers, ...rows, sumRow]);
+    const cols = [
+      { wch: 8 }, { wch: 12 }, { wch: 20 }, { wch: 18 }, { wch: 30 },
+      { wch: 18 }, { wch: 12 }, { wch: 12 }, { wch: 12 }, { wch: 10 },
+      { wch: 15 }, { wch: 18 }, { wch: 18 }, { wch: 12 }, { wch: 25 }, { wch: 15 }
+    ];
+    ws['!cols'] = cols;
+    XLSX.utils.book_append_sheet(wb, ws, "정산_대기_강의_내역");
+
+    const fileName = `KPCIA_정산대기_강의내역_${new Date().toISOString().substring(0, 10)}.xlsx`;
+    XLSX.writeFile(wb, fileName);
+    triggerToast("📊 강의 완료 후 정산 이전 내역 엑셀 다운로드 완료!", "success");
+  };
+
   const handleDownloadCompletedLecturesExcel = () => {
     const completedList = lectures.filter(l => l.status === 'completed');
     if (completedList.length === 0) {
@@ -951,7 +1090,7 @@ export default function App() {
     const headers = [
       "순번", "출강일자", "의뢰 기업명", "협력사명", "출강 교육 명칭", 
       "강사 등급", "주강사", "보조강사", "강의 시간수", "예정 인원", 
-      "인당 재료비(원)", "마일리지 로열티(M)", "정산 총 예산(원)", "만족도 평점", "출강 상태"
+      "인당 재료비(원)", "마일리지 로열티(M)", "정산 총 예산(원)", "만족도 평점", "예정 정산일(익월 말일)", "정산 상태"
     ];
 
     const rows = completedList.map((l, index) => [
@@ -969,7 +1108,8 @@ export default function App() {
       l.mileageRoyalty || 0,
       l.budget,
       l.lectureRating || 5.0,
-      "출강 완료"
+      getNextMonthLastDay(l.date),
+      l.settlementStatus === 'completed' ? "정산 완료" : "정산 대기"
     ]);
 
     const totalHours = completedList.reduce((sum, l) => sum + (l.mainHours || 0), 0);
@@ -983,14 +1123,14 @@ export default function App() {
     const sumRow = [
       "합계 (SUM)", "", "", "", "", 
       "", "", "", totalHours, totalAttendees, 
-      "", totalRoyalty, totalBudget, averageRating, ""
+      "", totalRoyalty, totalBudget, averageRating, "", ""
     ];
 
     const ws = XLSX.utils.aoa_to_sheet([headers, ...rows, sumRow]);
     const cols = [
       { wch: 8 }, { wch: 12 }, { wch: 20 }, { wch: 18 }, { wch: 30 },
       { wch: 18 }, { wch: 12 }, { wch: 12 }, { wch: 12 }, { wch: 10 },
-      { wch: 15 }, { wch: 18 }, { wch: 18 }, { wch: 12 }, { wch: 12 }
+      { wch: 15 }, { wch: 18 }, { wch: 18 }, { wch: 12 }, { wch: 25 }, { wch: 15 }
     ];
     ws['!cols'] = cols;
     XLSX.utils.book_append_sheet(wb, ws, "출강_완료_정산_마스터대장");
@@ -1676,6 +1816,171 @@ export default function App() {
     triggerToast(`💰 출강 완료 정산 및 만족도 평점(${rating.toFixed(1)}) 등록이 성공적으로 실행되어 마일리지가 정상 지급되었습니다!`, "success");
   };
 
+  // 2.1 Complete Lecture Only without Distributing Mileage (Admin - Pending Settlement)
+  const handleCompleteLectureOnly = async (lectureId: string, rating: number = 5.0) => {
+    const lect = lectures.find(l => l.id === lectureId);
+    if (!lect) return;
+
+    if (lect.status !== 'assigned') {
+      triggerToast("강사 배정이 완료된 상태에서만 출강 완료 처리가 가능합니다.", "error");
+      return;
+    }
+
+    const completedLec: LectureRequest = {
+      ...lect,
+      status: 'completed',
+      settlementStatus: 'pending',
+      lectureRating: rating
+    };
+
+    const updatedLectures = lectures.map(l => l.id === lectureId ? completedLec : l);
+    setLectures(updatedLectures);
+    await StorageService.saveLecture(completedLec);
+    triggerToast(`✓ 출강 완료 처리되었습니다! (현재 정산 대기 상태 - 익월 말일인 ${getNextMonthLastDay(lect.date)}까지 정산 예정)`, "success");
+  };
+
+  // 2.2 Execute Settlement and Distribute Mileage & Royalties (Admin)
+  const handleExecuteSettlementOnly = async (lectureId: string) => {
+    const lect = lectures.find(l => l.id === lectureId);
+    if (!lect) return;
+
+    if (lect.status !== 'completed') {
+      triggerToast("출강이 완료된 상태에서만 정산 처리가 가능합니다.", "error");
+      return;
+    }
+
+    if (lect.settlementStatus === 'completed') {
+      triggerToast("이미 정산 처리가 완료된 출강 건입니다.", "error");
+      return;
+    }
+
+    const mainId = lect.assignedTo!;
+    const assistantId = lect.assistantId;
+
+    const mainInst = users.find(u => u.uid === mainId);
+    const assistantInst = assistantId ? users.find(u => u.uid === assistantId) : null;
+
+    if (!mainInst) {
+      triggerToast("배정된 주강사의 정보가 존재하지 않아 정산을 진행할 수 없습니다.", "error");
+      return;
+    }
+
+    const rating = lect.lectureRating || 5.0;
+    const mainHours = lect.mainHours || 3;
+    const mainPayout = mainHours * 100; // 100 M per hour
+
+    const assistantHours = lect.assistantHours || 0;
+    const assistantPayout = assistantHours * 50; // 50 M per hour
+
+    const mainTx: MileageTransaction = {
+      id: `tx_main_${Date.now()}_1`,
+      userId: mainId,
+      userName: mainInst.name,
+      type: 'lecture_payout',
+      amount: mainPayout,
+      description: `[KPCIA 출강정산] '${lect.title}' 주강사 ${mainHours}시간 정산 지급 (만족도: ${rating.toFixed(1)})`,
+      relatedId: lectureId,
+      createdAt: new Date().toISOString()
+    };
+
+    const mainRatings = mainInst.lectureRatings || [];
+    const updatedMainRatings = [...mainRatings, rating];
+    const avgMainRating = Number((updatedMainRatings.reduce((a, b) => a + b, 0) / updatedMainRatings.length).toFixed(2));
+
+    const updatedMainUser: UserProfile = {
+      ...mainInst,
+      mileage: mainInst.mileage + mainPayout,
+      lectureCount: (mainInst.lectureCount || 0) + 1,
+      lectureRatings: updatedMainRatings,
+      averageRating: avgMainRating,
+      updatedAt: new Date().toISOString()
+    };
+
+    let updatedUsersList = users.map(u => u.uid === mainId ? updatedMainUser : u);
+
+    await StorageService.saveUser(updatedMainUser);
+    await StorageService.addTransaction(mainTx);
+
+    // Assistant payout
+    if (assistantInst && assistantPayout > 0) {
+      const assistantTx: MileageTransaction = {
+        id: `tx_ass_${Date.now()}_2`,
+        userId: assistantInst.uid,
+        userName: assistantInst.name,
+        type: 'lecture_payout',
+        amount: assistantPayout,
+        description: `[KPCIA 출강정산] '${lect.title}' 보조강사 ${assistantHours}시간 정산 지급`,
+        relatedId: lectureId,
+        createdAt: new Date().toISOString()
+      };
+
+      const updatedAssUser: UserProfile = {
+        ...assistantInst,
+        mileage: assistantInst.mileage + assistantPayout,
+        lectureCount: (assistantInst.lectureCount || 0) + 1,
+        updatedAt: new Date().toISOString()
+      };
+
+      updatedUsersList = updatedUsersList.map(u => u.uid === assistantInst.uid ? updatedAssUser : u);
+
+      await StorageService.saveUser(updatedAssUser);
+      await StorageService.addTransaction(assistantTx);
+    }
+
+    // Program royalty payout
+    if (lect.programId) {
+      const prog = programs.find(p => p.id === lect.programId);
+      if (prog && prog.isApproved) {
+        const author = users.find(u => u.uid === prog.authorId);
+        if (author) {
+          const actualRoyaltyPayout = lect.mileageRoyalty || Math.round((lect.budget * (prog.royaltyRate || 0)) / 100);
+
+          const royaltyTx: MileageTransaction = {
+            id: `tx_royalty_${Date.now()}_3`,
+            userId: author.uid,
+            userName: author.name,
+            type: 'royalty',
+            amount: actualRoyaltyPayout,
+            description: `[KPCIA 지식저작권] 제안 과정 '${prog.title}' 출강 활용에 따른 로열티 마일리지 지급 (총 예산의 ${prog.royaltyRate}%)`,
+            relatedId: prog.id,
+            createdAt: new Date().toISOString()
+          };
+
+          const updatedAuthor: UserProfile = {
+            ...author,
+            mileage: author.mileage + actualRoyaltyPayout,
+            updatedAt: new Date().toISOString()
+          };
+
+          updatedUsersList = updatedUsersList.map(u => u.uid === author.uid ? updatedAuthor : u);
+
+          await StorageService.saveUser(updatedAuthor);
+          await StorageService.addTransaction(royaltyTx);
+        }
+      }
+    }
+
+    setUsers(updatedUsersList);
+
+    const completedLec: LectureRequest = {
+      ...lect,
+      settlementStatus: 'completed'
+    };
+
+    const updatedLectures = lectures.map(l => l.id === lectureId ? completedLec : l);
+    setLectures(updatedLectures);
+    await StorageService.saveLecture(completedLec);
+
+    if (currentUser) {
+      const updatedMe = updatedUsersList.find(u => u.uid === currentUser.uid);
+      if (updatedMe) {
+        setCurrentUser(updatedMe);
+      }
+    }
+
+    triggerToast(`💰 실시간 정산 및 마일리지 지급이 최종 승인되었습니다!`, "success");
+  };
+
   // 3. Evaluate Assistant Instructor (Main Lecturer)
   const handleEvaluateAssistant = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -1916,6 +2221,29 @@ export default function App() {
     } catch (err) {
       console.error(err);
       triggerToast("강사 강제 탈퇴 처리 중 오류가 발생했습니다.", "error");
+    }
+  };
+
+  // 8.8. Reset Lecture Data to Empty (Admin)
+  const handleResetLectureData = async () => {
+    const confirmReset = window.confirm("⚠️ [경고] 정말로 모든 출강 요청 공고 및 매칭 데이터를 초기화(전체 삭제)하시겠습니까?\n\n이 작업은 삼성전자, 네이버, SKT 기본 공고를 포함한 모든 데이터를 완전히 삭제하며, 이 작업은 되돌릴 수 없습니다.");
+    if (!confirmReset) return;
+
+    try {
+      // Set cleared flag first to block subscriptions and seeding
+      await StorageService.setLecturesCleared(true);
+
+      // Delete existing lectures in state and database
+      for (const lec of lectures) {
+        await StorageService.deleteLecture(lec.id);
+      }
+
+      // Sync state to empty
+      setLectures([]);
+      triggerToast("📢 실시간 출강 요청 매칭 공고 데이터가 완전히 초기화(삭제)되었습니다.", "success");
+    } catch (err) {
+      console.error(err);
+      triggerToast("출강 데이터 초기화 중 오류가 발생했습니다.", "error");
     }
   };
 
@@ -3826,7 +4154,17 @@ export default function App() {
                       <h3 className="text-sm font-black text-white flex items-center gap-1.5">
                         <span className="text-[#D4AF37]">👑</span> KPCIA 출강 수탁 배정 및 정산 통제실 ({lectures.length}건)
                       </h3>
-                      <span className="text-[10px] text-amber-500 font-bold px-2 py-0.5 rounded bg-amber-500/10 border border-amber-500/20 select-none shrink-0 self-start sm:self-auto">마스터 전용 관제실</span>
+                      <div className="flex items-center gap-2">
+                        <button
+                          type="button"
+                          onClick={handleResetLectureData}
+                          className="px-2.5 py-1 text-[9px] text-red-400 hover:text-red-300 font-bold rounded-lg bg-red-950/30 hover:bg-red-900/40 border border-red-900/30 cursor-pointer transition-all duration-200"
+                          title="출강 매칭 공고 데이터를 초기 상태로 복원합니다."
+                        >
+                          🔄 출강 데이터 초기화
+                        </button>
+                        <span className="text-[10px] text-amber-500 font-bold px-2 py-0.5 rounded bg-amber-500/10 border border-amber-500/20 select-none shrink-0 self-start sm:self-auto">마스터 전용 관제실</span>
+                      </div>
                     </div>
 
                     {/* Filter & Sorting Controls */}
@@ -4068,24 +4406,48 @@ export default function App() {
                                       </select>
                                     </div>
                                   </div>
-                                  <div className="flex justify-end">
+                                  <div className="flex justify-end gap-2 flex-wrap">
+                                    <button
+                                      onClick={() => handleCompleteLectureOnly(lecture.id, adminLectureRatings[lecture.id] || 5.0)}
+                                      className="px-3.5 py-1.5 rounded-lg bg-amber-600 hover:bg-amber-500 text-white font-bold transition-all cursor-pointer text-xs flex items-center gap-1"
+                                    >
+                                      ✓ 만족도 등록 및 출강 완료 (정산 대기)
+                                    </button>
                                     <button
                                       onClick={() => handleCompleteLectureAndSettle(lecture.id, adminLectureRatings[lecture.id] || 5.0)}
                                       className="px-3.5 py-1.5 rounded-lg bg-emerald-500 hover:bg-emerald-400 text-neutral-950 font-black transition-all cursor-pointer text-xs flex items-center gap-1"
                                     >
-                                      💰 만족도 등록 및 실시간 정산·출강 완료
+                                      💰 즉시 정산 및 완료 처리 (마일리 즉시 지급)
                                     </button>
                                   </div>
                                 </div>
                               )}
 
                               {lecture.status === 'completed' && (
-                                <div className="pt-2 border-t border-neutral-850 text-[10px] text-neutral-500 space-y-1">
-                                  <div>
-                                    이 출강 건은 완전히 종료되었으며, 주강사 <strong>{lecture.assignedName}</strong> 및 보조강사 정산 지급이 완료되었습니다.
-                                  </div>
+                                <div className="pt-2 border-t border-neutral-850 text-[10px] text-neutral-500 space-y-2">
+                                  {lecture.settlementStatus === 'completed' ? (
+                                    <div className="text-emerald-400 font-bold">
+                                      ✓ 이 출강 건의 주강사 <strong>{lecture.assignedName}</strong> 및 보조강사/로열티 정산 지급이 완전히 완료되었습니다.
+                                    </div>
+                                  ) : (
+                                    <div className="space-y-2 bg-amber-500/5 border border-amber-500/10 p-2.5 rounded-lg text-amber-500">
+                                      <div className="font-bold flex items-center gap-1">
+                                        <span>⌛ 정산 대기 상태</span>
+                                        <span>(예정 정산일: {getNextMonthLastDay(lecture.date)})</span>
+                                      </div>
+                                      <p className="text-[9px] text-neutral-400">강의가 완료되었으나 아직 정산이 실행되지 않았습니다. 규정에 따라 익월 말일까지 정산이 완료되어야 합니다.</p>
+                                      <div className="flex justify-end">
+                                        <button
+                                          onClick={() => handleExecuteSettlementOnly(lecture.id)}
+                                          className="px-2.5 py-1 rounded bg-[#D4AF37] hover:brightness-110 text-neutral-950 font-black text-[10px] transition-all cursor-pointer"
+                                        >
+                                          💰 실시간 정산 즉시 승인 (마일리지 지급)
+                                        </button>
+                                      </div>
+                                    </div>
+                                  )}
                                   {lecture.lectureRating !== undefined && (
-                                    <div className="text-amber-400 font-bold flex items-center gap-1">
+                                    <div className="text-amber-400 font-bold flex items-center gap-1 mt-1">
                                       <span>⭐ 등록된 강의 만족도 평점:</span>
                                       <span className="bg-amber-500/10 border border-amber-500/20 px-1.5 py-0.5 rounded text-[10px]">
                                         {lecture.lectureRating.toFixed(1)} / 5.0
@@ -4128,7 +4490,7 @@ export default function App() {
             {adminSubTab === 'lectures' && (
               <div className="mt-8 animate-in fade-in duration-300">
                 <div className="p-6 rounded-2xl bg-[#0d0d0f] border border-neutral-800 space-y-5" id="master-completed-excel-sheet">
-                  <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-neutral-800 pb-4">
+                  <div className="flex flex-col xl:flex-row xl:items-center justify-between gap-4 border-b border-neutral-800 pb-4">
                     <div className="space-y-1">
                       <h3 className="text-sm font-black text-white flex items-center gap-2">
                         <span className="p-1 rounded bg-[#217346]/10 text-[#217346] border border-[#217346]/20">
@@ -4137,20 +4499,39 @@ export default function App() {
                         <span>📊 KPCIA 출강 완료 및 실시간 정산 마스터 대장 (Excel Live Sheet)</span>
                       </h3>
                       <p className="text-[10px] text-neutral-400">
-                        출강이 최종 완료되어 정산 처리 및 강사 평점 등록이 끝난 마스터 회계 전용 엑셀 대장입니다.
+                        출강 요청 강의 전체 리스트와 실시간 정산 현황 및 정산 기한을 모니터링하는 마스터 회계 대장입니다.
                       </p>
                     </div>
-                    <button
-                      onClick={handleDownloadCompletedLecturesExcel}
-                      className="px-4 py-2 rounded-xl bg-[#217346] hover:bg-[#1e663e] text-white text-[11px] font-black flex items-center justify-center gap-1.5 transition-all shadow-lg shadow-[#217346]/10 shrink-0 cursor-pointer"
-                    >
-                      <Download className="w-3.5 h-3.5" />
-                      <span>출강완료 정산 마스터 대장 Excel 다운로드 (.xlsx)</span>
-                    </button>
+                    <div className="flex flex-wrap gap-2">
+                      <button
+                        onClick={handleDownloadSettledLecturesExcel}
+                        className="px-3 py-2 rounded-lg bg-emerald-700 hover:bg-emerald-600 border border-emerald-600/30 text-white text-[10px] font-extrabold flex items-center justify-center gap-1.5 transition-all cursor-pointer"
+                        title="정산이 완료된 강의 내역만 엑셀로 다운로드합니다."
+                      >
+                        <Download className="w-3 h-3 text-emerald-300" />
+                        <span>1. 정산 완료 내역 (.xlsx)</span>
+                      </button>
+                      <button
+                        onClick={handleDownloadPendingSettlementLecturesExcel}
+                        className="px-3 py-2 rounded-lg bg-amber-600 hover:bg-amber-500 border border-amber-500/30 text-white text-[10px] font-extrabold flex items-center justify-center gap-1.5 transition-all cursor-pointer"
+                        title="강의가 완료되었으나 정산 이전 상태인 강의 내역을 다운로드합니다."
+                      >
+                        <Download className="w-3 h-3 text-amber-300" />
+                        <span>2. 정산 대기 내역 (.xlsx)</span>
+                      </button>
+                      <button
+                        onClick={handleDownloadCompletedLecturesExcel}
+                        className="px-3 py-2 rounded-lg bg-[#217346] hover:bg-[#1e663e] text-white text-[10px] font-extrabold flex items-center justify-center gap-1.5 transition-all cursor-pointer"
+                        title="전체 출강 완료 목록을 다운로드합니다."
+                      >
+                        <Download className="w-3.5 h-3.5 text-green-300" />
+                        <span>전체 마스터 대장 (.xlsx)</span>
+                      </button>
+                    </div>
                   </div>
 
                   {/* Real Excel Grid Simulation */}
-                  {lectures.filter(l => l.status === 'completed').length > 0 ? (
+                  {lectures.length > 0 ? (
                     <div className="overflow-x-auto rounded-xl border border-neutral-800">
                       <table className="w-full border-collapse text-[10px] text-neutral-300 font-mono">
                         {/* Excel Header row with letters */}
@@ -4171,7 +4552,8 @@ export default function App() {
                             <th className="p-1.5 border-r border-neutral-800 text-neutral-500 text-center uppercase font-bold w-20">L</th>
                             <th className="p-1.5 border-r border-neutral-800 text-neutral-500 text-center uppercase font-bold w-24">M</th>
                             <th className="p-1.5 border-r border-neutral-800 text-neutral-500 text-center uppercase font-bold w-16">N</th>
-                            <th className="p-1.5 text-neutral-500 text-center uppercase font-bold w-20">O</th>
+                            <th className="p-1.5 border-r border-neutral-800 text-neutral-500 text-center uppercase font-bold w-24">O</th>
+                            <th className="p-1.5 text-neutral-500 text-center uppercase font-bold w-24">P</th>
                           </tr>
                           <tr className="bg-neutral-900 border-b border-neutral-800 text-neutral-400 font-sans">
                             <th className="p-1.5 border-r border-neutral-800 text-center text-[9px] select-none text-neutral-600 font-bold">#</th>
@@ -4189,11 +4571,27 @@ export default function App() {
                             <th className="p-1.5 border-r border-neutral-800 text-right font-bold pr-3">로열티(M)</th>
                             <th className="p-1.5 border-r border-neutral-800 text-right font-bold pr-3">정산 총 예산</th>
                             <th className="p-1.5 border-r border-neutral-800 text-center font-bold">만족도 평점</th>
-                            <th className="p-1.5 text-center font-bold">출강 현황</th>
+                            <th className="p-1.5 border-r border-neutral-800 text-center font-bold">출강 현황</th>
+                            <th className="p-1.5 text-center font-bold">예정 정산일 (익월 말일)</th>
                           </tr>
                         </thead>
                         <tbody>
-                          {lectures.filter(l => l.status === 'completed').map((lecture, idx) => {
+                          {lectures.map((lecture, idx) => {
+                            let statusText = "모집 중";
+                            let statusClass = "text-amber-500 font-bold";
+                            if (lecture.status === 'assigned') {
+                              statusText = "배정 완료";
+                              statusClass = "text-blue-400 font-bold";
+                            } else if (lecture.status === 'completed') {
+                              if (lecture.settlementStatus === 'completed') {
+                                statusText = "✓ 정산 완료";
+                                statusClass = "text-emerald-400 font-extrabold";
+                              } else {
+                                statusText = "⌛ 정산 대기";
+                                statusClass = "text-amber-400 font-extrabold";
+                              }
+                            }
+
                             return (
                               <tr 
                                 key={lecture.id} 
@@ -4217,8 +4615,11 @@ export default function App() {
                                 <td className="p-1.5 border-r border-neutral-800 text-right pr-3">₩{(lecture.materialCost || 0).toLocaleString()}</td>
                                 <td className="p-1.5 border-r border-neutral-800 text-right pr-3 text-amber-400 font-bold">{(lecture.mileageRoyalty || 0).toLocaleString()} M</td>
                                 <td className="p-1.5 border-r border-neutral-800 text-right pr-3 text-white font-black">₩{lecture.budget.toLocaleString()}</td>
-                                <td className="p-1.5 border-r border-neutral-800 text-center text-amber-400 font-bold">⭐ {(lecture.lectureRating || 5.0).toFixed(1)}</td>
-                                <td className="p-1.5 text-center font-sans text-emerald-400 font-bold">✓ 정산 완료</td>
+                                <td className="p-1.5 border-r border-neutral-800 text-center text-amber-400 font-bold">
+                                  {lecture.lectureRating !== undefined ? `⭐ ${lecture.lectureRating.toFixed(1)}` : '-'}
+                                </td>
+                                <td className={`p-1.5 border-r border-neutral-800 text-center font-sans ${statusClass}`}>{statusText}</td>
+                                <td className="p-1.5 text-center text-neutral-400">{getNextMonthLastDay(lecture.date)}</td>
                               </tr>
                             );
                           })}
@@ -4226,10 +4627,10 @@ export default function App() {
                           {/* Sum total row */}
                           {(() => {
                             const completed = lectures.filter(l => l.status === 'completed');
-                            const totHours = completed.reduce((sum, l) => sum + (l.mainHours || 0), 0);
-                            const totAttendees = completed.reduce((sum, l) => sum + (l.attendees || 0), 0);
-                            const totRoyalty = completed.reduce((sum, l) => sum + (l.mileageRoyalty || 0), 0);
-                            const totBudget = completed.reduce((sum, l) => sum + l.budget, 0);
+                            const totHours = lectures.reduce((sum, l) => sum + (l.mainHours || 0), 0);
+                            const totAttendees = lectures.reduce((sum, l) => sum + (l.attendees || 0), 0);
+                            const totRoyalty = lectures.reduce((sum, l) => sum + (l.mileageRoyalty || 0), 0);
+                            const totBudget = lectures.reduce((sum, l) => sum + l.budget, 0);
                             const avgRating = completed.length > 0 
                               ? (completed.reduce((sum, l) => sum + (l.lectureRating || 5.0), 0) / completed.length)
                               : 5.0;
@@ -4245,6 +4646,7 @@ export default function App() {
                                 <td className="p-1.5 border-r border-neutral-800 text-right pr-3 text-amber-400">{totRoyalty.toLocaleString()} M</td>
                                 <td className="p-1.5 border-r border-neutral-800 text-right pr-3 text-[#217346]">₩{totBudget.toLocaleString()}</td>
                                 <td className="p-1.5 border-r border-neutral-800 text-center text-amber-500 font-mono">⭐ {avgRating.toFixed(2)}</td>
+                                <td className="p-1.5 border-r border-neutral-800 text-center text-neutral-500">-</td>
                                 <td className="p-1.5 text-center text-neutral-500">-</td>
                               </tr>
                             );
@@ -4254,7 +4656,7 @@ export default function App() {
                     </div>
                   ) : (
                     <div className="p-8 rounded-xl bg-neutral-950/40 border border-neutral-850 text-center text-neutral-500 text-xs font-semibold">
-                      현재 종료된 정산 대장 기록이 없습니다. 상단 관제실에서 배정된 강의를 "만족도 등록 및 정산·출강 완료"로 전환하시면 여기에 실시간으로 기록됩니다.
+                      등록된 출강 요청 강의 공고 내역이 없습니다.
                     </div>
                   )}
                 </div>
