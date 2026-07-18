@@ -508,7 +508,7 @@ export class StorageService {
 
   // Lectures Operations
   static async getLectures(): Promise<LectureRequest[]> {
-    const localData = this.getLocal<LectureRequest[]>('lectures', INITIAL_LECTURES);
+    const localData = this.getLocalLectures();
     return this.runWithTimeout(async () => {
       const snap = await getDocs(collection(db, 'lectures'));
       if (!snap.empty) {
@@ -789,6 +789,17 @@ export class StorageService {
     if (!useFirestore || !db) return;
 
     try {
+      // Sync cleared state first from Firestore metadata
+      try {
+        const stateSnap = await getDoc(doc(db, 'metadata', 'lectures_state'));
+        if (stateSnap.exists()) {
+          const isCleared = stateSnap.data()?.cleared === true;
+          this.setLocalItem('kpcia_lectures_cleared', isCleared ? 'true' : 'false');
+        }
+      } catch (e) {
+        console.warn("Could not sync lectures_state on startup", e);
+      }
+
       // 1. Fetch all documents from Firestore
       const usersSnap = await getDocs(collection(db, 'users'));
       const lecturesSnap = await getDocs(collection(db, 'lectures'));
