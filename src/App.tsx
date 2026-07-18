@@ -7202,10 +7202,12 @@ export default function App() {
                     onChange={(e) => setEditLecTier(e.target.value as InstructorTier)}
                     className="w-full bg-neutral-950 border border-neutral-800 rounded-lg px-2.5 py-2 text-white focus:outline-none focus:border-[#D4AF37] cursor-pointer"
                   >
-                    <option value="Prestige Member">Prestige Member (일반)</option>
-                    <option value="Prestige Master">Prestige Master (우수)</option>
-                    <option value="Prestige Royal">Prestige Royal (수석)</option>
-                    <option value="Prestige Black">Prestige Black (명예/최우수)</option>
+                    <option value="Prestige Member">Prestige Member (일반 회원)</option>
+                    <option value="Prestige Associate">Prestige Associate (어소시에이트)</option>
+                    <option value="Prestige Professional">Prestige Professional (프로페셔널)</option>
+                    <option value="Prestige Master">Prestige Master (마스터)</option>
+                    <option value="Prestige Elite">Prestige Elite (엘리트)</option>
+                    <option value="Prestige Legend">Prestige Legend (레전드)</option>
                   </select>
                 </div>
 
