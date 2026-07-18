@@ -1486,7 +1486,7 @@ export default function App() {
         cell('A18:B18', '총 정산 합계', { bold: true, fill: 'FEF3C7', align: 'center' }); // Light amber background
         cell('C18:D18', `${lecture.budget.toLocaleString()}원`, { bold: true, color: 'FFB45309', fill: 'FEF3C7', align: 'right' });
         cell('E18:F18', '총 예산 금액', { bold: true, fill: 'FEF3C7', align: 'center' });
-        cell('G18:H18', '', { size: 9, fill: 'FEF3C7', align: 'left' });
+        cell('G18:H18', `정산기준: 익월 말일 (${getNextMonthLastDay(lecture.date)} 예정)`, { size: 8.5, bold: true, color: 'FFB45309', fill: 'FEF3C7', align: 'center' });
 
         cell('A19:H19', '', { border: 'none' });
 
@@ -1523,7 +1523,7 @@ export default function App() {
         // [Section 4: 비상 대응]
         cell('A27:H27', ' ▶ 4. 출강 후 행정 증빙 및 현장 비상 대응 매뉴얼 (FAQ)', { size: 11, bold: true, color: 'FFFFFFFF', fill: 'FF1E3A8A' });
         cell('A28:B28', '[지출 증빙 제출]', { bold: true, fill: 'FFF1F5F9', align: 'center' });
-        cell('C28:H28', '출강 예산 지출 증빙 영수증은 사진 촬영 후 이메일(insight9edu@naver.com) 또는 카카오톡 발송', { align: 'left' });
+        cell('C28:H28', `출강 예산 지출 증빙 영수증은 사진 촬영 후 이메일(insight9edu@naver.com) 또는 카카오톡 발송 (정산기한: 익월 말일인 ${getNextMonthLastDay(lecture.date)} 일괄 정산)`, { align: 'left' });
         cell('A29:B29', '[현금영수증 발행]', { bold: true, fill: 'FFF1F5F9', align: 'center' });
         cell('C29:H29', '사업자 번호: 702-41-00899 인사이트9교육연구소 / 대표: 구교준', { align: 'left' });
         cell('A30:B30', '[추가 계약 문의]', { bold: true, fill: 'FFF1F5F9', align: 'center' });
