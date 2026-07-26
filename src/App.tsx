@@ -135,7 +135,9 @@ export default function App() {
   const [newLecManagerName, setNewLecManagerName] = useState<string>('');
   const [newLecManagerPhone, setNewLecManagerPhone] = useState<string>('');
   const [newLecAttendees, setNewLecAttendees] = useState<number>(25);
-  const [newLecHours, setNewLecHours] = useState<number>(3);
+  const [newLecHours, setNewLecHours] = useState<number>(2);
+  const [newLecHoursInt, setNewLecHoursInt] = useState<number>(2);
+  const [newLecMinsInt, setNewLecMinsInt] = useState<number>(0);
   const [newLecMaterialCost, setNewLecMaterialCost] = useState<number>(10000);
   const [newLecProgramId, setNewLecProgramId] = useState<string>('');
   const [newLecSurveyUrl, setNewLecSurveyUrl] = useState<string>('');
@@ -542,7 +544,7 @@ export default function App() {
     };
   }, []);
 
-  // Automatically calculate lecture hours (newLecHours) based on newLecStartTime and newLecEndTime
+  // Automatically calculate lecture hours & minutes based on newLecStartTime and newLecEndTime
   useEffect(() => {
     if (!newLecStartTime || !newLecEndTime) return;
     const [startH, startM] = newLecStartTime.split(':').map(Number);
@@ -552,11 +554,25 @@ export default function App() {
       const endMinutes = endH * 60 + endM;
       const diffMinutes = endMinutes - startMinutes;
       if (diffMinutes > 0) {
-        const calculatedHours = Math.max(1, Math.round((diffMinutes / 60) * 10) / 10);
-        setNewLecHours(calculatedHours);
+        const h = Math.floor(diffMinutes / 60);
+        const m = diffMinutes % 60;
+        setNewLecHoursInt(h);
+        setNewLecMinsInt(m);
+        const totalDecimalHours = Math.max(0.5, Math.round((diffMinutes / 60) * 10) / 10);
+        setNewLecHours(totalDecimalHours);
       }
     }
   }, [newLecStartTime, newLecEndTime]);
+
+  const handleHoursMinsChange = (h: number, m: number) => {
+    const safeH = Math.max(0, h);
+    const safeM = Math.max(0, Math.min(59, m));
+    setNewLecHoursInt(safeH);
+    setNewLecMinsInt(safeM);
+    const totalMins = safeH * 60 + safeM;
+    const totalDecimalHours = Math.max(0.5, Math.round((totalMins / 60) * 10) / 10);
+    setNewLecHours(totalDecimalHours);
+  };
 
   // Authentication: Login
   const handleLogin = async (e: React.FormEvent) => {
@@ -999,7 +1015,7 @@ export default function App() {
       programTitle: isProgramApproved ? assocProgram.title : undefined,
       date: newLecDate,
       time: `${newLecStartTime}~${newLecEndTime}`,
-      duration: `${newLecHours}시간`,
+      duration: newLecMinsInt > 0 ? `${newLecHoursInt}시간 ${newLecMinsInt}분` : `${newLecHoursInt}시간`,
       location: cleanLocation || "기업 연수원 혹은 사내 교육장",
       attendees: newLecAttendees,
       managerName: cleanMName || "인재개발원 담당자",
@@ -4269,6 +4285,10 @@ export default function App() {
                                 className="flex-1 bg-[#09090b] border border-neutral-800 rounded-lg px-2 py-2 text-white focus:outline-none focus:border-[#D4AF37] text-xs font-bold text-center"
                               />
                             </div>
+                            <div className="flex items-center justify-between text-[10px] text-emerald-400 font-extrabold bg-emerald-500/10 border border-emerald-500/20 px-2 py-1 rounded-md mt-1">
+                              <span>⚡ 자동 산출 강의 시간:</span>
+                              <span>{newLecHoursInt}시간 {newLecMinsInt > 0 ? `${newLecMinsInt}분` : ''} ({newLecHours}시간)</span>
+                            </div>
                           </div>
                         </div>
 
@@ -4293,14 +4313,31 @@ export default function App() {
 
                       <div className="grid grid-cols-3 gap-2">
                         <div className="space-y-1">
-                          <label className="text-neutral-400 font-semibold block">강의 시간</label>
-                          <input
-                            type="number"
-                            min={1}
-                            value={newLecHours}
-                            onChange={(e) => setNewLecHours(Math.max(1, Number(e.target.value)))}
-                            className="w-full bg-neutral-950 border border-neutral-800 rounded-lg px-2.5 py-2 text-white focus:outline-none focus:border-[#D4AF37] text-xs font-bold text-center"
-                          />
+                          <label className="text-neutral-400 font-semibold block text-[10px]">강의 시간 (자동 입력)</label>
+                          <div className="grid grid-cols-2 gap-1">
+                            <div className="flex items-center bg-neutral-950 border border-neutral-800 rounded-lg px-1.5 py-1.5 focus-within:border-[#D4AF37]">
+                              <input
+                                type="number"
+                                min={0}
+                                value={newLecHoursInt}
+                                onChange={(e) => handleHoursMinsChange(Number(e.target.value), newLecMinsInt)}
+                                className="w-full bg-transparent text-white text-xs font-bold text-center focus:outline-none"
+                              />
+                              <span className="text-[9px] text-neutral-400 font-bold shrink-0 pr-0.5">시</span>
+                            </div>
+                            <div className="flex items-center bg-neutral-950 border border-neutral-800 rounded-lg px-1.5 py-1.5 focus-within:border-[#D4AF37]">
+                              <input
+                                type="number"
+                                min={0}
+                                max={59}
+                                step={5}
+                                value={newLecMinsInt}
+                                onChange={(e) => handleHoursMinsChange(newLecHoursInt, Number(e.target.value))}
+                                className="w-full bg-transparent text-white text-xs font-bold text-center focus:outline-none"
+                              />
+                              <span className="text-[9px] text-neutral-400 font-bold shrink-0 pr-0.5">분</span>
+                            </div>
+                          </div>
                         </div>
 
                         <div className="space-y-1">
