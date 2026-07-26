@@ -2938,22 +2938,8 @@ export default function App() {
                     <span className="text-[10px] text-orange-500/80 font-normal">| 몰입과 창조</span>
                   </h4>
                   <p className="text-[11px] text-neutral-400 mt-1 leading-relaxed">
-                    캘리, 드로잉, 팝아트 등 감성 친화적 예술 도구와 소재를 활용해 손끝으로 아름다운 작품을 완성해 나가는 과정에서 깊은 성취감과 창의적 영감을 얻습니다.
+                    웜아트, 자개, 캘리, 드로잉, 팝아트 등 감성 친화적 예술 도구와 소재를 활용해 손끝으로 아름다운 작품을 완성해 나가는 과정에서 깊은 성취감과 창의적 영감을 얻습니다.
                   </p>
-                  <button 
-                    onClick={() => {
-                      if (currentUser && currentUser.isApproved) {
-                        setActiveTab('programs');
-                      } else {
-                        setActiveTab('lectures');
-                        triggerToast("ℹ️ 출강 정보센터에서 관련 매칭 공고를 즉시 확인하실 수 있습니다. (정회원 승인 후 고품격 교육과정 전체 열람 가능)", "info");
-                      }
-                    }}
-                    className="mt-2.5 text-[#D4AF37] hover:text-amber-300 font-black text-[10px] inline-flex items-center gap-1 transition-all cursor-pointer group/btn"
-                  >
-                    <span>🎨 공예/캘리/팝아트 교육과정 더보기</span>
-                    <ArrowRight className="w-3 h-3 transition-transform group-hover/btn:translate-x-1" />
-                  </button>
                 </div>
               </div>
             </div>
@@ -3001,7 +2987,7 @@ export default function App() {
                   <span className="text-2xl">🎨</span>
                   <h4 className="text-xs font-bold text-neutral-100">깊은 몰입과 성취의 공예 창조</h4>
                   <p className="text-[11px] text-neutral-400 leading-relaxed">
-                    캘리그라피, 드로잉, 팝아트 등 감성 친화적 도구와 소재를 활용해 무언가를 완성해 나가는 과정에서 깊은 성취감과 창의적 영감을 얻습니다.
+                    웜아트, 자개, 캘리그라피, 드로잉, 팝아트 등 감성 친화적 도구와 소재를 활용해 무언가를 완성해 나가는 과정에서 깊은 성취감과 창의적 영감을 얻습니다.
                   </p>
                 </div>
                 <button onClick={() => setActiveTab('programs')} className="text-[10px] text-[#D4AF37] font-bold mt-4 flex items-center gap-1 hover:underline cursor-pointer">
