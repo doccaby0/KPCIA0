@@ -244,6 +244,7 @@ export default function App() {
   const [filterRegion, setFilterRegion] = useState<string>('all');
   const [searchLecture, setSearchLecture] = useState<string>('');
   const [filterLecTier, setFilterLecTier] = useState<string>('all');
+  const [filterLecStatus, setFilterLecStatus] = useState<'all' | 'open' | 'assigned' | 'completed'>('all');
 
   // Admin Portal Sub-tab Advanced Filters and Pagination States
   const [adminInstSearch, setAdminInstSearch] = useState<string>('');
@@ -270,28 +271,35 @@ export default function App() {
         const queryText = searchLecture.toLowerCase();
         const titleMatch = l.title.toLowerCase().includes(queryText) || (l.companyName && l.companyName.toLowerCase().includes(queryText));
         const tierMatch = filterLecTier === 'all' || l.targetTier === filterLecTier;
-        return titleMatch && tierMatch;
+        const statusMatch = filterLecStatus === 'all' || l.status === filterLecStatus;
+        return titleMatch && tierMatch && statusMatch;
       })
       .sort((a, b) => {
-        // Status priority: 'open' (Priority 1) -> 'assigned' (Priority 2) -> 'completed' (Priority 3)
-        const getStatusPriority = (status: string) => {
-          if (status === 'open') return 1;
-          if (status === 'assigned') return 2;
-          return 3;
+        // Always sort by recent lecture date (most recent date first)
+        const getLectureDateMs = (l: LectureRequest) => {
+          if (l.date) {
+            const t = new Date(l.date).getTime();
+            if (!isNaN(t) && t > 0) return t;
+          }
+          if (l.createdAt) {
+            const t = new Date(l.createdAt).getTime();
+            if (!isNaN(t) && t > 0) return t;
+          }
+          return 0;
         };
-        const prioA = getStatusPriority(a.status);
-        const prioB = getStatusPriority(b.status);
-        if (prioA !== prioB) {
-          return prioA - prioB;
-        }
-        const dateA = a.createdAt ? new Date(a.createdAt).getTime() : 0;
-        const dateB = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+        const dateA = getLectureDateMs(a);
+        const dateB = getLectureDateMs(b);
         if (dateB !== dateA) {
-          return dateB - dateA; // Newest registered first
+          return dateB - dateA; // Newest date first
+        }
+        const createdA = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+        const createdB = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+        if (createdB !== createdA) {
+          return createdB - createdA;
         }
         return (b.id || '').localeCompare(a.id || '');
       });
-  }, [lectures, searchLecture, filterLecTier]);
+  }, [lectures, searchLecture, filterLecTier, filterLecStatus]);
 
   // Memoized: Lectures count statistics
   const lecturesStats = React.useMemo(() => {
@@ -572,6 +580,75 @@ export default function App() {
     const totalMins = safeH * 60 + safeM;
     const totalDecimalHours = Math.max(0.5, Math.round((totalMins / 60) * 10) / 10);
     setNewLecHours(totalDecimalHours);
+  };
+
+  const applyDurationPreset = (h: number, m: number) => {
+    const start = newLecStartTime || '10:00';
+    const parts = start.split(':').map(Number);
+    const startH = isNaN(parts[0]) ? 10 : parts[0];
+    const startM = isNaN(parts[1]) ? 0 : parts[1];
+    const startMinsTotal = startH * 60 + startM;
+    const endMinsTotal = startMinsTotal + h * 60 + m;
+    const endH = Math.floor(endMinsTotal / 60) % 24;
+    const endM = endMinsTotal % 60;
+    const formattedStart = `${String(startH).padStart(2, '0')}:${String(startM).padStart(2, '0')}`;
+    const formattedEnd = `${String(endH).padStart(2, '0')}:${String(endM).padStart(2, '0')}`;
+
+    setNewLecStartTime(formattedStart);
+    setNewLecEndTime(formattedEnd);
+    setNewLecHoursInt(h);
+    setNewLecMinsInt(m);
+    const totalMins = h * 60 + m;
+    const totalDecimalHours = Math.max(0.5, Math.round((totalMins / 60) * 10) / 10);
+    setNewLecHours(totalDecimalHours);
+  };
+
+  const formatKoreanDateWithDay = (dateStr: string) => {
+    if (!dateStr) return '';
+    try {
+      const parts = dateStr.split('-');
+      if (parts.length !== 3) return dateStr;
+      const y = Number(parts[0]);
+      const m = Number(parts[1]);
+      const d = Number(parts[2]);
+      const dateObj = new Date(y, m - 1, d);
+      const days = ['일', '월', '화', '수', '목', '금', '토'];
+      const dayName = days[dateObj.getDay()];
+      return `${y}년 ${String(m).padStart(2, '0')}월 ${String(d).padStart(2, '0')}일 (${dayName})`;
+    } catch {
+      return dateStr;
+    }
+  };
+
+  const setQuickDatePreset = (type: 'today' | 'tomorrow' | 'friday' | 'nextMon' | 'in2weeks' | 'in1month', isEdit = false) => {
+    const now = new Date();
+    let target = new Date();
+    if (type === 'today') {
+      target = now;
+    } else if (type === 'tomorrow') {
+      target.setDate(now.getDate() + 1);
+    } else if (type === 'friday') {
+      const day = now.getDay();
+      const diff = (5 - day + 7) % 7 || 7;
+      target.setDate(now.getDate() + diff);
+    } else if (type === 'nextMon') {
+      const day = now.getDay();
+      const diff = (1 - day + 7) % 7 || 7;
+      target.setDate(now.getDate() + diff);
+    } else if (type === 'in2weeks') {
+      target.setDate(now.getDate() + 14);
+    } else if (type === 'in1month') {
+      target.setMonth(now.getMonth() + 1);
+    }
+    const y = target.getFullYear();
+    const m = String(target.getMonth() + 1).padStart(2, '0');
+    const d = String(target.getDate()).padStart(2, '0');
+    const formatted = `${y}-${m}-${d}`;
+    if (isEdit) {
+      setEditLecDate(formatted);
+    } else {
+      setNewLecDate(formatted);
+    }
   };
 
   // Authentication: Login
@@ -3136,28 +3213,128 @@ export default function App() {
 
             {/* Dynamic Lecture Counts Stat Bar */}
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-3" id="lecture-notices-stats">
-              <div className="p-3 bg-neutral-900/40 rounded-xl border border-neutral-850 text-center">
-                <span className="text-[10px] text-neutral-500 font-bold block">전체 출강 요청</span>
+              <button
+                type="button"
+                onClick={() => { setFilterLecStatus('all'); setLecturePage(1); }}
+                className={`p-3 rounded-xl border text-center transition-all cursor-pointer ${
+                  filterLecStatus === 'all'
+                    ? 'bg-neutral-800 border-neutral-600 shadow-md ring-1 ring-white/20'
+                    : 'bg-neutral-900/40 border-neutral-850 hover:bg-neutral-850/60'
+                }`}
+              >
+                <span className="text-[10px] text-neutral-400 font-bold block">전체 출강 요청</span>
                 <strong className="text-sm text-white font-black mt-0.5 block">{lecturesStats.total} 건</strong>
-              </div>
-              <div className="p-3 bg-amber-500/[0.02] rounded-xl border border-amber-500/10 text-center">
-                <span className="text-[10px] text-[#D4AF37] font-bold block">🔥 강사 모집 중</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => { setFilterLecStatus('open'); setLecturePage(1); }}
+                className={`p-3 rounded-xl border text-center transition-all cursor-pointer ${
+                  filterLecStatus === 'open'
+                    ? 'bg-amber-500/20 border-amber-500 text-amber-300 ring-2 ring-amber-500/30 shadow-lg shadow-amber-500/10'
+                    : 'bg-amber-500/[0.02] border-amber-500/10 hover:bg-amber-500/10'
+                }`}
+              >
+                <span className="text-[10px] text-[#D4AF37] font-bold block">🔥 모집중 (미확정)</span>
                 <strong className="text-sm text-[#D4AF37] font-black mt-0.5 block">
                   {lecturesStats.open} 건
                 </strong>
-              </div>
-              <div className="p-3 bg-blue-500/[0.02] rounded-xl border border-blue-500/10 text-center">
+              </button>
+
+              <button
+                type="button"
+                onClick={() => { setFilterLecStatus('assigned'); setLecturePage(1); }}
+                className={`p-3 rounded-xl border text-center transition-all cursor-pointer ${
+                  filterLecStatus === 'assigned'
+                    ? 'bg-blue-500/20 border-blue-500 text-blue-300 ring-2 ring-blue-500/30'
+                    : 'bg-blue-500/[0.02] border-blue-500/10 hover:bg-blue-500/10'
+                }`}
+              >
                 <span className="text-[10px] text-blue-400 font-bold block">🤝 매칭 배정 완료</span>
                 <strong className="text-sm text-blue-400 font-black mt-0.5 block">
                   {lecturesStats.assigned} 건
                 </strong>
-              </div>
-              <div className="p-3 bg-emerald-500/[0.02] rounded-xl border border-emerald-500/10 text-center">
+              </button>
+
+              <button
+                type="button"
+                onClick={() => { setFilterLecStatus('completed'); setLecturePage(1); }}
+                className={`p-3 rounded-xl border text-center transition-all cursor-pointer ${
+                  filterLecStatus === 'completed'
+                    ? 'bg-emerald-500/20 border-emerald-500 text-emerald-300 ring-2 ring-emerald-500/30'
+                    : 'bg-emerald-500/[0.02] border-emerald-500/10 hover:bg-emerald-500/10'
+                }`}
+              >
                 <span className="text-[10px] text-emerald-400 font-bold block">✓ 출강 정산 완료</span>
                 <strong className="text-sm text-emerald-400 font-black mt-0.5 block">
                   {lecturesStats.completed} 건
                 </strong>
-              </div>
+              </button>
+            </div>
+
+            {/* Status Filter Tabs (For easy instructor access) */}
+            <div className="flex flex-wrap items-center gap-2 p-1.5 bg-neutral-900/80 border border-neutral-800 rounded-2xl">
+              <button
+                type="button"
+                onClick={() => { setFilterLecStatus('all'); setLecturePage(1); }}
+                className={`px-3.5 py-2 rounded-xl text-xs font-black transition-all cursor-pointer flex items-center gap-1.5 ${
+                  filterLecStatus === 'all'
+                    ? 'bg-neutral-800 text-white shadow-md border border-neutral-700'
+                    : 'text-neutral-400 hover:text-white hover:bg-neutral-850'
+                }`}
+              >
+                <span>📋 전체 출강 보기</span>
+                <span className="px-1.5 py-0.2 rounded-full text-[10px] bg-neutral-800 text-neutral-300 font-bold">
+                  {lecturesStats.total}
+                </span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => { setFilterLecStatus('open'); setLecturePage(1); }}
+                className={`px-4 py-2 rounded-xl text-xs font-black transition-all cursor-pointer flex items-center gap-2 relative ${
+                  filterLecStatus === 'open'
+                    ? 'bg-amber-500/25 text-amber-300 border border-amber-500/60 shadow-lg shadow-amber-500/10 ring-1 ring-amber-500/40'
+                    : 'text-amber-400 hover:text-amber-300 bg-amber-500/5 hover:bg-amber-500/15 border border-amber-500/20'
+                }`}
+              >
+                <span className="flex items-center gap-1.5">
+                  <span className="animate-pulse">🔥</span> 아직 확정 안 된 출강 요청 (신규)
+                </span>
+                <span className="px-2 py-0.5 rounded-full text-[10px] bg-amber-500 text-black font-black">
+                  {lecturesStats.open}
+                </span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => { setFilterLecStatus('assigned'); setLecturePage(1); }}
+                className={`px-3.5 py-2 rounded-xl text-xs font-black transition-all cursor-pointer flex items-center gap-1.5 ${
+                  filterLecStatus === 'assigned'
+                    ? 'bg-blue-500/20 text-blue-300 border border-blue-500/40 shadow-md'
+                    : 'text-neutral-400 hover:text-blue-300 hover:bg-blue-500/10'
+                }`}
+              >
+                <span>🤝 매칭 완료</span>
+                <span className="px-1.5 py-0.2 rounded-full text-[10px] bg-blue-500/20 text-blue-300 font-bold">
+                  {lecturesStats.assigned}
+                </span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => { setFilterLecStatus('completed'); setLecturePage(1); }}
+                className={`px-3.5 py-2 rounded-xl text-xs font-black transition-all cursor-pointer flex items-center gap-1.5 ${
+                  filterLecStatus === 'completed'
+                    ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 shadow-md'
+                    : 'text-neutral-400 hover:text-emerald-300 hover:bg-emerald-500/10'
+                }`}
+              >
+                <span>✓ 정산 완료</span>
+                <span className="px-1.5 py-0.2 rounded-full text-[10px] bg-emerald-500/20 text-emerald-300 font-bold">
+                  {lecturesStats.completed}
+                </span>
+              </button>
             </div>
 
             {/* Filter Panel */}
@@ -4249,65 +4426,144 @@ export default function App() {
                         </div>
                       </div>
 
-                      <div className="space-y-3 p-3.5 bg-neutral-950/60 rounded-xl border border-neutral-850">
-                        <div className="space-y-3.5">
-                          <div className="space-y-1.5">
-                            <label className="text-neutral-400 font-bold flex items-center gap-1.5 text-xs">
-                              <Calendar className="w-3.5 h-3.5 text-amber-400 shrink-0" />
-                              <span>출강 일자 *</span>
+                      {/* 📅 & ⏰ Smart Date & Time Selector Container */}
+                      <div className="space-y-4 p-4 bg-neutral-950/80 rounded-2xl border border-neutral-800 shadow-xl">
+                        {/* Header */}
+                        <div className="flex items-center justify-between border-b border-neutral-850 pb-2.5">
+                          <div className="flex items-center gap-2">
+                            <div className="p-1.5 rounded-lg bg-amber-500/10 border border-amber-500/20 text-amber-400">
+                              <Calendar className="w-4 h-4" />
+                            </div>
+                            <div>
+                              <span className="text-xs font-black text-white block">출강 일자 & 시간 스마트 설정</span>
+                              <span className="text-[9px] text-neutral-400 font-semibold block">달력과 시계를 활용해 편하게 일정을 지정하세요</span>
+                            </div>
+                          </div>
+                          <span className="text-[9px] text-amber-300 font-bold bg-amber-500/10 px-2 py-0.5 rounded-full border border-amber-500/20">원클릭 자동 산출</span>
+                        </div>
+
+                        {/* 1. Date Picker */}
+                        <div className="space-y-2">
+                          <div className="flex items-center justify-between">
+                            <label className="text-neutral-300 font-bold flex items-center gap-1.5 text-xs">
+                              <span>📅 출강 일자 지정 *</span>
                             </label>
+                            {newLecDate && (
+                              <span className="text-[10px] text-amber-300 font-black bg-amber-500/10 border border-amber-500/20 px-2.5 py-0.5 rounded-md shadow-sm">
+                                {formatKoreanDateWithDay(newLecDate)}
+                              </span>
+                            )}
+                          </div>
+
+                          <div className="relative">
                             <input
                               type="date"
                               value={newLecDate}
                               onChange={(e) => setNewLecDate(e.target.value)}
                               required
-                              className="w-full bg-neutral-950 border border-neutral-800 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-[#D4AF37] text-xs font-bold"
+                              style={{ colorScheme: 'dark' }}
+                              className="w-full bg-neutral-900 border border-neutral-750 hover:border-[#D4AF37] rounded-xl px-3.5 py-2 text-white focus:outline-none focus:border-[#D4AF37] text-xs font-black cursor-pointer transition-colors shadow-sm"
                             />
                           </div>
+                        </div>
 
-                          <div className="space-y-1.5">
-                            <label className="text-neutral-400 font-bold flex items-center gap-1.5 text-xs">
+                        {/* 2. Time & Duration Clock Box */}
+                        <div className="space-y-2 pt-2.5 border-t border-neutral-850">
+                          <div className="flex items-center justify-between">
+                            <label className="text-neutral-300 font-bold flex items-center gap-1.5 text-xs">
                               <Clock className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
                               <span>강의 시간 (시작 ~ 종료) *</span>
                             </label>
-                            <div className="flex items-center gap-2">
+                            <span className="text-[10px] text-emerald-400 font-black bg-emerald-500/10 border border-emerald-500/20 px-2.5 py-0.5 rounded-md shadow-sm">
+                              ⏱️ 총 {newLecHoursInt}시간 {newLecMinsInt > 0 ? `${newLecMinsInt}분` : ''} ({newLecHours}시간)
+                            </span>
+                          </div>
+
+                          <div className="flex items-center gap-2">
+                            <div className="flex-1 space-y-1">
+                              <span className="text-[9px] text-neutral-400 font-bold block text-center">시작 시간</span>
                               <input
                                 type="time"
                                 value={newLecStartTime}
                                 onChange={(e) => setNewLecStartTime(e.target.value)}
-                                className="flex-1 bg-neutral-950 border border-neutral-800 rounded-lg px-2 py-2 text-white focus:outline-none focus:border-[#D4AF37] text-xs font-bold text-center"
+                                style={{ colorScheme: 'dark' }}
+                                className="w-full bg-neutral-900 border border-neutral-750 hover:border-emerald-500/50 rounded-xl px-2 py-2 text-white focus:outline-none focus:border-emerald-400 text-xs font-black text-center cursor-pointer transition-colors"
                               />
-                              <span className="text-neutral-600 font-black shrink-0">~</span>
+                            </div>
+                            <span className="text-neutral-500 font-black shrink-0 mt-4">~</span>
+                            <div className="flex-1 space-y-1">
+                              <span className="text-[9px] text-neutral-400 font-bold block text-center">종료 시간</span>
                               <input
                                 type="time"
                                 value={newLecEndTime}
                                 onChange={(e) => setNewLecEndTime(e.target.value)}
-                                className="flex-1 bg-[#09090b] border border-neutral-800 rounded-lg px-2 py-2 text-white focus:outline-none focus:border-[#D4AF37] text-xs font-bold text-center"
+                                style={{ colorScheme: 'dark' }}
+                                className="w-full bg-neutral-900 border border-neutral-750 hover:border-emerald-500/50 rounded-xl px-2 py-2 text-white focus:outline-none focus:border-emerald-400 text-xs font-black text-center cursor-pointer transition-colors"
                               />
                             </div>
-                            <div className="flex items-center justify-between text-[10px] text-emerald-400 font-extrabold bg-emerald-500/10 border border-emerald-500/20 px-2 py-1 rounded-md mt-1">
-                              <span>⚡ 자동 산출 강의 시간:</span>
-                              <span>{newLecHoursInt}시간 {newLecMinsInt > 0 ? `${newLecMinsInt}분` : ''} ({newLecHours}시간)</span>
+                          </div>
+
+                          {/* Quick Duration Presets (1시간, 1시간 30분, 2시간) */}
+                          <div className="space-y-1.5 pt-1.5">
+                            <span className="text-[9.5px] text-neutral-400 font-bold block">⏱️ 강의 시간 옵션 원클릭 선택</span>
+                            <div className="grid grid-cols-3 gap-2">
+                              <button
+                                type="button"
+                                onClick={() => applyDurationPreset(1, 0)}
+                                className={`p-2 rounded-xl border text-center transition-all cursor-pointer ${
+                                  newLecHoursInt === 1 && newLecMinsInt === 0
+                                    ? 'bg-emerald-500/20 border-emerald-500 text-emerald-300 font-black shadow-md ring-1 ring-emerald-500/30'
+                                    : 'bg-neutral-900 border-neutral-800 text-neutral-300 hover:border-emerald-500/40 hover:text-emerald-300 font-semibold'
+                                }`}
+                              >
+                                <div className="text-[11px] font-bold">1시간</div>
+                                <div className="text-[8.5px] text-neutral-400 font-normal">단기 특강</div>
+                              </button>
+
+                              <button
+                                type="button"
+                                onClick={() => applyDurationPreset(1, 30)}
+                                className={`p-2 rounded-xl border text-center transition-all cursor-pointer ${
+                                  newLecHoursInt === 1 && newLecMinsInt === 30
+                                    ? 'bg-emerald-500/20 border-emerald-500 text-emerald-300 font-black shadow-md ring-1 ring-emerald-500/30'
+                                    : 'bg-neutral-900 border-neutral-800 text-neutral-300 hover:border-emerald-500/40 hover:text-emerald-300 font-semibold'
+                                }`}
+                              >
+                                <div className="text-[11px] font-bold">1시간 30분</div>
+                                <div className="text-[8.5px] text-neutral-400 font-normal">표준 세션</div>
+                              </button>
+
+                              <button
+                                type="button"
+                                onClick={() => applyDurationPreset(2, 0)}
+                                className={`p-2 rounded-xl border text-center transition-all cursor-pointer ${
+                                  newLecHoursInt === 2 && newLecMinsInt === 0
+                                    ? 'bg-emerald-500/20 border-emerald-500 text-emerald-300 font-black shadow-md ring-1 ring-emerald-500/30'
+                                    : 'bg-neutral-900 border-neutral-800 text-neutral-300 hover:border-emerald-500/40 hover:text-emerald-300 font-semibold'
+                                }`}
+                              >
+                                <div className="text-[11px] font-bold">2시간</div>
+                                <div className="text-[8.5px] text-neutral-400 font-normal">심화 워크숍</div>
+                              </button>
                             </div>
                           </div>
                         </div>
 
-                        <div className="space-y-3.5 pt-1.5">
-                          <div className="space-y-1.5">
-                            <label className="text-neutral-400 font-semibold block text-xs">요구 강사 등급컷 *</label>
-                            <select
-                              value={newLecTier}
-                              onChange={(e) => setNewLecTier(e.target.value as any)}
-                              className="w-full bg-[#09090b] border border-neutral-800 rounded-lg px-2.5 py-2 text-white focus:outline-none focus:border-[#D4AF37] text-xs cursor-pointer font-medium"
-                            >
-                              <option value="Prestige Member">Prestige Member 이상</option>
-                              <option value="Prestige Associate">Prestige Associate 이상</option>
-                              <option value="Prestige Professional">Prestige Professional 이상</option>
-                              <option value="Prestige Master">Prestige Master 이상</option>
-                              <option value="Prestige Elite">Prestige Elite 전용</option>
-                              <option value="Prestige Legend">Prestige Legend 전용</option>
-                            </select>
-                          </div>
+                        {/* Tier Cut Requirement */}
+                        <div className="pt-2 border-t border-neutral-850 space-y-1.5">
+                          <label className="text-neutral-400 font-semibold block text-xs">요구 강사 등급컷 *</label>
+                          <select
+                            value={newLecTier}
+                            onChange={(e) => setNewLecTier(e.target.value as any)}
+                            className="w-full bg-[#09090b] border border-neutral-800 rounded-xl px-3 py-2 text-white focus:outline-none focus:border-[#D4AF37] text-xs cursor-pointer font-medium"
+                          >
+                            <option value="Prestige Member">Prestige Member 이상</option>
+                            <option value="Prestige Associate">Prestige Associate 이상</option>
+                            <option value="Prestige Professional">Prestige Professional 이상</option>
+                            <option value="Prestige Master">Prestige Master 이상</option>
+                            <option value="Prestige Elite">Prestige Elite 전용</option>
+                            <option value="Prestige Legend">Prestige Legend 전용</option>
+                          </select>
                         </div>
                       </div>
 
@@ -7571,13 +7827,24 @@ export default function App() {
                   </select>
                 </div>
 
-                <div className="space-y-1 text-left">
-                  <label className="text-neutral-400 font-semibold block">출강 일자 *</label>
+                <div className="space-y-1.5 text-left md:col-span-2 p-3 bg-neutral-950/70 border border-neutral-800 rounded-xl">
+                  <div className="flex items-center justify-between">
+                    <label className="text-neutral-300 font-bold text-xs flex items-center gap-1.5">
+                      <Calendar className="w-3.5 h-3.5 text-amber-400" />
+                      <span>출강 일자 *</span>
+                    </label>
+                    {editLecDate && (
+                      <span className="text-[10px] text-amber-300 font-bold bg-amber-500/10 border border-amber-500/20 px-2 py-0.5 rounded-md">
+                        {formatKoreanDateWithDay(editLecDate)}
+                      </span>
+                    )}
+                  </div>
                   <input
                     type="date"
                     value={editLecDate}
                     onChange={(e) => setEditLecDate(e.target.value)}
-                    className="w-full bg-neutral-950 border border-neutral-800 rounded-lg px-2.5 py-2 text-white focus:outline-none focus:border-[#D4AF37]"
+                    style={{ colorScheme: 'dark' }}
+                    className="w-full bg-neutral-900 border border-neutral-750 hover:border-[#D4AF37] rounded-lg px-2.5 py-2 text-white focus:outline-none focus:border-[#D4AF37] text-xs font-bold cursor-pointer"
                   />
                 </div>
 
