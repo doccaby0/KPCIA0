@@ -231,6 +231,7 @@ export default function App() {
   const [editLecDuration, setEditLecDuration] = useState<string>('');
   const [editLecLocation, setEditLecLocation] = useState<string>('');
   const [editLecAttendees, setEditLecAttendees] = useState<number>(0);
+  const [editLecMaterialCost, setEditLecMaterialCost] = useState<number>(0);
   const [editLecBudget, setEditLecBudget] = useState<number>(0);
   const [editLecMileage, setEditLecMileage] = useState<number>(0);
   const [editLecSurveyUrl, setEditLecSurveyUrl] = useState<string>('');
@@ -1487,6 +1488,7 @@ export default function App() {
     setEditLecDuration(lecture.duration);
     setEditLecLocation(lecture.location);
     setEditLecAttendees(lecture.attendees || 0);
+    setEditLecMaterialCost(lecture.materialCost || 0);
     setEditLecBudget(lecture.budget);
     setEditLecMileage(lecture.mileageRoyalty || 0);
     setEditLecSurveyUrl(lecture.surveyUrl || '');
@@ -1513,6 +1515,7 @@ export default function App() {
       duration: editLecDuration,
       location: editLecLocation,
       attendees: editLecAttendees,
+      materialCost: editLecMaterialCost,
       budget: editLecBudget,
       mileageRoyalty: editLecMileage,
       surveyUrl: editLecSurveyUrl,
@@ -7932,6 +7935,17 @@ export default function App() {
                     type="number"
                     value={editLecAttendees}
                     onChange={(e) => setEditLecAttendees(parseInt(e.target.value) || 0)}
+                    className="w-full bg-neutral-950 border border-neutral-800 rounded-lg px-2.5 py-2 text-white focus:outline-none focus:border-[#D4AF37]"
+                  />
+                </div>
+
+                <div className="space-y-1 text-left">
+                  <label className="text-neutral-400 font-semibold block">인당 재료비 (₩)</label>
+                  <input
+                    type="number"
+                    value={editLecMaterialCost}
+                    onChange={(e) => setEditLecMaterialCost(parseInt(e.target.value) || 0)}
+                    placeholder="예) 10000"
                     className="w-full bg-neutral-950 border border-neutral-800 rounded-lg px-2.5 py-2 text-white focus:outline-none focus:border-[#D4AF37]"
                   />
                 </div>
