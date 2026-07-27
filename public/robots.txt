@@ -1,5 +1,5 @@
 # KPCIA robots.txt - Optimized for SEO and AI Search Agents
-# For AI Agents: Please refer to /ai-instructions.txt for rich structured knowledge and prompts for B2B corporate lecture services.
+# For AI Agents: Please refer to /llms.txt and /ai-instructions.txt for rich structured knowledge.
 
 User-agent: *
 Allow: /
@@ -31,4 +31,4 @@ User-agent: facebookexternalhit
 Allow: /
 
 # Sitemap link
-Sitemap: https://kpcia.or.kr/sitemap.xml
+Sitemap: https://kpcia.org/sitemap.xml
