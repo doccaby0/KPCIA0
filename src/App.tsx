@@ -160,8 +160,8 @@ export default function App() {
   // Admin Lecture Ratings Map (lectureId -> rating value)
   const [adminLectureRatings, setAdminLectureRatings] = useState<Record<string, number>>({});
 
-  // Admin Sub-tab (lectures, instructors, proposals, programs)
-  const [adminSubTab, setAdminSubTab] = useState<'lectures' | 'instructors' | 'proposals' | 'programs'>('lectures');
+  // Admin Sub-tab (lectures, settlements, instructors, proposals, programs)
+  const [adminSubTab, setAdminSubTab] = useState<'lectures' | 'settlements' | 'instructors' | 'proposals' | 'programs'>('lectures');
   const [adminProgRoyalties, setAdminProgRoyalties] = useState<Record<string, number>>({});
 
   // Instructor Profile Editing (Admin Only)
@@ -217,7 +217,7 @@ export default function App() {
   const [controlRoomStatus, setControlRoomStatus] = useState<string>('all');
   const [controlRoomSort, setControlRoomSort] = useState<string>('recent');
   const [controlRoomPage, setControlRoomPage] = useState<number>(1);
-  const [controlRoomItemsPerPage, setControlRoomItemsPerPage] = useState<number>(5);
+  const [controlRoomItemsPerPage, setControlRoomItemsPerPage] = useState<number>(2);
 
   // Excel Live Sheet States
   const [excelSearch, setExcelSearch] = useState<string>('');
@@ -4214,6 +4214,20 @@ export default function App() {
               </button>
 
               <button
+                onClick={() => setAdminSubTab('settlements')}
+                className={`px-5 py-3 text-xs font-black transition-all border-b-2 shrink-0 flex items-center gap-1.5 cursor-pointer ${
+                  adminSubTab === 'settlements'
+                    ? 'border-[#D4AF37] text-[#D4AF37] bg-amber-500/5'
+                    : 'border-transparent text-neutral-400 hover:text-neutral-200 hover:bg-neutral-950/40'
+                }`}
+              >
+                <span>📊 KPCIA 출강 완료 및 실시간 정산 마스터 대장</span>
+                <span className="px-1.5 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 text-[9px] font-bold">
+                  {lectures.filter(l => l.status === 'completed').length}건
+                </span>
+              </button>
+
+              <button
                 onClick={() => setAdminSubTab('instructors')}
                 className={`px-5 py-3 text-xs font-black transition-all border-b-2 shrink-0 flex items-center gap-1.5 cursor-pointer ${
                   adminSubTab === 'instructors'
@@ -4276,11 +4290,11 @@ export default function App() {
 
             {/* Admin Grid: Left Form, Right List */}
             {adminSubTab === 'lectures' && (
-              <div className="grid lg:grid-cols-3 gap-8 animate-in fade-in duration-200">
+              <div className="grid lg:grid-cols-3 gap-4 animate-in fade-in duration-200">
                 
                 {/* Left Column: Post a Lecture Request Form */}
-                <div className="lg:col-span-1 p-6 rounded-2xl bg-neutral-900 border border-neutral-800 space-y-4" id="admin-create-lecture-form">
-                  <div className="flex items-center justify-between gap-2 border-b border-neutral-800 pb-2.5">
+                <div className="lg:col-span-1 p-3.5 rounded-xl bg-neutral-900 border border-neutral-800 space-y-2" id="admin-create-lecture-form">
+                  <div className="flex items-center justify-between gap-2 border-b border-neutral-800 pb-2">
                     <div className="flex items-center gap-1.5 text-white font-bold">
                       <Plus className="w-4 h-4 text-[#D4AF37]" />
                       <span className="text-xs font-black">강의 출강 요청서</span>
@@ -4289,7 +4303,7 @@ export default function App() {
                       <button
                         type="button"
                         onClick={() => setLectureRegMode('single')}
-                        className={`px-2 py-1 rounded text-[9px] font-extrabold transition-all cursor-pointer ${
+                        className={`px-2 py-0.5 rounded text-[9px] font-extrabold transition-all cursor-pointer ${
                           lectureRegMode === 'single'
                             ? 'bg-amber-500/10 text-[#D4AF37] border border-amber-500/20'
                             : 'text-neutral-500 hover:text-neutral-300'
@@ -4300,7 +4314,7 @@ export default function App() {
                       <button
                         type="button"
                         onClick={() => setLectureRegMode('bulk')}
-                        className={`px-2 py-1 rounded text-[9px] font-extrabold transition-all cursor-pointer ${
+                        className={`px-2 py-0.5 rounded text-[9px] font-extrabold transition-all cursor-pointer ${
                           lectureRegMode === 'bulk'
                             ? 'bg-[#217346]/10 text-[#217346] border border-[#217346]/20'
                             : 'text-neutral-500 hover:text-neutral-300'
@@ -4312,113 +4326,112 @@ export default function App() {
                   </div>
 
                   {lectureRegMode === 'single' ? (
-                    <form onSubmit={handleCreateLecture} className="space-y-4 text-xs animate-in fade-in duration-200">
-                      <div className="space-y-1">
-                        <label className="text-neutral-400 font-semibold block">출강 교육 명칭 (Title) *</label>
+                    <form onSubmit={handleCreateLecture} className="space-y-2 text-xs animate-in fade-in duration-200">
+                      <div className="space-y-0.5">
+                        <label className="text-neutral-400 font-semibold block text-[11px]">출강 교육 명칭 (Title) *</label>
                         <input
                           type="text"
                           placeholder="예) 인공지능 기반 마케팅 혁신 실전 특강"
                           value={newLecTitle}
                           onChange={(e) => setNewLecTitle(e.target.value)}
                           required
-                          className="w-full bg-neutral-950 border border-neutral-800 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-[#D4AF37] text-xs"
+                          className="w-full bg-neutral-950 border border-neutral-800 rounded-lg px-2.5 py-1.5 text-white focus:outline-none focus:border-[#D4AF37] text-xs"
                         />
                       </div>
 
                       <div className="grid grid-cols-2 gap-2">
-                        <div className="space-y-1">
-                          <label className="text-neutral-400 font-semibold block">의뢰 기업명 *</label>
+                        <div className="space-y-0.5">
+                          <label className="text-neutral-400 font-semibold block text-[11px]">의뢰 기업명 *</label>
                           <input
                             type="text"
                             placeholder="예) 현대자동차 마케팅부"
                             value={newLecCompany}
                             onChange={(e) => setNewLecCompany(e.target.value)}
                             required
-                            className="w-full bg-neutral-950 border border-neutral-800 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-[#D4AF37] text-xs"
+                            className="w-full bg-neutral-950 border border-neutral-800 rounded-lg px-2.5 py-1.5 text-white focus:outline-none focus:border-[#D4AF37] text-xs"
                           />
                         </div>
-                        <div className="space-y-1">
-                          <label className="text-neutral-400 font-semibold block">지정 협력사 (선택)</label>
+                        <div className="space-y-0.5">
+                          <label className="text-neutral-400 font-semibold block text-[11px]">지정 협력사 (선택)</label>
                           <input
                             type="text"
                             placeholder="예) 파트너사명 기입"
                             value={newLecPartner}
                             onChange={(e) => setNewLecPartner(e.target.value)}
-                            className="w-full bg-neutral-950 border border-neutral-800 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-[#D4AF37] text-xs"
+                            className="w-full bg-neutral-950 border border-neutral-800 rounded-lg px-2.5 py-1.5 text-white focus:outline-none focus:border-[#D4AF37] text-xs"
                           />
                         </div>
                       </div>
 
-                      <div className="space-y-1">
-                        <label className="text-neutral-400 font-semibold block">교육 내용 및 요구 사양 개요 *</label>
+                      <div className="space-y-0.5">
+                        <label className="text-neutral-400 font-semibold block text-[11px]">교육 내용 및 요구 사양 개요 *</label>
                         <textarea
                           placeholder="사내 마케터 대상으로 프롬프트 엔지니어링 및 자동화 교안을 기반으로 특강 진행..."
                           value={newLecDesc}
                           onChange={(e) => setNewLecDesc(e.target.value)}
                           required
-                          rows={3}
-                          className="w-full bg-neutral-950 border border-neutral-800 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-[#D4AF37] text-xs leading-normal"
+                          rows={2}
+                          className="w-full bg-neutral-950 border border-neutral-800 rounded-lg px-2.5 py-1.5 text-white focus:outline-none focus:border-[#D4AF37] text-xs leading-normal resize-none"
                         />
                       </div>
 
-                      <div className="space-y-1">
-                        <label className="text-neutral-400 font-semibold block">출강 지역 / 교육장 위치</label>
+                      <div className="space-y-0.5">
+                        <label className="text-neutral-400 font-semibold block text-[11px]">출강 지역 / 교육장 위치</label>
                         <input
                           type="text"
                           placeholder="예) 경기도 화성시 남양읍 현대연구소"
                           value={newLecLocation}
                           onChange={(e) => setNewLecLocation(e.target.value)}
-                          className="w-full bg-neutral-950 border border-neutral-800 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-[#D4AF37] text-xs"
+                          className="w-full bg-neutral-950 border border-neutral-800 rounded-lg px-2.5 py-1.5 text-white focus:outline-none focus:border-[#D4AF37] text-xs"
                         />
                       </div>
 
                       <div className="grid grid-cols-2 gap-2">
-                        <div className="space-y-1">
-                          <label className="text-neutral-400 font-semibold block">현장 담당자 성함</label>
+                        <div className="space-y-0.5">
+                          <label className="text-neutral-400 font-semibold block text-[11px]">현장 담당자 성함</label>
                           <input
                             type="text"
                             placeholder="예) 김성진"
                             value={newLecManagerName}
                             onChange={(e) => setNewLecManagerName(e.target.value)}
-                            className="w-full bg-neutral-950 border border-neutral-800 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-[#D4AF37] text-xs"
+                            className="w-full bg-neutral-950 border border-neutral-800 rounded-lg px-2.5 py-1.5 text-white focus:outline-none focus:border-[#D4AF37] text-xs"
                           />
                         </div>
-                        <div className="space-y-1">
-                          <label className="text-neutral-400 font-semibold block">현장 담당자 연락처</label>
+                        <div className="space-y-0.5">
+                          <label className="text-neutral-400 font-semibold block text-[11px]">현장 담당자 연락처</label>
                           <input
                             type="tel"
                             placeholder="예) 010-5259-7458"
                             value={newLecManagerPhone}
                             onChange={(e) => setNewLecManagerPhone(e.target.value)}
-                            className="w-full bg-neutral-950 border border-neutral-800 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-[#D4AF37] text-xs"
+                            className="w-full bg-neutral-950 border border-neutral-800 rounded-lg px-2.5 py-1.5 text-white focus:outline-none focus:border-[#D4AF37] text-xs"
                           />
                         </div>
                       </div>
 
                       {/* 📅 & ⏰ Smart Date & Time Selector Container */}
-                      <div className="space-y-4 p-4 bg-neutral-950/80 rounded-2xl border border-neutral-800 shadow-xl">
+                      <div className="space-y-2 p-2.5 bg-neutral-950/80 rounded-xl border border-neutral-800 shadow-md">
                         {/* Header */}
-                        <div className="flex items-center justify-between border-b border-neutral-850 pb-2.5">
-                          <div className="flex items-center gap-2">
-                            <div className="p-1.5 rounded-lg bg-amber-500/10 border border-amber-500/20 text-amber-400">
-                              <Calendar className="w-4 h-4" />
+                        <div className="flex items-center justify-between border-b border-neutral-850 pb-1.5">
+                          <div className="flex items-center gap-1.5">
+                            <div className="p-1 rounded bg-amber-500/10 border border-amber-500/20 text-amber-400">
+                              <Calendar className="w-3.5 h-3.5" />
                             </div>
                             <div>
-                              <span className="text-xs font-black text-white block">출강 일자 & 시간 스마트 설정</span>
-                              <span className="text-[9px] text-neutral-400 font-semibold block">달력과 시계를 활용해 편하게 일정을 지정하세요</span>
+                              <span className="text-[11px] font-black text-white block">출강 일자 & 시간 스마트 설정</span>
                             </div>
                           </div>
-                          <span className="text-[9px] text-amber-300 font-bold bg-amber-500/10 px-2 py-0.5 rounded-full border border-amber-500/20">원클릭 자동 산출</span>
+                          <span className="text-[8.5px] text-amber-300 font-bold bg-amber-500/10 px-1.5 py-0.5 rounded border border-amber-500/20">원클릭 자동 산출</span>
                         </div>
 
                         {/* 1. Date Picker */}
-                        <div className="space-y-2">
+                        <div className="space-y-1">
                           <div className="flex items-center justify-between">
-                            <label className="text-neutral-300 font-bold flex items-center gap-1.5 text-xs">
+                            <label className="text-neutral-300 font-bold flex items-center gap-1 text-[11px]">
                               <span>📅 출강 일자 지정 *</span>
                             </label>
                             {newLecDate && (
-                              <span className="text-[10px] text-amber-300 font-black bg-amber-500/10 border border-amber-500/20 px-2.5 py-0.5 rounded-md shadow-sm">
+                              <span className="text-[9.5px] text-amber-300 font-black bg-amber-500/10 border border-amber-500/20 px-2 py-0.5 rounded shadow-sm">
                                 {formatKoreanDateWithDay(newLecDate)}
                               </span>
                             )}
@@ -4431,100 +4444,100 @@ export default function App() {
                               onChange={(e) => setNewLecDate(e.target.value)}
                               required
                               style={{ colorScheme: 'dark' }}
-                              className="w-full bg-neutral-900 border border-neutral-750 hover:border-[#D4AF37] rounded-xl px-3.5 py-2 text-white focus:outline-none focus:border-[#D4AF37] text-xs font-black cursor-pointer transition-colors shadow-sm"
+                              className="w-full bg-neutral-900 border border-neutral-750 hover:border-[#D4AF37] rounded-lg px-2.5 py-1.5 text-white focus:outline-none focus:border-[#D4AF37] text-xs font-black cursor-pointer transition-colors shadow-sm"
                             />
                           </div>
                         </div>
 
                         {/* 2. Time & Duration Clock Box */}
-                        <div className="space-y-2 pt-2.5 border-t border-neutral-850">
+                        <div className="space-y-1.5 pt-1.5 border-t border-neutral-850">
                           <div className="flex items-center justify-between">
-                            <label className="text-neutral-300 font-bold flex items-center gap-1.5 text-xs">
-                              <Clock className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+                            <label className="text-neutral-300 font-bold flex items-center gap-1 text-[11px]">
+                              <Clock className="w-3 h-3 text-emerald-400 shrink-0" />
                               <span>강의 시간 (시작 ~ 종료) *</span>
                             </label>
-                            <span className="text-[10px] text-emerald-400 font-black bg-emerald-500/10 border border-emerald-500/20 px-2.5 py-0.5 rounded-md shadow-sm">
+                            <span className="text-[9.5px] text-emerald-400 font-black bg-emerald-500/10 border border-emerald-500/20 px-2 py-0.5 rounded shadow-sm">
                               ⏱️ 총 {newLecHoursInt}시간 {newLecMinsInt > 0 ? `${newLecMinsInt}분` : ''} ({newLecHours}시간)
                             </span>
                           </div>
 
                           <div className="flex items-center gap-2">
-                            <div className="flex-1 space-y-1">
-                              <span className="text-[9px] text-neutral-400 font-bold block text-center">시작 시간</span>
+                            <div className="flex-1 space-y-0.5">
+                              <span className="text-[8.5px] text-neutral-400 font-bold block text-center">시작 시간</span>
                               <input
                                 type="time"
                                 value={newLecStartTime}
                                 onChange={(e) => setNewLecStartTime(e.target.value)}
                                 style={{ colorScheme: 'dark' }}
-                                className="w-full bg-neutral-900 border border-neutral-750 hover:border-emerald-500/50 rounded-xl px-2 py-2 text-white focus:outline-none focus:border-emerald-400 text-xs font-black text-center cursor-pointer transition-colors"
+                                className="w-full bg-neutral-900 border border-neutral-750 hover:border-emerald-500/50 rounded-lg px-2 py-1 text-white focus:outline-none focus:border-emerald-400 text-xs font-black text-center cursor-pointer transition-colors"
                               />
                             </div>
-                            <span className="text-neutral-500 font-black shrink-0 mt-4">~</span>
-                            <div className="flex-1 space-y-1">
-                              <span className="text-[9px] text-neutral-400 font-bold block text-center">종료 시간</span>
+                            <span className="text-neutral-500 font-black shrink-0 mt-3 text-xs">~</span>
+                            <div className="flex-1 space-y-0.5">
+                              <span className="text-[8.5px] text-neutral-400 font-bold block text-center">종료 시간</span>
                               <input
                                 type="time"
                                 value={newLecEndTime}
                                 onChange={(e) => setNewLecEndTime(e.target.value)}
                                 style={{ colorScheme: 'dark' }}
-                                className="w-full bg-neutral-900 border border-neutral-750 hover:border-emerald-500/50 rounded-xl px-2 py-2 text-white focus:outline-none focus:border-emerald-400 text-xs font-black text-center cursor-pointer transition-colors"
+                                className="w-full bg-neutral-900 border border-neutral-750 hover:border-emerald-500/50 rounded-lg px-2 py-1 text-white focus:outline-none focus:border-emerald-400 text-xs font-black text-center cursor-pointer transition-colors"
                               />
                             </div>
                           </div>
 
                           {/* Quick Duration Presets (1시간, 1시간 30분, 2시간) */}
-                          <div className="space-y-1.5 pt-1.5">
-                            <span className="text-[9.5px] text-neutral-400 font-bold block">⏱️ 강의 시간 옵션 원클릭 선택</span>
-                            <div className="grid grid-cols-3 gap-2">
+                          <div className="space-y-1 pt-1">
+                            <span className="text-[9px] text-neutral-400 font-bold block">⏱️ 강의 시간 옵션 원클릭 선택</span>
+                            <div className="grid grid-cols-3 gap-1.5">
                               <button
                                 type="button"
                                 onClick={() => applyDurationPreset(1, 0)}
-                                className={`p-2 rounded-xl border text-center transition-all cursor-pointer ${
+                                className={`py-1 px-1.5 rounded-lg border text-center transition-all cursor-pointer ${
                                   newLecHoursInt === 1 && newLecMinsInt === 0
-                                    ? 'bg-emerald-500/20 border-emerald-500 text-emerald-300 font-black shadow-md ring-1 ring-emerald-500/30'
+                                    ? 'bg-emerald-500/20 border-emerald-500 text-emerald-300 font-black shadow-sm ring-1 ring-emerald-500/30'
                                     : 'bg-neutral-900 border-neutral-800 text-neutral-300 hover:border-emerald-500/40 hover:text-emerald-300 font-semibold'
                                 }`}
                               >
-                                <div className="text-[11px] font-bold">1시간</div>
-                                <div className="text-[8.5px] text-neutral-400 font-normal">단기 특강</div>
+                                <div className="text-[10.5px] font-bold">1시간</div>
+                                <div className="text-[8px] text-neutral-400 font-normal">단기 특강</div>
                               </button>
 
                               <button
                                 type="button"
                                 onClick={() => applyDurationPreset(1, 30)}
-                                className={`p-2 rounded-xl border text-center transition-all cursor-pointer ${
+                                className={`py-1 px-1.5 rounded-lg border text-center transition-all cursor-pointer ${
                                   newLecHoursInt === 1 && newLecMinsInt === 30
-                                    ? 'bg-emerald-500/20 border-emerald-500 text-emerald-300 font-black shadow-md ring-1 ring-emerald-500/30'
+                                    ? 'bg-emerald-500/20 border-emerald-500 text-emerald-300 font-black shadow-sm ring-1 ring-emerald-500/30'
                                     : 'bg-neutral-900 border-neutral-800 text-neutral-300 hover:border-emerald-500/40 hover:text-emerald-300 font-semibold'
                                 }`}
                               >
-                                <div className="text-[11px] font-bold">1시간 30분</div>
-                                <div className="text-[8.5px] text-neutral-400 font-normal">표준 세션</div>
+                                <div className="text-[10.5px] font-bold">1시간 30분</div>
+                                <div className="text-[8px] text-neutral-400 font-normal">표준 세션</div>
                               </button>
 
                               <button
                                 type="button"
                                 onClick={() => applyDurationPreset(2, 0)}
-                                className={`p-2 rounded-xl border text-center transition-all cursor-pointer ${
+                                className={`py-1 px-1.5 rounded-lg border text-center transition-all cursor-pointer ${
                                   newLecHoursInt === 2 && newLecMinsInt === 0
-                                    ? 'bg-emerald-500/20 border-emerald-500 text-emerald-300 font-black shadow-md ring-1 ring-emerald-500/30'
+                                    ? 'bg-emerald-500/20 border-emerald-500 text-emerald-300 font-black shadow-sm ring-1 ring-emerald-500/30'
                                     : 'bg-neutral-900 border-neutral-800 text-neutral-300 hover:border-emerald-500/40 hover:text-emerald-300 font-semibold'
                                 }`}
                               >
-                                <div className="text-[11px] font-bold">2시간</div>
-                                <div className="text-[8.5px] text-neutral-400 font-normal">심화 워크숍</div>
+                                <div className="text-[10.5px] font-bold">2시간</div>
+                                <div className="text-[8px] text-neutral-400 font-normal">심화 워크숍</div>
                               </button>
                             </div>
                           </div>
                         </div>
 
                         {/* Tier Cut Requirement */}
-                        <div className="pt-2 border-t border-neutral-850 space-y-1.5">
-                          <label className="text-neutral-400 font-semibold block text-xs">요구 강사 등급컷 *</label>
+                        <div className="pt-1.5 border-t border-neutral-850 space-y-0.5">
+                          <label className="text-neutral-400 font-semibold block text-[11px]">요구 강사 등급컷 *</label>
                           <select
                             value={newLecTier}
                             onChange={(e) => setNewLecTier(e.target.value as any)}
-                            className="w-full bg-[#09090b] border border-neutral-800 rounded-xl px-3 py-2 text-white focus:outline-none focus:border-[#D4AF37] text-xs cursor-pointer font-medium"
+                            className="w-full bg-[#09090b] border border-neutral-800 rounded-lg px-2.5 py-1 text-white focus:outline-none focus:border-[#D4AF37] text-xs cursor-pointer font-medium"
                           >
                             <option value="Prestige Member">Prestige Member 이상</option>
                             <option value="Prestige Associate">Prestige Associate 이상</option>
@@ -4537,10 +4550,10 @@ export default function App() {
                       </div>
 
                       <div className="grid grid-cols-3 gap-2">
-                        <div className="space-y-1">
-                          <label className="text-neutral-400 font-semibold block text-[10px]">강의 시간 (자동 입력)</label>
+                        <div className="space-y-0.5">
+                          <label className="text-neutral-400 font-semibold block text-[9.5px]">강의 시간 (자동 입력)</label>
                           <div className="grid grid-cols-2 gap-1">
-                            <div className="flex items-center bg-neutral-950 border border-neutral-800 rounded-lg px-1.5 py-1.5 focus-within:border-[#D4AF37]">
+                            <div className="flex items-center bg-neutral-950 border border-neutral-800 rounded-lg px-1 py-1 focus-within:border-[#D4AF37]">
                               <input
                                 type="number"
                                 min={0}
@@ -4548,9 +4561,9 @@ export default function App() {
                                 onChange={(e) => handleHoursMinsChange(Number(e.target.value), newLecMinsInt)}
                                 className="w-full bg-transparent text-white text-xs font-bold text-center focus:outline-none"
                               />
-                              <span className="text-[9px] text-neutral-400 font-bold shrink-0 pr-0.5">시</span>
+                              <span className="text-[8.5px] text-neutral-400 font-bold shrink-0 pr-0.5">시</span>
                             </div>
-                            <div className="flex items-center bg-neutral-950 border border-neutral-800 rounded-lg px-1.5 py-1.5 focus-within:border-[#D4AF37]">
+                            <div className="flex items-center bg-neutral-950 border border-neutral-800 rounded-lg px-1 py-1 focus-within:border-[#D4AF37]">
                               <input
                                 type="number"
                                 min={0}
@@ -4560,40 +4573,40 @@ export default function App() {
                                 onChange={(e) => handleHoursMinsChange(newLecHoursInt, Number(e.target.value))}
                                 className="w-full bg-transparent text-white text-xs font-bold text-center focus:outline-none"
                               />
-                              <span className="text-[9px] text-neutral-400 font-bold shrink-0 pr-0.5">분</span>
+                              <span className="text-[8.5px] text-neutral-400 font-bold shrink-0 pr-0.5">분</span>
                             </div>
                           </div>
                         </div>
 
-                        <div className="space-y-1">
-                          <label className="text-neutral-400 font-semibold block">예정 인원</label>
+                        <div className="space-y-0.5">
+                          <label className="text-neutral-400 font-semibold block text-[11px]">예정 인원</label>
                           <input
                             type="number"
                             min={1}
                             value={newLecAttendees}
                             onChange={(e) => setNewLecAttendees(Math.max(1, Number(e.target.value)))}
-                            className="w-full bg-neutral-950 border border-neutral-800 rounded-lg px-2.5 py-2 text-white focus:outline-none focus:border-[#D4AF37] text-xs font-bold text-center"
+                            className="w-full bg-neutral-950 border border-neutral-800 rounded-lg px-2 py-1.5 text-white focus:outline-none focus:border-[#D4AF37] text-xs font-bold text-center"
                           />
                         </div>
 
-                        <div className="space-y-1">
-                          <label className="text-neutral-400 font-semibold block">인당 재료비</label>
+                        <div className="space-y-0.5">
+                          <label className="text-neutral-400 font-semibold block text-[11px]">인당 재료비</label>
                           <input
                             type="number"
                             min={0}
                             value={newLecMaterialCost}
                             onChange={(e) => setNewLecMaterialCost(Math.max(0, Number(e.target.value)))}
-                            className="w-full bg-neutral-950 border border-neutral-800 rounded-lg px-2.5 py-2 text-white focus:outline-none focus:border-[#D4AF37] text-xs font-bold text-center"
+                            className="w-full bg-neutral-950 border border-neutral-800 rounded-lg px-2 py-1.5 text-white focus:outline-none focus:border-[#D4AF37] text-xs font-bold text-center"
                           />
                         </div>
                       </div>
 
-                      <div className="space-y-1">
-                        <label className="text-neutral-400 font-semibold block">지식 저작권 과정 연계 (선택)</label>
+                      <div className="space-y-0.5">
+                        <label className="text-neutral-400 font-semibold block text-[11px]">지식 저작권 과정 연계 (선택)</label>
                         <select
                           value={newLecProgramId}
                           onChange={(e) => setNewLecProgramId(e.target.value)}
-                          className="w-full bg-neutral-950 border border-neutral-800 rounded-lg px-2.5 py-2 text-white focus:outline-none focus:border-[#D4AF37] text-xs cursor-pointer"
+                          className="w-full bg-neutral-950 border border-neutral-800 rounded-lg px-2.5 py-1.5 text-white focus:outline-none focus:border-[#D4AF37] text-xs cursor-pointer"
                         >
                           <option value="">과정 선택 안함 (로열티 없음)</option>
                           {programs.filter(p => p.isApproved).map(p => (
@@ -4602,20 +4615,20 @@ export default function App() {
                         </select>
                       </div>
 
-                      <div className="space-y-1">
-                        <label className="text-neutral-400 font-semibold block">만족도 조사 링크 (선택)</label>
+                      <div className="space-y-0.5">
+                        <label className="text-neutral-400 font-semibold block text-[11px]">만족도 조사 링크 (선택)</label>
                         <input
                           type="url"
                           placeholder="예) https://forms.gle/abcdef123"
                           value={newLecSurveyUrl}
                           onChange={(e) => setNewLecSurveyUrl(e.target.value)}
-                          className="w-full bg-neutral-950 border border-neutral-800 rounded-lg px-2.5 py-2 text-white focus:outline-none focus:border-[#D4AF37] text-xs font-medium"
+                          className="w-full bg-neutral-950 border border-neutral-800 rounded-lg px-2.5 py-1.5 text-white focus:outline-none focus:border-[#D4AF37] text-xs font-medium"
                         />
                       </div>
 
                       {/* Real-time Budget Calculation Live Preview Block */}
-                      <div className="p-3.5 rounded-xl bg-neutral-950 border border-neutral-800/80 space-y-1.5 font-mono text-[10px]">
-                        <div className="text-amber-500 font-bold border-b border-neutral-900 pb-1 flex justify-between">
+                      <div className="p-2 rounded-lg bg-neutral-950 border border-neutral-800/80 space-y-0.5 font-mono text-[9.5px]">
+                        <div className="text-amber-500 font-bold border-b border-neutral-900 pb-0.5 flex justify-between">
                           <span>💰 실시간 강사료 예산 검산</span>
                           <span>100% 자동 산정</span>
                         </div>
@@ -4633,7 +4646,7 @@ export default function App() {
                           <span>• 재료 소요비:</span>
                           <span className="text-neutral-200">{newLecAttendees}명 × {newLecMaterialCost.toLocaleString()}원 = {(newLecAttendees * newLecMaterialCost).toLocaleString()}원</span>
                         </div>
-                        <div className="flex justify-between border-t border-neutral-900 pt-1.5 text-white font-extrabold text-[11px]">
+                        <div className="flex justify-between border-t border-neutral-900 pt-1 text-white font-extrabold text-[10.5px]">
                           <span>계산 총 예산:</span>
                           <span className="text-[#D4AF37]">
                             ₩{(newLecHours * 100000 + (newLecAttendees >= 20 ? newLecHours * 50000 : 0) + newLecAttendees * newLecMaterialCost).toLocaleString()}
@@ -4643,7 +4656,7 @@ export default function App() {
 
                       <button
                         type="submit"
-                        className="w-full py-2.5 rounded-xl bg-[#D4AF37] hover:brightness-110 text-neutral-950 font-black text-center transition-all cursor-pointer"
+                        className="w-full py-2 rounded-xl bg-[#D4AF37] hover:brightness-110 text-neutral-950 font-black text-center transition-all cursor-pointer text-xs"
                       >
                         📢 공식 위임 출강 공고 수탁 발행
                       </button>
@@ -4693,51 +4706,66 @@ export default function App() {
                 </div>
 
                 {/* Right Column: Registered Instructors Management & Partnership Inquiries (2 cols) */}
-                <div className="lg:col-span-2 space-y-8" id="admin-management-lists">
+                <div className="lg:col-span-2 space-y-4" id="admin-management-lists">
                   
                   {/* 👑 KPCIA Lecture Assignment & Settlement Control Room */}
-                  <div className="p-6 rounded-2xl bg-[#0e0e10] border border-neutral-800 space-y-4">
-                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-neutral-850 pb-3">
-                      <h3 className="text-sm font-black text-white flex items-center gap-1.5">
+                  <div className="p-3.5 rounded-xl bg-[#0e0e10] border border-neutral-800 space-y-2.5">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-neutral-850 pb-2">
+                      <h3 className="text-xs font-black text-white flex items-center gap-1.5">
                         <span className="text-[#D4AF37]">👑</span> KPCIA 출강 수탁 배정 및 정산 통제실 ({lectures.length}건)
                       </h3>
                       <div className="flex items-center gap-2">
                         <button
                           type="button"
                           onClick={handleResetLectureData}
-                          className="px-2.5 py-1 text-[9px] text-red-400 hover:text-red-300 font-bold rounded-lg bg-red-950/30 hover:bg-red-900/40 border border-red-900/30 cursor-pointer transition-all duration-200"
+                          className="px-2 py-0.5 text-[8.5px] text-red-400 hover:text-red-300 font-bold rounded bg-red-950/30 hover:bg-red-900/40 border border-red-900/30 cursor-pointer transition-all duration-200"
                           title="출강 매칭 공고 데이터를 초기 상태로 복원합니다."
                         >
                           🔄 출강 데이터 초기화
                         </button>
-                        <span className="text-[10px] text-amber-500 font-bold px-2 py-0.5 rounded bg-amber-500/10 border border-amber-500/20 select-none shrink-0 self-start sm:self-auto">마스터 전용 관제실</span>
+                        <span className="text-[9px] text-amber-500 font-bold px-1.5 py-0.5 rounded bg-amber-500/10 border border-amber-500/20 select-none shrink-0 self-start sm:self-auto">마스터 전용 관제실</span>
                       </div>
                     </div>
 
                     {/* Filter & Sorting Controls */}
-                    <div className="grid grid-cols-1 md:grid-cols-12 gap-3 bg-neutral-950 p-3 rounded-xl border border-neutral-850">
+                    <div className="grid grid-cols-1 md:grid-cols-12 gap-2 bg-neutral-950 p-2 rounded-xl border border-neutral-850">
                       {/* Search */}
-                      <div className="md:col-span-5 relative">
-                        <Search className="w-3.5 h-3.5 text-neutral-500 absolute left-2.5 top-2.5" />
+                      <div className="md:col-span-4 relative">
+                        <Search className="w-3.5 h-3.5 text-neutral-500 absolute left-2 top-2" />
                         <input
                           type="text"
                           placeholder="강의명, 의뢰처, 협력사명, 지역 검색..."
                           value={controlRoomSearch}
                           onChange={(e) => { setControlRoomSearch(e.target.value); setControlRoomPage(1); }}
-                          className="w-full bg-neutral-900 border border-neutral-800 rounded-lg pl-8 pr-2.5 py-1.5 text-white text-[11px] focus:outline-none focus:border-[#D4AF37]"
+                          className="w-full bg-neutral-900 border border-neutral-800 rounded-lg pl-7 pr-2 py-1 text-white text-[10.5px] focus:outline-none focus:border-[#D4AF37]"
                         />
                       </div>
                       
                       {/* Sort */}
-                      <div className="md:col-span-3">
+                      <div className="md:col-span-2">
                         <select
                           value={controlRoomSort}
                           onChange={(e) => { setControlRoomSort(e.target.value); setControlRoomPage(1); }}
-                          className="w-full bg-neutral-900 border border-neutral-800 rounded-lg px-2.5 py-1.5 text-white text-[11px] focus:outline-none focus:border-[#D4AF37] cursor-pointer font-bold"
+                          className="w-full bg-neutral-900 border border-neutral-800 rounded-lg px-1.5 py-1 text-white text-[10.5px] focus:outline-none focus:border-[#D4AF37] cursor-pointer font-bold"
                         >
                           <option value="recent">최근 등록순</option>
                           <option value="date">출강 일정순</option>
                           <option value="budget">총 예산 높은순</option>
+                        </select>
+                      </div>
+
+                      {/* Items Per Page */}
+                      <div className="md:col-span-2">
+                        <select
+                          value={controlRoomItemsPerPage}
+                          onChange={(e) => { setControlRoomItemsPerPage(Number(e.target.value)); setControlRoomPage(1); }}
+                          className="w-full bg-neutral-900 border border-neutral-800 rounded-lg px-1.5 py-1 text-white text-[10.5px] focus:outline-none focus:border-[#D4AF37] cursor-pointer font-bold"
+                          title="한 페이지에 표시할 개수 선택"
+                        >
+                          <option value={1}>페이지당 1개씩 (한화면)</option>
+                          <option value={2}>페이지당 2개씩 (추천)</option>
+                          <option value={3}>페이지당 3개씩</option>
+                          <option value={5}>페이지당 5개씩</option>
                         </select>
                       </div>
 
@@ -4746,7 +4774,7 @@ export default function App() {
                         <button
                           type="button"
                           onClick={() => { setControlRoomStatus('all'); setControlRoomPage(1); }}
-                          className={`flex-1 text-center py-1 text-[10px] font-bold rounded transition-all cursor-pointer ${
+                          className={`flex-1 text-center py-0.5 text-[9.5px] font-bold rounded transition-all cursor-pointer ${
                             controlRoomStatus === 'all' ? 'bg-neutral-850 text-white' : 'text-neutral-500 hover:text-neutral-300'
                           }`}
                         >
@@ -4755,7 +4783,7 @@ export default function App() {
                         <button
                           type="button"
                           onClick={() => { setControlRoomStatus('open'); setControlRoomPage(1); }}
-                          className={`flex-1 text-center py-1 text-[10px] font-bold rounded transition-all cursor-pointer ${
+                          className={`flex-1 text-center py-0.5 text-[9.5px] font-bold rounded transition-all cursor-pointer ${
                             controlRoomStatus === 'open' ? 'bg-amber-500/10 text-amber-500 border border-amber-500/10' : 'text-neutral-500 hover:text-neutral-300'
                           }`}
                         >
@@ -4764,7 +4792,7 @@ export default function App() {
                         <button
                           type="button"
                           onClick={() => { setControlRoomStatus('assigned'); setControlRoomPage(1); }}
-                          className={`flex-1 text-center py-1 text-[10px] font-bold rounded transition-all cursor-pointer ${
+                          className={`flex-1 text-center py-0.5 text-[9.5px] font-bold rounded transition-all cursor-pointer ${
                             controlRoomStatus === 'assigned' ? 'bg-blue-500/10 text-blue-400 border border-blue-500/10' : 'text-neutral-500 hover:text-neutral-300'
                           }`}
                         >
@@ -4773,7 +4801,7 @@ export default function App() {
                         <button
                           type="button"
                           onClick={() => { setControlRoomStatus('completed'); setControlRoomPage(1); }}
-                          className={`flex-1 text-center py-1 text-[10px] font-bold rounded transition-all cursor-pointer ${
+                          className={`flex-1 text-center py-0.5 text-[9.5px] font-bold rounded transition-all cursor-pointer ${
                             controlRoomStatus === 'completed' ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/10' : 'text-neutral-500 hover:text-neutral-300'
                           }`}
                         >
@@ -4782,14 +4810,14 @@ export default function App() {
                       </div>
                     </div>
 
-                    {/* Compact Scrollable List (Prevent vertical bloat) */}
-                    <div className="space-y-3.5 max-h-[620px] overflow-y-auto pr-1.5 custom-scrollbar">
+                    {/* Pagination List without Mouse Scrollbar */}
+                    <div className="space-y-2.5">
                       {(() => {
                         const sorted = controlRoomFilteredAndSortedLectures;
 
                         if (sorted.length === 0) {
                           return (
-                            <div className="text-neutral-500 text-center py-12 text-xs font-semibold bg-neutral-950/20 rounded-xl border border-neutral-850/50">
+                            <div className="text-neutral-500 text-center py-8 text-xs font-semibold bg-neutral-950/20 rounded-xl border border-neutral-850/50">
                               조건에 합치하는 출강 요청 내역이 없습니다.
                             </div>
                           );
@@ -4802,10 +4830,37 @@ export default function App() {
                         const paginatedItems = sorted.slice(startIndex, startIndex + controlRoomItemsPerPage);
 
                         return (
-                          <div className="space-y-3.5">
+                          <div className="space-y-2.5">
+                            {/* Top Page Flip Bar */}
+                            <div className="flex flex-col sm:flex-row items-center justify-between gap-1.5 p-1.5 rounded-lg bg-neutral-950 border border-neutral-850/60 text-[10.5px]">
+                              <span className="text-neutral-400 font-bold text-[9.5px]">
+                                📄 <strong className="text-[#D4AF37]">{currentPage}</strong> / {totalPages} 페이지 (총 {totalItems}건 중 {startIndex + 1}-{Math.min(startIndex + controlRoomItemsPerPage, totalItems)}건)
+                              </span>
+                              <div className="flex items-center gap-1">
+                                <button
+                                  type="button"
+                                  disabled={currentPage === 1}
+                                  onClick={() => setControlRoomPage(prev => Math.max(prev - 1, 1))}
+                                  className="px-2 py-0.5 text-[9px] font-bold rounded bg-neutral-900 hover:bg-neutral-850 border border-neutral-800 text-neutral-300 hover:text-white disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer transition-all"
+                                >
+                                  ◀ 이전 페이지
+                                </button>
+                                <span className="text-neutral-500 text-[9px] font-mono px-1">
+                                  {currentPage} / {totalPages}
+                                </span>
+                                <button
+                                  type="button"
+                                  disabled={currentPage >= totalPages}
+                                  onClick={() => setControlRoomPage(prev => Math.min(prev + 1, totalPages))}
+                                  className="px-2 py-0.5 text-[9px] font-bold rounded bg-neutral-900 hover:bg-neutral-850 border border-neutral-800 text-neutral-300 hover:text-white disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer transition-all"
+                                >
+                                  다음 페이지 ▶
+                                </button>
+                              </div>
+                            </div>
                             {paginatedItems.map(lecture => {
                               return (
-                            <div key={lecture.id} className="p-4 rounded-xl bg-neutral-900/60 border border-neutral-800/80 space-y-3 text-[11px] hover:border-neutral-700/80 transition-colors">
+                            <div key={lecture.id} className="p-2.5 rounded-xl bg-neutral-900/60 border border-neutral-800/80 space-y-2 text-[10.5px] hover:border-neutral-700/80 transition-colors">
                               <div className="flex justify-between items-start gap-3">
                                 <div>
                                   <div className="flex items-center gap-1.5 flex-wrap">
@@ -5077,7 +5132,7 @@ export default function App() {
             )}
 
             {/* Beautiful Completed Lecture Excel Sheet & Download Section */}
-            {adminSubTab === 'lectures' && (
+            {adminSubTab === 'settlements' && (
               <div className="mt-8 animate-in fade-in duration-300">
                 <div className="p-6 rounded-2xl bg-[#0d0d0f] border border-neutral-800 space-y-5" id="master-completed-excel-sheet">
                   <div className="flex flex-col xl:flex-row xl:items-center justify-between gap-4 border-b border-neutral-800 pb-4">
