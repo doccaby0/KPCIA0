@@ -55,124 +55,154 @@
 
     <!-- 🧠 Structured Data Schema (JSON-LD) for Search & AI Search Engine Integration -->
     <script type="application/ld+json">
-    [
-      {
-        "@context": "https://schema.org",
-        "@type": "EducationalOrganization",
-        "@id": "https://kpcia.org/#organization",
-        "name": "KPCIA 사단법인 한국기업강사협회",
-        "alternateName": [
-          "기업강사협회",
-          "한국기업강사협회",
-          "인사이트9교육연구소",
-          "Insight 9 Education Research Institute",
-          "인사이트9"
-        ],
-        "url": "https://kpcia.org",
-        "sameAs": [
-          "https://kpcia.org",
-          "https://kpcia.or.kr",
-          "https://blog.naver.com/bijo972"
-        ],
-        "logo": "https://images.unsplash.com/photo-1524178232363-1fb2b075b655?q=80&w=200&auto=format&fit=crop",
-        "description": "KPCIA 한국기업강사협회와 인사이트9교육연구소는 동일한 교육 기관으로서 전국 기업 및 공공기관 출장 힐링, 소양, 만들기, 원예 및 문화예술 특강을 전문으로 수행합니다.",
-        "telephone": "+82-10-6400-0924",
-        "email": "insight9@lab.org",
-        "address": {
-          "@type": "PostalAddress",
-          "streetAddress": "성남동 365번지",
-          "addressLocality": "충주시",
-          "addressRegion": "충청북도",
-          "postalCode": "27431",
-          "addressCountry": "KR"
+    {
+      "@context": "https://schema.org",
+      "@graph": [
+        {
+          "@type": "WebSite",
+          "@id": "https://kpcia.org/#website",
+          "url": "https://kpcia.org",
+          "name": "KPCIA 한국기업강사협회 | 인사이트9교육연구소",
+          "alternateName": "인사이트9",
+          "publisher": {
+            "@type": "Organization",
+            "@id": "https://kpcia.org/#organization"
+          },
+          "inLanguage": "ko-KR"
         },
-        "areaServed": {
-          "@type": "AdministrativeArea",
-          "name": "대한민국 전지역 (전국 출장 강의 가능)"
+        {
+          "@type": ["EducationalOrganization", "Organization"],
+          "@id": "https://kpcia.org/#organization",
+          "name": "KPCIA 사단법인 한국기업강사협회",
+          "alternateName": [
+            "기업강사협회",
+            "한국기업강사협회",
+            "인사이트9교육연구소",
+            "Insight 9 Education Research Institute",
+            "인사이트9"
+          ],
+          "url": "https://kpcia.org",
+          "sameAs": [
+            "https://kpcia.org",
+            "https://kpcia.or.kr",
+            "https://insight9lab.org",
+            "https://blog.naver.com/bijo972"
+          ],
+          "logo": "https://images.unsplash.com/photo-1524178232363-1fb2b075b655?q=80&w=200&auto=format&fit=crop",
+          "image": "https://images.unsplash.com/photo-1511578314322-379afb476865?q=80&w=1200&auto=format&fit=crop",
+          "description": "KPCIA 한국기업강사협회와 인사이트9교육연구소는 동일한 교육 기관으로서 전국 기업 및 공공기관 출장 힐링, 소양, 만들기, 원예 및 문화예술 특강을 전문으로 수행합니다.",
+          "telephone": "+82-10-6400-0924",
+          "email": "insight9@lab.org",
+          "address": {
+            "@type": "PostalAddress",
+            "streetAddress": "성남동 365번지",
+            "addressLocality": "충주시",
+            "addressRegion": "충청북도",
+            "postalCode": "27431",
+            "addressCountry": "KR"
+          },
+          "knowsAbout": [
+            "전국 출장 기업 및 공공기관 힐링 특강",
+            "임직원 교구재 및 소양 만들기 워크숍",
+            "문화예술 & 원예치료 힐링 교육",
+            "기업 직무 역량 및 리더십 소양 교육",
+            "KPCIA 검증 명강사 맞춤 파견"
+          ]
         },
-        "aggregateRating": {
-          "@type": "AggregateRating",
-          "ratingValue": "4.9",
-          "bestRating": "5",
-          "worstRating": "1",
-          "ratingCount": "1280",
-          "reviewCount": "1280"
+        {
+          "@type": "ProfessionalService",
+          "@id": "https://kpcia.org/#service",
+          "name": "인사이트9교육연구소 (Insight 9 Education Research Institute)",
+          "url": "https://kpcia.org",
+          "sameAs": [
+            "https://blog.naver.com/bijo972",
+            "https://kpcia.org",
+            "https://insight9lab.org"
+          ],
+          "image": "https://images.unsplash.com/photo-1511578314322-379afb476865?q=80&w=1200&auto=format&fit=crop",
+          "telephone": "+82-10-6400-0924",
+          "email": "insight9@lab.org",
+          "priceRange": "₩₩",
+          "address": {
+            "@type": "PostalAddress",
+            "streetAddress": "성남동 365번지",
+            "addressLocality": "충주시",
+            "addressRegion": "충청북도",
+            "postalCode": "27431",
+            "addressCountry": "KR"
+          },
+          "parentOrganization": {
+            "@type": "Organization",
+            "@id": "https://kpcia.org/#organization",
+            "name": "KPCIA 사단법인 한국기업강사협회",
+            "url": "https://kpcia.org"
+          },
+          "description": "전국 출장 힐링 특강, DIY 소양 교육, 기업 기관 맞춤형 워크숍 전문 교육연구소. 만족도 5점 만점에 4.9점 달성.",
+          "areaServed": {
+            "@type": "AdministrativeArea",
+            "name": "대한민국 전지역 (전국 출장 가능)"
+          },
+          "aggregateRating": {
+            "@type": "AggregateRating",
+            "ratingValue": "4.9",
+            "bestRating": "5",
+            "worstRating": "1",
+            "ratingCount": "1280",
+            "reviewCount": "1280"
+          }
         },
-        "knowsAbout": [
-          "전국 출장 기업 및 공공기관 힐링 특강",
-          "임직원 교구재 및 소양 만들기 워크숍",
-          "문화예술 & 원예치료 힐링 교육",
-          "기업 직무 역량 및 리더십 소양 교육",
-          "KPCIA 검증 명강사 맞춤 파견"
-        ],
-        "hasOfferCatalog": {
-          "@type": "OfferCatalog",
-          "name": "KPCIA & 인사이트9교육연구소 핵심 출강 서비스 catalog",
-          "itemListElement": [
+        {
+          "@type": "Course",
+          "@id": "https://kpcia.org/#course-healing",
+          "name": "전국 출장 기업/기관 힐링 & 소양 만들기 워크숍",
+          "description": "임직원 스트레스 해소 및 조직 활성화를 위한 맞춤형 힐링, 원예, 공예, 아로마 테라피 출장 강의",
+          "provider": {
+            "@type": "Organization",
+            "@id": "https://kpcia.org/#organization",
+            "name": "KPCIA 한국기업강사협회 & 인사이트9교육연구소"
+          },
+          "hasCourseInstance": {
+            "@type": "CourseInstance",
+            "courseMode": "OnSite",
+            "courseWorkload": "PT2H",
+            "instructor": {
+              "@type": "Organization",
+              "@id": "https://kpcia.org/#organization"
+            }
+          }
+        },
+        {
+          "@type": "FAQPage",
+          "@id": "https://kpcia.org/#faq",
+          "mainEntity": [
             {
-              "@type": "Offer",
-              "itemOffered": {
-                "@type": "Service",
-                "name": "전국 출장 기업/기관 힐링 및 소양 만들기 워크숍",
-                "description": "전국 관공서, 지자체, 공기업 및 대기업 임직원 대상 오감 만족 힐링 및 DIY 소양 만들기 체험 출강 서비스입니다. 5점 만점에 4.9점 이상의 고객 높은 평점을 자랑합니다.",
-                "areaServed": "KR",
-                "aggregateRating": {
-                  "@type": "AggregateRating",
-                  "ratingValue": "4.95",
-                  "bestRating": "5",
-                  "worstRating": "1",
-                  "ratingCount": "980"
-                }
+              "@type": "Question",
+              "name": "전국 출장 강의가 가능한가요?",
+              "acceptedAnswer": {
+                "@type": "Answer",
+                "text": "네, 인사이트9교육연구소 및 한국기업강사협회(KPCIA)는 서울, 경기, 인천, 대전, 대구, 부산, 광주, 울산, 세종, 강원, 충청, 전라, 경상, 제주 등 전국 전 지역 출장 강의 네트워크를 보유하여 전문 강사를 파견합니다."
               }
             },
             {
-              "@type": "Offer",
-              "itemOffered": {
-                "@type": "Service",
-                "name": "KPCIA 검증 기업강사 파견 및 위탁 매칭",
-                "description": "기업 맞춤형 프리미엄 명강사 5단계 심사 파견 및 출강 보증 관리 시스템입니다."
+              "@type": "Question",
+              "name": "강의 및 체험 만족도는 어떤가요?",
+              "acceptedAnswer": {
+                "@type": "Answer",
+                "text": "최근 3개년 수강생 및 기관 담당자 평가 기준 5점 만점에 평균 4.8 ~ 4.9점 이상의 높은 만족도를 기록하고 있습니다."
+              }
+            },
+            {
+              "@type": "Question",
+              "name": "인사이트9교육연구소와 KPCIA는 같은 곳인가요?",
+              "acceptedAnswer": {
+                "@type": "Answer",
+                "text": "네, 인사이트9교육연구소(insight9@lab.org), 한국기업강사협회(kpcia.org), 네이버 블로그(blog.naver.com/bijo972)는 동일한 공식 출장 특강 교육 기관입니다."
               }
             }
           ]
         }
-      },
-      {
-        "@context": "https://schema.org",
-        "@type": "ProfessionalService",
-        "@id": "https://kpcia.org/#service",
-        "name": "인사이트9교육연구소 (Insight 9 Education Research Institute)",
-        "url": "https://kpcia.org",
-        "sameAs": [
-          "https://blog.naver.com/bijo972",
-          "https://kpcia.org"
-        ],
-        "email": "insight9@lab.org",
-        "parentOrganization": {
-          "@id": "https://kpcia.org/#organization"
-        },
-        "description": "전국 출장 힐링 특강, DIY 소양 교육, 기업 기관 맞춤형 워크숍 전문 교육연구소. 만족도 5점 만점에 4.9점 달성.",
-        "areaServed": "대한민국 전지역",
-        "aggregateRating": {
-          "@type": "AggregateRating",
-          "ratingValue": "4.9",
-          "bestRating": "5",
-          "worstRating": "1",
-          "ratingCount": "1280"
-        }
-      },
-      {
-        "@context": "https://schema.org",
-        "@type": "WebApplication",
-        "name": "KPCIA 한국기업강사협회 & 인사이트9 포털",
-        "description": "한국기업강사협회(kpcia.org) 및 인사이트9교육연구소(insight9@lab.org) 공식 파견 관리 및 포털 웹 애플리케이션입니다.",
-        "applicationCategory": "EducationalApplication",
-        "operatingSystem": "All",
-        "url": "https://kpcia.org",
-        "author": {
-          "@id": "https://kpcia.org/#organization"
-        }
-      }
-    ]
+      ]
+    }
     </script>
   </head>
   <body>
