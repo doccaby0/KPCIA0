@@ -620,37 +620,6 @@ export default function App() {
     }
   };
 
-  const setQuickDatePreset = (type: 'today' | 'tomorrow' | 'friday' | 'nextMon' | 'in2weeks' | 'in1month', isEdit = false) => {
-    const now = new Date();
-    let target = new Date();
-    if (type === 'today') {
-      target = now;
-    } else if (type === 'tomorrow') {
-      target.setDate(now.getDate() + 1);
-    } else if (type === 'friday') {
-      const day = now.getDay();
-      const diff = (5 - day + 7) % 7 || 7;
-      target.setDate(now.getDate() + diff);
-    } else if (type === 'nextMon') {
-      const day = now.getDay();
-      const diff = (1 - day + 7) % 7 || 7;
-      target.setDate(now.getDate() + diff);
-    } else if (type === 'in2weeks') {
-      target.setDate(now.getDate() + 14);
-    } else if (type === 'in1month') {
-      target.setMonth(now.getMonth() + 1);
-    }
-    const y = target.getFullYear();
-    const m = String(target.getMonth() + 1).padStart(2, '0');
-    const d = String(target.getDate()).padStart(2, '0');
-    const formatted = `${y}-${m}-${d}`;
-    if (isEdit) {
-      setEditLecDate(formatted);
-    } else {
-      setNewLecDate(formatted);
-    }
-  };
-
   // Authentication: Login
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
